@@ -29,3 +29,9 @@ Thumbs.db
 # lokale database
 /database/*.sqlite
 /database/*.sqlite-journal
+
+# persoonlijke werkwijze, niet van het project
+CLAUDE.local.md
+
+# mockups met echte reviewtekst erin
+/public/mockup-*.html

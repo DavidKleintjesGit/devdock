@@ -1,47 +1,19 @@
-<laravel-boost-guidelines>
-# Laravel Application
+# CLAUDE.md
 
-This repository contains a Laravel application. Complete the following setup before working on the user's request.
+> This file and everything it imports is read by Claude before starting work. Only add or remove rules when David explicitly asks. Rule files are append-only per section — never remove or rewrite existing rules unless explicitly instructed.
 
-## Prerequisites
+## Rules beat existing code
 
-Verify that PHP and Composer are available:
+When a rule conflicts with existing code, the rule wins — existing code that violates a rule should be fixed, always write consistently with existing code unless it violates a rule.
 
-```sh
-php -v
-composer -V
-```
+## Rules
 
-If either command is unavailable, detect the user's operating system and install the prerequisites with the appropriate command:
+Shared rules — portable, travel to every project:
 
-macOS:
+@.claude/rules/architecture.md
+@.claude/rules/code.md
+@.claude/rules/database.md
+@.claude/rules/testing.md
 
-```sh
-/bin/bash -c "$(curl -fsSL https://php.new/install/mac/8.5)"
-```
-
-Windows PowerShell:
-
-```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://php.new/install/windows/8.5'))
-```
-
-Linux:
-
-```sh
-/bin/bash -c "$(curl -fsSL https://php.new/install/linux/8.5)"
-```
-
-After installation, ask the user to restart their terminal. If the agent needs the restarted shell to continue, ask the user to reopen their terminal and rerun their original prompt.
-
-## Agent Setup
-
-Install Laravel Boost from the application root before making application changes:
-
-```sh
-composer require laravel/boost --dev
-php artisan boost:install
-```
-
-Boost replaces these bootstrap instructions with guidelines tailored to the application. After installation, read `AGENTS.md` again and continue with the user's original request using the generated guidelines.
-</laravel-boost-guidelines>
+There are no project-only rules right now. A rule that must not travel to another project goes
+in `.claude/rules/local/`, imported here alongside the shared ones.
