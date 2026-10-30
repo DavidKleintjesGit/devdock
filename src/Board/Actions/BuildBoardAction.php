@@ -17,11 +17,17 @@ use Src\PullRequest\Actions\GetPullRequestsAction;
 use Src\PullRequest\Enums\PullRequestRoleEnum;
 use Src\PullRequest\Objects\PullRequestEntity;
 use Src\PullRequest\Objects\PullRequestEntityCollection;
+use Src\Review\Contracts\ReviewRoundRepositoryContract;
+use Src\Review\Enums\RoundStatusEnum;
+use Src\Review\Objects\ReviewRoundEntity;
 use Src\Session\Actions\GetSessionsAction;
 use Src\Session\Objects\SessionEntity;
 use Src\Session\Objects\SessionEntityCollection;
+use Src\Task\Actions\GetTasksAction;
+use Src\Task\Objects\TaskEntity;
 use Src\Ticket\Actions\GetTicketsAction;
 use Src\Ticket\Objects\TicketEntity;
+use Src\Worktree\Actions\GetWorktreesAction;
 
 /**
  * Every task on the board. A task is what belongs together: a Jira ticket,
@@ -53,12 +59,32 @@ class BuildBoardAction extends Command
 	/** @var array<string, string> */
 	private array $projectNamesByRepository = [];
 
+	/** @var array<string, bool> */
+	private array $waitingWorkByBranch = [];
+
+	/** @var array<string, bool> */
+	private array $deliveredByBranch = [];
+
+	/** @var array<string, ReviewRoundEntity> */
+	private array $roundsByCard = [];
+
+	/** @var array<string, array<string, string>> */
+	private array $pinned = [];
+
+	/** @var Collection<string, TaskEntity> */
+	private Collection $tasksByKey;
+
 	public function handle(TodoRepositoryContract $todoRepository): CardObjectCollection
 	{
 		$projectEntities = collect(GetProjectsAction::execute());
 
 		$this->ticketsByKey = collect(GetTicketsAction::execute())->keyBy('key');
 		$this->projectNamesByRepository = $this->projectNamesByRepository($projectEntities);
+		$this->waitingWorkByBranch = $this->waitingWorkByBranch();
+		$this->deliveredByBranch = $this->deliveredByBranch();
+		$this->roundsByCard = resolve(ReviewRoundRepositoryContract::class)->getLatestPerCard();
+		$this->tasksByKey = collect(GetTasksAction::execute())->keyBy('key');
+		$this->pinned = $this->pinned();
 		$this->sessionEntities = collect(GetSessionsAction::execute())
 			->filter(fn (SessionEntity $sessionEntity) => $sessionEntity->branch !== null)
 			->values();
@@ -86,7 +112,9 @@ class BuildBoardAction extends Command
 	{
 		$pullRequests = collect(GetPullRequestsAction::execute())
 			->map(fn (PullRequestEntity $pullRequestEntity) => [
-				'key' => $pullRequestEntity->boardKey(),
+				'key' => $this->pinned['pull_request'][$pullRequestEntity->repository . '#' . $pullRequestEntity->number]
+					?? $this->pinned['ticket'][(string) $pullRequestEntity->ticketKey()]
+					?? $pullRequestEntity->boardKey(),
 				'pullRequest' => $pullRequestEntity,
 			]);
 
@@ -98,7 +126,8 @@ class BuildBoardAction extends Command
 			->reject(fn (ProjectEntity $projectEntity) => in_array($projectEntity->branch, $branches, true))
 			->reject(fn (ProjectEntity $projectEntity) => $projectEntity->changedFiles === 0 && $projectEntity->ahead === 0)
 			->map(fn (ProjectEntity $projectEntity) => [
-				'key' => $projectEntity->ticketKey()
+				'key' => $this->pinned['branch'][$projectEntity->name . '/' . $projectEntity->branch]
+					?? $projectEntity->ticketKey()
 					?? $this->ticketFromSessions($projectEntity->branch)
 					?? 'branch:' . $projectEntity->name . '/' . $projectEntity->branch,
 				'project' => $projectEntity,
@@ -109,7 +138,10 @@ class BuildBoardAction extends Command
 
 		$tickets = $this->ticketsByKey
 			->reject(fn (TicketEntity $ticketEntity) => $started->contains($ticketEntity->key))
-			->map(fn (TicketEntity $ticketEntity) => ['key' => $ticketEntity->key, 'ticket' => $ticketEntity])
+			->map(fn (TicketEntity $ticketEntity) => [
+				'key' => $this->pinned['ticket'][$ticketEntity->key] ?? $ticketEntity->key,
+				'ticket' => $ticketEntity,
+			])
 			->values();
 
 		$todos = $todoEntities->map(fn (TodoEntity $todoEntity) => [
@@ -133,20 +165,33 @@ class BuildBoardAction extends Command
 
 		$pullRequestEntities = $pieces->pluck('pullRequest')->filter()->values();
 		$projectEntity = $pieces->pluck('project')->filter()->first();
-		$ticketEntity = $this->ticketsByKey->get($key);
-		$branch = $pullRequestEntities->first()?->sourceBranch ?? $projectEntity?->branch;
+		$taskEntity = $this->tasksByKey->get($key);
+		$ticketKey = $taskEntity?->ticketKey()
+			?? ($this->isTicketKey($key) ? $key : null);
+		$ticketEntity = $ticketKey === null ? null : $this->ticketsByKey->get($ticketKey);
+		$branch = $taskEntity?->branch()
+			?? $pullRequestEntities->first()?->sourceBranch
+			?? $projectEntity?->branch;
 		$sessionEntities = $this->sessionsFor($key, $branch);
-		$column = $this->columnFor($pullRequestEntities, $projectEntity);
-		[$note, $tone] = $this->noteFor($column, $pullRequestEntities, $projectEntity, $sessionEntities);
+		$latestRound = $this->roundsByCard[$key] ?? null;
+		$column = $this->columnFor(
+			$pullRequestEntities,
+			$latestRound,
+			$branch !== null || $sessionEntities->isNotEmpty(),
+			$this->isDelivered($branch, $pullRequestEntities),
+		);
+		[$note, $tone] = $this->noteFor($column, $pullRequestEntities, $projectEntity, $sessionEntities, $latestRound);
 
 		return new CardObject(
 			id: $key,
 			column: $column,
 			title: $this->titleFor($pullRequestEntities, $ticketEntity, $sessionEntities, $branch),
-			project: $this->projectNameFor($pullRequestEntities->first()?->repository) ?? $projectEntity?->name,
+			project: $taskEntity?->project()
+				?? $this->projectNameFor($pullRequestEntities->first()?->repository)
+				?? $projectEntity?->name,
 			pullRequests: PullRequestEntityCollection::fromArray($pullRequestEntities->all()),
 			sessions: SessionEntityCollection::fromArray($sessionEntities->all()),
-			ticketKey: $this->isTicketKey($key) ? $key : null,
+			ticketKey: $ticketKey,
 			ticketStatus: $ticketEntity?->status,
 			ticketPriority: $ticketEntity?->priority,
 			ticketUrl: $ticketEntity?->url,
@@ -155,6 +200,7 @@ class BuildBoardAction extends Command
 			changedAt: $pullRequestEntities->first()?->changedAt
 				?? $ticketEntity?->changedAt
 				?? $projectEntity?->scannedAt,
+			description: $ticketEntity?->description,
 			note: $note,
 			tone: $tone,
 			hasNameMismatch: $sessionEntities->contains(
@@ -162,30 +208,65 @@ class BuildBoardAction extends Command
 			),
 			myRole: $this->roleFor($pullRequestEntities, $ticketEntity),
 			isStale: $this->isStale($column, $pullRequestEntities),
+			hasWaitingWork: $this->waitingWorkByBranch[$branch] ?? false,
+			activePullRequest: $this->activePullRequest($taskEntity, $pullRequestEntities),
+			agent: $taskEntity?->activeAgent(),
 		);
+	}
+
+	/**
+	 * The pull request this task works with: the one it was told to use, and
+	 * otherwise the first one that is still open.
+	 *
+	 * @param  Collection<int, PullRequestEntity>  $pullRequestEntities
+	 */
+	private function activePullRequest(?TaskEntity $taskEntity, Collection $pullRequestEntities): ?string
+	{
+		$chosen = $taskEntity?->pullRequest();
+
+		if ($chosen !== null) {
+			return $chosen;
+		}
+
+		$pullRequestEntity = $pullRequestEntities->first(
+			fn (PullRequestEntity $entity) => $entity->isOpen(),
+		) ?? $pullRequestEntities->first();
+
+		return $pullRequestEntity === null
+			? null
+			: $pullRequestEntity->repository . '#' . $pullRequestEntity->number;
 	}
 
 	private function cardFromTodo(TodoEntity $todoEntity): CardObject
 	{
+		// a to-do is a task like any other: it may carry a project, a branch and
+		// an agent of its own as soon as you tie them to it
+		$taskEntity = $this->tasksByKey->get($todoEntity->boardKey());
+		$ticketKey = $taskEntity?->ticketKey();
+
 		return new CardObject(
 			id: $todoEntity->boardKey(),
 			column: $todoEntity->isDone() ? BoardColumnEnum::DONE : BoardColumnEnum::TO_DO,
 			title: $todoEntity->title,
-			project: $todoEntity->project,
+			project: $taskEntity?->project() ?? $todoEntity->project,
 			pullRequests: PullRequestEntityCollection::fromArray([]),
 			sessions: SessionEntityCollection::fromArray([]),
-			ticketKey: null,
-			ticketStatus: null,
-			ticketPriority: null,
-			ticketUrl: null,
-			branch: null,
+			ticketKey: $ticketKey,
+			ticketStatus: $ticketKey === null ? null : $this->ticketsByKey->get($ticketKey)?->status,
+			ticketPriority: $ticketKey === null ? null : $this->ticketsByKey->get($ticketKey)?->priority,
+			ticketUrl: $ticketKey === null ? null : $this->ticketsByKey->get($ticketKey)?->url,
+			branch: $taskEntity?->branch(),
 			changedFiles: null,
 			changedAt: $todoEntity->changedAt,
-			note: $todoEntity->note,
-			tone: $todoEntity->note === null ? null : 'blue',
+			description: $todoEntity->note,
+			note: null,
+			tone: null,
 			hasNameMismatch: false,
 			myRole: PullRequestRoleEnum::AUTHOR->value,
 			isStale: false,
+			hasWaitingWork: false,
+			activePullRequest: $taskEntity?->pullRequest(),
+			agent: $taskEntity?->activeAgent(),
 		);
 	}
 
@@ -196,33 +277,59 @@ class BuildBoardAction extends Command
 	 *
 	 * @param  Collection<int, PullRequestEntity>  $pullRequestEntities
 	 */
-	private function columnFor(Collection $pullRequestEntities, ?ProjectEntity $projectEntity): BoardColumnEnum
-	{
+	/**
+	 * Waar een taak op het bord staat, afgeleid van de weg die hij aflegt en
+	 * niet van de pull request alleen. De eerste commit is het keerpunt: pas
+	 * dan is er iets opgeleverd om over te oordelen.
+	 *
+	 * @param  Collection<int, PullRequestEntity>  $pullRequestEntities
+	 */
+	private function columnFor(
+		Collection $pullRequestEntities,
+		?ReviewRoundEntity $latestRound,
+		bool $isStarted,
+		bool $isDelivered,
+	): BoardColumnEnum {
 		$open = $pullRequestEntities->filter(
 			fn (PullRequestEntity $pullRequestEntity) => $pullRequestEntity->isOpen(),
 		);
 
-		if ($open->contains(fn (PullRequestEntity $pullRequestEntity) => $pullRequestEntity->hasChangesRequested())) {
-			return BoardColumnEnum::CHANGES_REQUESTED;
-		}
-
-		$waiting = $open->contains(
-			fn (PullRequestEntity $pullRequestEntity) => ! $pullRequestEntity->isApproved() || $pullRequestEntity->isDraft,
-		);
-
-		if ($waiting) {
-			return BoardColumnEnum::IN_PROGRESS;
-		}
-
-		if ($open->isNotEmpty()) {
-			return BoardColumnEnum::READY_TO_MERGE;
-		}
-
-		if ($pullRequestEntities->isNotEmpty()) {
+		if ($open->isEmpty() && $pullRequestEntities->isNotEmpty()) {
 			return BoardColumnEnum::DONE;
 		}
 
-		return $projectEntity === null ? BoardColumnEnum::TO_DO : BoardColumnEnum::IN_PROGRESS;
+		if (! $isStarted) {
+			return BoardColumnEnum::TO_DO;
+		}
+
+		if (! $isDelivered) {
+			return BoardColumnEnum::IN_PROGRESS;
+		}
+
+		$changesRequested = $open->contains(
+			fn (PullRequestEntity $pullRequestEntity) => $pullRequestEntity->hasChangesRequested(),
+		);
+
+		// schoon teruggekomen, of een mens die het al goedkeurde: dan wacht het
+		// alleen nog op het mergen zelf
+		$approved = $latestRound?->status === RoundStatusEnum::PASSED
+			|| $open->contains(fn (PullRequestEntity $pullRequestEntity) => $pullRequestEntity->isApproved());
+
+		return $approved && ! $changesRequested
+			? BoardColumnEnum::READY_TO_MERGE
+			: BoardColumnEnum::REVIEW;
+	}
+
+	/**
+	 * Of er werk opgeleverd is: een commit op de branch, of een pull request,
+	 * die er zonder commit niet kan zijn.
+	 *
+	 * @param  Collection<int, PullRequestEntity>  $pullRequestEntities
+	 */
+	private function isDelivered(?string $branch, Collection $pullRequestEntities): bool
+	{
+		return $pullRequestEntities->isNotEmpty()
+			|| ($branch !== null && ($this->deliveredByBranch[$branch] ?? false));
 	}
 
 	/**
@@ -232,11 +339,54 @@ class BuildBoardAction extends Command
 	 * @param  Collection<int, SessionEntity>  $sessionEntities
 	 * @return array{0: ?string, 1: ?string}
 	 */
+	/**
+	 * Waarom een taak in Nakijken staat. Dat kan van alles zijn, en alleen de
+	 * draaiende ronde wacht niet op jou.
+	 *
+	 * @return array{0: ?string, 1: ?string}
+	 */
+	private function reviewNote(?ReviewRoundEntity $latestRound): array
+	{
+		$maxRounds = (int) config('devdock.review.max_rounds');
+
+		if ($latestRound === null || $latestRound->status === RoundStatusEnum::STOPPED) {
+			return [__('Mag naar de lenzen.'), 'amber'];
+		}
+
+		if ($latestRound->isRunning()) {
+			return [__('Lenzen draaien · ronde :number van :max', [
+				'number' => $latestRound->number,
+				'max' => $maxRounds,
+			]), 'teal'];
+		}
+
+		$open = $latestRound->openFindings();
+
+		if ($open === 0) {
+			return [__('Schoon. Akkoord om te committen?'), 'green'];
+		}
+
+		if ($latestRound->number >= $maxRounds) {
+			return [trans_choice(
+				':max rondes op, :count punt open.|:max rondes op, :count punten open.',
+				$open,
+				['max' => $maxRounds, 'count' => $open],
+			), 'red'];
+		}
+
+		return [trans_choice(
+			'De agent werkt :count punt bij.|De agent werkt :count punten bij.',
+			$open,
+			['count' => $open],
+		), 'teal'];
+	}
+
 	private function noteFor(
 		BoardColumnEnum $column,
 		Collection $pullRequestEntities,
 		?ProjectEntity $projectEntity,
 		Collection $sessionEntities,
+		?ReviewRoundEntity $latestRound = null,
 	): array {
 		$changesRequested = $pullRequestEntities->first(
 			fn (PullRequestEntity $pullRequestEntity) => $pullRequestEntity->hasChangesRequested(),
@@ -244,6 +394,10 @@ class BuildBoardAction extends Command
 
 		if ($changesRequested !== null) {
 			return [__(':name vroeg om wijzigingen.', ['name' => $changesRequested->changesRequestedBy]), 'red'];
+		}
+
+		if ($column === BoardColumnEnum::REVIEW) {
+			return $this->reviewNote($latestRound);
 		}
 
 		$activeToday = $sessionEntities->filter(
@@ -352,6 +506,58 @@ class BuildBoardAction extends Command
 		}
 
 		return $this->projectNamesByRepository[$repository] ?? $repository;
+	}
+
+	/**
+	 * What is pinned where, as kind and value to the key of the task that
+	 * claims it. A pin beats anything the board would work out itself.
+	 *
+	 * @return array<string, array<string, string>>
+	 */
+	private function pinned(): array
+	{
+		$pinned = ['ticket' => [], 'branch' => [], 'pull_request' => [], 'project' => []];
+
+		foreach ($this->tasksByKey as $taskEntity) {
+			foreach ($taskEntity->links as $taskLinkEntity) {
+				$pinned[$taskLinkEntity->kind->value][$taskLinkEntity->value] = $taskEntity->key;
+			}
+		}
+
+		return $pinned;
+	}
+
+	/**
+	 * Which branches have a working copy with work standing in it, so a card
+	 * can say so without anyone opening it.
+	 *
+	 * @return array<string, bool>
+	 */
+	/**
+	 * Per branch of er al een commit op staat.
+	 *
+	 * @return array<string, bool>
+	 */
+	private function deliveredByBranch(): array
+	{
+		$delivered = [];
+
+		foreach (GetWorktreesAction::execute() as $worktreeEntity) {
+			$delivered[$worktreeEntity->branch] = $worktreeEntity->hasCommits;
+		}
+
+		return $delivered;
+	}
+
+	private function waitingWorkByBranch(): array
+	{
+		$waiting = [];
+
+		foreach (GetWorktreesAction::execute() as $worktreeEntity) {
+			$waiting[$worktreeEntity->branch] = $worktreeEntity->holdsWork();
+		}
+
+		return $waiting;
 	}
 
 	/**

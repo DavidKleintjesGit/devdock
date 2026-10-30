@@ -1,4 +1,10 @@
-<div @class(['statusbox', 'running' => $running]) @if ($running) wire:poll.2s @endif>
+<div @class(['statusbox', 'running' => $running])
+	@if ($running)
+		wire:poll.2s
+	@elseif ($refreshSeconds > 0)
+		wire:poll.{{ $refreshSeconds }}s="refreshWhenStale"
+	@endif
+>
 	<div class="statusrow">
 		<span class="dot {{ $connected === 4 ? 'green' : 'amber' }}"></span>
 		<span class="k">{{ __('Koppelingen') }}</span>
@@ -15,7 +21,7 @@
 	@else
 		<button class="statusrow" type="button" wire:click="fetchNow" title="{{ __('Nu ophalen') }}">
 			<span class="dot"></span>
-			<span class="k">{{ __('Bijgewerkt') }}</span>
+			<span class="k">{{ $refreshSeconds > 0 ? __('Werkt vanzelf bij') : __('Bijgewerkt') }}</span>
 			<span class="v">{{ $updated ?? __('nooit') }}</span>
 			<span class="slot"><x-icon name="refresh" small/></span>
 		</button>

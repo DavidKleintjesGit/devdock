@@ -54,8 +54,19 @@ class RenderMarkdown
 		};
 	}
 
+	/**
+	 * Code, bold and links inside a line. Escaping comes first, so the markup
+	 * below is the only html that survives.
+	 */
 	private function inline(string $line): string
 	{
-		return (string) preg_replace('/`([^`]+)`/', '<code class="mono">$1</code>', e($line));
+		$patterns = [
+			'/`([^`]+)`/' => '<code class="mono">$1</code>',
+			'/\*\*([^*]+)\*\*/' => '<strong>$1</strong>',
+			'/(?<![*\w])\*([^*\n]+)\*(?![*\w])/' => '<em>$1</em>',
+			'/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/' => '<a href="$2" target="_blank" rel="noopener">$1</a>',
+		];
+
+		return (string) preg_replace(array_keys($patterns), array_values($patterns), e($line));
 	}
 }

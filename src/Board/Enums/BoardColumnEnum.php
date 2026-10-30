@@ -8,7 +8,7 @@ enum BoardColumnEnum: string
 {
 	case TO_DO = 'todo';
 	case IN_PROGRESS = 'busy';
-	case CHANGES_REQUESTED = 'changes';
+	case REVIEW = 'review';
 	case READY_TO_MERGE = 'merge';
 	case DONE = 'done';
 
@@ -17,7 +17,7 @@ enum BoardColumnEnum: string
 		return __(match ($this) {
 			self::TO_DO => 'Te doen',
 			self::IN_PROGRESS => 'Mee bezig',
-			self::CHANGES_REQUESTED => 'Changes requested',
+			self::REVIEW => 'Nakijken',
 			self::READY_TO_MERGE => 'Klaar om te mergen',
 			self::DONE => 'Klaar',
 		});
@@ -26,7 +26,7 @@ enum BoardColumnEnum: string
 	public function tone(): string
 	{
 		return match ($this) {
-			self::CHANGES_REQUESTED => 'red',
+			self::REVIEW => 'amber',
 			self::READY_TO_MERGE => 'green',
 			self::IN_PROGRESS => 'teal',
 			default => 'gray',
@@ -47,7 +47,7 @@ enum BoardColumnEnum: string
 	public function waitsOn(): string
 	{
 		return __(match ($this) {
-			self::TO_DO, self::CHANGES_REQUESTED, self::READY_TO_MERGE => 'Wacht op jou',
+			self::TO_DO, self::REVIEW, self::READY_TO_MERGE => 'Wacht op jou',
 			self::IN_PROGRESS => 'Wacht op een collega',
 			self::DONE => 'Niemand meer',
 		});

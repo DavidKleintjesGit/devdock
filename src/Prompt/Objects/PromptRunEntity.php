@@ -16,10 +16,13 @@ class PromptRunEntity extends ValueObject
 	public function __construct(
 		public readonly PromptRunId $promptRunId,
 		public readonly string $card,
+		public readonly ?int $reviewRoundId,
 		public readonly ?string $project,
 		public readonly ?string $branch,
+		public readonly ?string $directory,
 		public readonly ?string $ticketKey,
 		public readonly ?string $sessionUuid,
+		public readonly bool $claimsSession,
 		public readonly string $prompt,
 		public readonly PromptStatusEnum $status,
 		public readonly ?string $output,

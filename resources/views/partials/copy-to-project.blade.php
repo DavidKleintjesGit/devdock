@@ -29,7 +29,7 @@
 		<div class="mfoot">
 			<span class="note-left">{{ __('Dit kopieert alleen; er wordt nooit iets weggehaald.') }}</span>
 			<button class="btn" type="button" wire:click="cancelCopy">{{ __('Annuleren') }}</button>
-			<button class="btn primary" type="button" wire:click="copy" @disabled($copyTo === '')><x-icon name="copy" small/>{{ __('Overnemen') }}</button>
+			<x-busy-button action="copy" class="btn primary" icon="copy" :busy="__('Overnemen...')" :disabled="$copyTo === ''">{{ __('Overnemen') }}</x-busy-button>
 		</div>
 	</div>
 </div>

@@ -18,6 +18,7 @@ class RuleFileEntity extends ValueObject
 		public readonly RuleFileId $ruleFileId,
 		public readonly string $project,
 		public readonly string $path,
+		public readonly ?string $summary,
 		public readonly RuleGroupEnum $group,
 		public readonly RuleOriginEnum $origin,
 		public readonly int $lines,

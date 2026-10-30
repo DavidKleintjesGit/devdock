@@ -25,6 +25,7 @@ class RuleFileRepository implements RuleFileRepositoryContract
 				'path' => $ruleFileObject->path,
 			],
 			[
+				'summary' => $ruleFileObject->summary,
 				'group' => $ruleFileObject->group->value,
 				'origin' => $ruleFileObject->origin->value,
 				'lines' => $ruleFileObject->lines,
@@ -86,6 +87,7 @@ class RuleFileRepository implements RuleFileRepositoryContract
 			ruleFileId: new RuleFileId(id: $ruleFileEloquent->id),
 			project: (string) $ruleFileEloquent->project,
 			path: (string) $ruleFileEloquent->path,
+			summary: $ruleFileEloquent->summary,
 			group: RuleGroupEnum::from((string) $ruleFileEloquent->group),
 			origin: RuleOriginEnum::from((string) $ruleFileEloquent->origin),
 			lines: (int) $ruleFileEloquent->lines,

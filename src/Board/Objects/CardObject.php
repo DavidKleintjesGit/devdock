@@ -11,6 +11,7 @@ use Src\PullRequest\Objects\PullRequestEntity;
 use Src\PullRequest\Objects\PullRequestEntityCollection;
 use Src\Session\Objects\SessionEntity;
 use Src\Session\Objects\SessionEntityCollection;
+use Src\Task\Objects\TaskAgentEntity;
 
 /**
  * One task on the board: what belongs together under the same ticket number
@@ -32,11 +33,15 @@ class CardObject extends ValueObject
 		public readonly ?string $branch,
 		public readonly ?int $changedFiles,
 		public readonly ?CarbonImmutable $changedAt,
+		public readonly ?string $description,
 		public readonly ?string $note,
 		public readonly ?string $tone,
 		public readonly bool $hasNameMismatch,
 		public readonly ?string $myRole,
 		public readonly bool $isStale,
+		public readonly bool $hasWaitingWork,
+		public readonly ?string $activePullRequest,
+		public readonly ?TaskAgentEntity $agent,
 	) {
 		parent::__construct();
 	}
@@ -47,6 +52,24 @@ class CardObject extends ValueObject
 	public function isHighPriority(): bool
 	{
 		return in_array($this->ticketPriority, ['Highest', 'High'], true);
+	}
+
+	/**
+	 * A commit message to start from: the ticket key, a dash and what the task
+	 * is about, the way this repository writes them.
+	 */
+	public function suggestedCommitMessage(): string
+	{
+		$subject = trim($this->title);
+
+		if ($this->ticketKey === null) {
+			return $subject;
+		}
+
+		// the title of a pull request usually opens with the key already
+		$subject = (string) preg_replace('/^' . preg_quote($this->ticketKey, '/') . '\s*[-:·]?\s*/i', '', $subject);
+
+		return $this->ticketKey . ' - ' . $subject;
 	}
 
 	public function matches(string $term): bool

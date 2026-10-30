@@ -43,7 +43,7 @@
 			</details>
 
 			@foreach ($signals as $signal)
-				<button class="btn sm" type="button" aria-pressed="{{ $attention === $signal['case']->value ? 'true' : 'false' }}" wire:click="toggleAttention('{{ $signal['case']->value }}')">
+				<button class="btn" type="button" aria-pressed="{{ $attention === $signal['case']->value ? 'true' : 'false' }}" wire:click="toggleAttention('{{ $signal['case']->value }}')">
 					<span class="dot {{ $signal['case']->tone() }}"></span>{{ $signal['case']->label() }}<span class="n">{{ $signal['count'] }}</span>
 				</button>
 			@endforeach
@@ -108,8 +108,12 @@
 		@if ($drawer['type'] === 'session')
 			@include('partials.session-drawer', ['session' => $drawer['session'], 'tab' => $drawer['tab'], 'transcript' => $drawer['transcript'], 'previous' => $drawer['previous'], 'projectPath' => $drawer['projectPath']])
 		@else
-			@include('partials.card-drawer', ['card' => $drawer['card'], 'drawerTab' => $drawer['tab'], 'promptRun' => $drawer['run'], 'previous' => $drawer['previous'], 'reviewComments' => $drawer['reviewComments'], 'hasReviewPrompt' => $drawer['hasReviewPrompt']])
+			@include('partials.card-drawer', $drawer)
 		@endif
+	@endif
+
+	@if ($drawer && $drawer['type'] === 'card' && $drawer['openDiffFile'])
+		@include('partials.diff-panel', $drawer)
 	@endif
 
 	@if ($drawer && $drawer['type'] === 'session' && $renaming)

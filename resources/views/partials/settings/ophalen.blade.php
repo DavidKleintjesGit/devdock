@@ -20,7 +20,5 @@
 			@if ($run->message)<span class="hint bad"><x-icon name="alert" small/>{{ $run->message }}</span>@endif
 		@endif
 	</div>
-	<button class="btn" type="button" wire:click="fetchNow" @disabled($run?->isRunning())>
-		<x-icon name="refresh" small/>{{ $run?->isRunning() ? __('Bezig...') : __('Nu ophalen') }}
-	</button>
+	<x-busy-button action="fetchNow" icon="refresh" :busy="__('Starten...')" :disabled="$run?->isRunning()">{{ $run?->isRunning() ? __('Bezig...') : __('Nu ophalen') }}</x-busy-button>
 </div>

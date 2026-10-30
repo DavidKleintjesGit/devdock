@@ -59,3 +59,17 @@
 	</div>
 	<input id="bitbucket-token" class="input" type="password" wire:model="bitbucketToken" placeholder="{{ $hasBitbucketToken ? '••••••••••••' : '' }}" autocomplete="off">
 </div>
+
+<div class="setgroup">{{ __('Claude Code') }}</div>
+
+<div class="set">
+	<div class="txt">
+		<label class="lbl" for="claude-token">{{ __('Langlopend token') }}</label>
+		@if ($hasClaudeToken)
+			<span class="hint ok"><x-icon name="check" small/>{{ __('Ingesteld') }}</span>
+		@else
+			<span class="hint">{{ __('Leeg: prompts draaien op de sessie waarmee je bent ingelogd.') }}</span>
+		@endif
+	</div>
+	<input id="claude-token" class="input" type="password" wire:model="claudeToken" placeholder="{{ $hasClaudeToken ? '••••••••••••' : 'sk-ant-oat01-...' }}" autocomplete="off">
+</div>

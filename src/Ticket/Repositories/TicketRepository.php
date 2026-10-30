@@ -20,6 +20,7 @@ class TicketRepository implements TicketRepositoryContract
 			['key' => $ticketObject->key],
 			[
 				'summary' => $ticketObject->summary,
+				'description' => $ticketObject->description,
 				'status' => $ticketObject->status,
 				'type' => $ticketObject->type,
 				'priority' => $ticketObject->priority,
@@ -71,6 +72,7 @@ class TicketRepository implements TicketRepositoryContract
 			ticketId: new TicketId(id: $ticketEloquent->id),
 			key: (string) $ticketEloquent->key,
 			summary: (string) $ticketEloquent->summary,
+			description: $ticketEloquent->description,
 			status: $ticketEloquent->status,
 			type: $ticketEloquent->type,
 			priority: $ticketEloquent->priority,

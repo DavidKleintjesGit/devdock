@@ -20,6 +20,7 @@ class EnvironmentSettingRepository implements SettingRepositoryContract
 			bitbucketWorkspace: (string) config('devdock.bitbucket.workspace'),
 			bitbucketMe: (string) config('devdock.bitbucket.me'),
 			hasBitbucketToken: filled(config('devdock.bitbucket.token')),
+			hasClaudeToken: filled(config('devdock.claude_token')),
 			sitesPath: (string) config('devdock.paths.sites'),
 			sessionsPath: (string) config('devdock.paths.sessions'),
 			corePath: (string) config('devdock.paths.core'),
@@ -62,6 +63,10 @@ class EnvironmentSettingRepository implements SettingRepositoryContract
 
 		if ($settingObject->bitbucketToken !== null) {
 			$values['BITBUCKET_TOKEN'] = $settingObject->bitbucketToken;
+		}
+
+		if ($settingObject->claudeToken !== null) {
+			$values['DEVDOCK_CLAUDE_TOKEN'] = $settingObject->claudeToken;
 		}
 
 		$this->write($values);

@@ -16,6 +16,9 @@
 		<span><x-icon name="folder" small/>{{ $card->project ?? __('Zonder project') }}</span>
 		@if ($card->branch && config('devdock.board.show_branch'))<span class="mono"><x-icon name="branch" small/>{{ $card->branch }}</span>@endif
 	</span>
+	@if ($card->hasWaitingWork)
+		<span class="note green"><x-icon name="check" small/><span>{{ __('Werk klaar in de werkkopie') }}</span></span>
+	@endif
 	@if ($card->note)
 		<span class="note {{ $card->tone }}"><x-icon :name="$card->tone === 'green' ? 'check' : 'alert'" small/><span>{{ $card->note }}</span></span>
 	@endif

@@ -15,6 +15,7 @@ class TicketObject extends ValueObject
 	public function __construct(
 		public readonly string $key,
 		public readonly string $summary,
+		public readonly ?string $description,
 		public readonly ?string $status,
 		public readonly ?string $type,
 		public readonly ?string $priority,
@@ -31,6 +32,7 @@ class TicketObject extends ValueObject
 		return new self(
 			key: (string) $data['key'],
 			summary: (string) ($fields['summary'] ?? $data['key']),
+			description: $data['description'] ?? null,
 			status: $fields['status']['name'] ?? null,
 			type: $fields['issuetype']['name'] ?? null,
 			priority: $fields['priority']['name'] ?? null,

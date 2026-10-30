@@ -35,7 +35,7 @@ class JiraTicketRepository implements TicketSourceRepositoryContract
 		do {
 			$result = $this->client()->get('/rest/api/3/search/jql', array_filter([
 				'jql' => 'assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC',
-				'fields' => 'summary,status,issuetype,priority,updated',
+				'fields' => 'summary,description,status,issuetype,priority,updated',
 				'maxResults' => 100,
 				'nextPageToken' => $nextPageToken,
 			]));
@@ -50,6 +50,7 @@ class JiraTicketRepository implements TicketSourceRepositoryContract
 			foreach ($response['issues'] ?? [] as $issue) {
 				$ticketObjects[] = TicketObject::from($issue + [
 					'url' => $site . '/browse/' . $issue['key'],
+					'description' => $this->plainText($issue['fields']['description'] ?? null),
 				]);
 			}
 
@@ -57,6 +58,48 @@ class JiraTicketRepository implements TicketSourceRepositoryContract
 		} while ($nextPageToken !== null);
 
 		return TicketObjectCollection::fromArray($ticketObjects);
+	}
+
+	/**
+	 * Jira hands a description back as a tree of blocks. Only the words are
+	 * of use in a prompt, so the tree is walked and flattened, with a blank
+	 * line between paragraphs and a dash in front of list items.
+	 */
+	private function plainText(?array $node): ?string
+	{
+		if ($node === null) {
+			return null;
+		}
+
+		$text = trim($this->walk($node));
+
+		return $text === '' ? null : $text;
+	}
+
+	private function walk(array $node): string
+	{
+		$type = $node['type'] ?? '';
+
+		if ($type === 'text') {
+			return (string) ($node['text'] ?? '');
+		}
+
+		$inside = '';
+
+		foreach ($node['content'] ?? [] as $child) {
+			$inside .= $this->walk($child);
+		}
+
+		return match ($type) {
+			'paragraph', 'heading', 'codeBlock' => $inside .'
+
+',
+			'listItem' => '- ' . trim($inside) .'
+',
+			'hardBreak' => '
+',
+			default => $inside,
+		};
 	}
 
 	/**

@@ -1,3 +1,4 @@
+[x-cloak]{display:none !important}
 /* Layout: vaste zijbalk links; elke pagina heeft dezelfde vaste kop (72px) en werkbalk (60px) als herkenningspunt; details in een breed paneel rechts, op mobiel als sheet van onderen */
 :root{
   --bg:#F5F5F2; --surface:#FFFFFF; --surface-2:#FAFAF7; --sunken:#EDEDE8;
@@ -271,6 +272,9 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--line-strong)
 .ldesc{color:var(--fg-2)}
 .lpaths{display:flex;flex-wrap:wrap;gap:4px}
 .path{font-family:var(--mono);font-size:11.5px;background:var(--sunken);color:var(--fg-2);border-radius:6px;padding:2px 7px;white-space:nowrap}
+.path.deny{background:var(--red-soft);color:var(--red)}
+.path.ask{background:var(--amber-soft);color:var(--amber)}
+.path.skip{opacity:.45}
 .rules{margin:0}
 .rules div{display:grid;grid-template-columns:160px minmax(0,1fr);gap:16px;padding:14px 18px;border-bottom:1px solid var(--line)}
 .rules div:last-child{border-bottom:0}
@@ -355,6 +359,14 @@ button.statusrow .v .ic{color:var(--muted)}
 .progress span{display:block;height:100%;border-radius:4px;background:var(--amber-dot);position:relative;overflow:hidden}
 .progress span::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);animation:sweep 1.4s linear infinite}
 @keyframes sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+
+/* ---------- bezig: een balk bovenaan bij elk verzoek ---------- */
+.working{position:fixed;top:0;left:0;right:0;height:2px;z-index:100;pointer-events:none;opacity:0;transition:opacity .12s}
+body.is-working .working{opacity:1}
+.btn .lbl{display:inline-flex;align-items:center;gap:6px}
+.btn[disabled]{opacity:.65;cursor:default}
+.working span{display:block;height:100%;background:var(--accent);position:relative;overflow:hidden}
+.working span::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent);animation:sweep 1.1s linear infinite}
 @media (max-width:520px){.hsteps b{font-size:11.5px}.feed li{grid-template-columns:minmax(0,1fr);gap:0}}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
@@ -399,6 +411,17 @@ button.statusrow .v .ic{color:var(--muted)}
 .input.mono{font-family:var(--mono);font-size:13px}
 .textarea{width:100%;min-height:96px;padding:10px 12px;border:1px solid var(--line-strong);border-radius:10px;background:var(--surface);color:var(--fg);line-height:1.55;resize:vertical}
 .textarea.code-area{min-height:220px;font-family:var(--mono);font-size:12.5px}
+.textarea.grow{field-sizing:content;min-height:220px;max-height:52vh;overflow-y:auto;resize:none}
+.fieldhead{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.sources{display:flex;gap:6px;flex-wrap:wrap}
+.sendrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sendrow .input{width:auto;min-width:200px;max-width:100%}
+.sendrow .hint{color:var(--muted);font-size:12.5px;margin-left:auto;text-align:right}
+.menu-inline summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.menu-inline summary::-webkit-details-marker{display:none}
+.menu-inline summary::before{content:'▸';font-size:11px}
+.menu-inline[open] summary::before{content:'▾'}
+.menu-inline .code{margin-top:8px}
 .input:focus,.textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .choice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .choice label{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line-strong);border-radius:12px;cursor:pointer}
@@ -434,7 +457,9 @@ button.statusrow .v .ic{color:var(--muted)}
 .tabs{display:flex;gap:4px;height:48px;flex:none;padding:0 22px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
 .tabs button{border:0;background:transparent;font-weight:500;color:var(--muted);padding:0 8px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
 .tabs button[aria-selected="true"]{color:var(--accent-ink);border-bottom-color:var(--accent)}
-.dbody{padding:24px 28px 36px;display:flex;flex-direction:column;gap:24px;overflow-y:auto;flex:1;overscroll-behavior:contain}
+.dbody{padding:24px 28px 0;display:flex;flex-direction:column;gap:24px;overflow-y:auto;flex:1;overscroll-behavior:contain}
+.dfail{display:flex;align-items:flex-start;gap:8px;padding:12px 28px 0}
+.dfail .note{flex:1}
 .fix{border-radius:12px;background:var(--amber-soft);padding:16px;display:flex;flex-direction:column;gap:10px;color:var(--amber)}
 .resume{border-radius:12px;background:var(--accent-soft);padding:16px;display:flex;flex-direction:column;gap:12px;color:var(--accent-ink)}
 .field{display:flex;flex-direction:column;gap:8px}
@@ -538,7 +563,7 @@ button.statusrow .v .ic{color:var(--muted)}
   .frow{padding:10px 14px}
   .frow .lines,.frow .read{display:none}
   .settings h2{height:52px}
-  .tabbar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);padding-top:6px;padding-bottom:calc(6px + env(safe-area-inset-bottom,0px));padding-left:max(6px,env(safe-area-inset-left,0px));padding-right:max(6px,env(safe-area-inset-right,0px))}
+  .tabbar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);padding-top:6px;padding-bottom:calc(6px + env(safe-area-inset-bottom,0px));padding-left:max(6px,env(safe-area-inset-left,0px));padding-right:max(6px,env(safe-area-inset-right,0px))}
   .tabbar button,.tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:52px;border:0;background:transparent;font-size:11px;font-weight:500;color:var(--muted);cursor:pointer}
   .tabbar .pillbg{display:grid;place-items:center;width:56px;height:30px;border-radius:15px;transition:background .15s}
   .tabbar button[aria-current="page"],.tabbar a[aria-current="page"]{color:var(--accent-ink);font-weight:600}
@@ -547,7 +572,9 @@ button.statusrow .v .ic{color:var(--muted)}
   .kcard:active,.srow:active,.frow:active,.lrow:active,.linkrow:active{transform:scale(.985);transition:transform .08s}
   .drawer{top:auto;left:0;right:0;width:100%;height:calc(100% - env(safe-area-inset-top,0px) - 24px);border-left:0;border-radius:20px 20px 0 0;padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);animation:sheet .28s cubic-bezier(.2,.8,.2,1);touch-action:pan-y}
   @keyframes sheet{from{transform:translateY(40%);opacity:.4}}
-  .grab{display:block;width:40px;height:5px;border-radius:3px;background:var(--line-strong);margin:8px auto 0;flex:none}
+  .grab{display:block;width:44px;height:5px;border-radius:3px;background:var(--line-strong);margin:10px auto 2px;flex:none}
+  .drawer{will-change:transform}
+  .dbar .kind{color:var(--muted)}
   .dbar{height:52px;padding:0 12px 0 16px}
   .dbar .close{width:44px;min-height:44px}
   .dhead{padding:16px 20px 12px}
@@ -769,3 +796,150 @@ body{margin:0}
 .filterchip:hover{border-color:var(--red);color:var(--red)}
 .filterchip .ic{color:var(--muted)}
 .filterchip:hover .ic{color:var(--red)}
+
+/* ---------- koppelingen in de kaart ---------- */
+.linkform{display:flex;flex-direction:column;gap:8px}
+.linkform .row{display:flex;gap:8px;align-items:center}
+.linkform .row .input,.linkform .row .select{flex:1;min-width:0}
+.linkrow.static .btn.icon.ghost{width:32px;min-height:32px;flex:none}
+
+/* ---------- rapport van een ronde ---------- */
+.lede{margin:0;font-size:15px;line-height:1.55;color:var(--fg)}
+.outcome{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.outcome h4{margin:0 0 6px}
+.bullet{display:flex;gap:8px;align-items:flex-start;margin-bottom:5px;font-size:13.5px;line-height:1.5;color:var(--fg-2)}
+.bullet .ic{flex:none;margin-top:3px;color:var(--muted)}
+@media (max-width:640px){.outcome{grid-template-columns:1fr}}
+
+/* ---------- gesprek met de agent ---------- */
+.agentbar{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);flex:none}
+.agentbar .grow{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.agentbar .grow b{font-weight:600;font-size:13.5px}
+.agentbar .grow small{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.talk{display:flex;flex-direction:column;gap:18px}
+.say{display:flex;flex-direction:column;gap:5px}
+.say.mine{align-items:flex-end}
+.say .fieldhead{width:100%}
+.said{padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-size:13.5px;line-height:1.55;display:flex;flex-direction:column;gap:10px;white-space:pre-line;max-width:100%}
+.say.mine .said{max-width:86%;background:var(--accent-soft);color:var(--accent-ink);border-color:transparent}
+.linkrow .dot{flex:none}
+
+/* ---------- omschrijving van een ticket ---------- */
+.prose{padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface);white-space:pre-line;font-size:13.5px;line-height:1.65;color:var(--fg-2);min-height:72px}
+.prose.empty-prose{color:var(--muted);font-style:italic;display:flex;align-items:center}
+
+/* ---------- vaste voet in de lade ---------- */
+/* elke tab eindigt hier, zodat de knoppen op elke tab op dezelfde plek staan
+   en een korte tab geen gat onderin laat */
+.dfoot{position:sticky;bottom:0;z-index:2;margin:auto -28px 0;padding:14px 28px 18px;background:var(--surface);border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dfoot .hint{color:var(--muted);font-size:12.5px;margin-left:auto;text-align:right}
+.dbody>*:last-child:not(.dfoot){margin-bottom:28px}
+.dbody>.dfoot{margin-top:auto}
+.dfoot.stack{flex-direction:column;align-items:stretch;gap:9px}
+.dfoot.stack .sendrow{width:100%}
+@media (max-width:720px){.dfoot{margin-left:-20px;margin-right:-20px;padding-left:20px;padding-right:20px}}
+
+/* ---------- stappen en lenzen op de taakkaart ---------- */
+.hsteps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));margin:0;padding:0;list-style:none;flex:none}
+.hsteps li{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;min-width:0}
+.hsteps .bar{position:absolute;top:14px;right:50%;width:100%;height:2px;background:var(--line);z-index:0}
+.hsteps .bar.on{background:var(--accent)}
+.hsteps .n{position:relative;z-index:1;width:30px;height:30px;border-radius:50%;border:2px solid var(--line-strong);background:var(--surface);color:var(--muted);font-weight:700;font-size:12.5px;display:grid;place-items:center}
+.hsteps .done .n{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.hsteps .now .n{border-color:var(--accent);color:var(--accent-ink);box-shadow:0 0 0 5px var(--accent-soft)}
+.hsteps .lbl{font-size:11.5px;color:var(--muted);line-height:1.3}
+.hsteps .now .lbl{color:var(--accent-ink);font-weight:600}
+.ldot{width:10px;height:10px;border-radius:3px;flex:none;background:var(--line-strong)}
+.ldot.pass{background:var(--green-dot)}
+.ldot.fail{background:var(--red-dot)}
+.ldot.run{background:var(--amber-dot);animation:pulse 1.6s ease-in-out infinite}
+.ldot.skip{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line-strong)}
+.ldot.wait{background:var(--sunken)}
+.lensdots{display:flex;gap:4px;flex:none}
+details.linkrow>summary{display:flex;align-items:center;gap:12px;min-height:56px;padding:10px 14px;width:100%}
+details.linkrow>.code{margin:0;border-radius:0;border-top:1px solid var(--line)}
+
+/* ---------- de workflows-pagina ---------- */
+.wrow{display:grid;grid-template-columns:minmax(0,1fr) 220px 150px 120px;gap:18px;align-items:center;min-height:68px;padding:12px 18px;border-bottom:1px solid var(--line);width:100%;border-left:0;border-right:0;border-top:0;background:var(--surface);color:inherit;text-align:left;font:inherit;cursor:pointer}
+.wrow:last-child{border-bottom:0}
+.wname{min-width:0;display:flex;flex-direction:column;gap:3px}
+.wname b{font-weight:600;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wname small{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wrow .hsteps li{gap:0}
+.wrow .hsteps .n{width:20px;height:20px}
+.wrow .hsteps .bar{top:9px}
+.wlens{display:flex;align-items:center;gap:10px}
+.wlens small{color:var(--muted);font-size:12px;white-space:nowrap}
+.wrow .chip{justify-self:end}
+@media (hover:hover){.wrow:hover{background:var(--surface-2)}}
+@media (max-width:860px){
+  .wrow{grid-template-columns:1fr;gap:10px}
+  .wrow .chip{justify-self:start}
+  .chain{grid-template-columns:1fr}
+  .step{border-right:0;border-bottom:1px solid var(--line)}
+  .step:last-child{border-bottom:0}
+  .lrow{grid-template-columns:44px minmax(0,1fr);gap:12px}
+  .lrow .ldesc,.lrow .lpaths{grid-column:2}
+  .rules div{grid-template-columns:1fr;gap:4px}
+}
+
+/* ---------- een regel met zijn eigen omschrijving ---------- */
+.frow .fname .ftext{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.frow .fname .ftext small{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.frow .fname .ftext .mono{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.frow:has(.ftext small){min-height:60px}
+
+/* ---------- invoervak met de verstuurknop in de hoek ---------- */
+.composer{position:relative;display:flex}
+.composer .textarea{min-height:84px;padding-right:56px;resize:none;field-sizing:content;max-height:34vh;overflow-y:auto}
+.composer .send{position:absolute;right:9px;bottom:9px;width:36px;height:36px;padding:0;border-radius:10px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;cursor:pointer}
+.composer .send:hover{filter:brightness(1.07)}
+.composer .send[disabled]{opacity:.45;cursor:default}
+.composer .send .ic{width:18px;height:18px}
+.sendrow .hint:first-child{margin-left:0}
+.composer .stop{position:absolute;right:53px;bottom:9px;width:36px;height:36px;padding:0;border-radius:10px;border:1px solid var(--line-strong);background:var(--surface);color:var(--red);display:grid;place-items:center;cursor:pointer}
+.composer .stop:hover{border-color:var(--red-dot);background:var(--red-soft)}
+.mark{width:24px;height:24px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:12px;font-weight:700;border:2px solid var(--line-strong);color:var(--muted);background:var(--surface)}
+.mark.done{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.mark.now{border-color:var(--accent);color:var(--accent-ink);box-shadow:0 0 0 4px var(--accent-soft)}
+
+/* Een veld dat dichtklapt. Geen eigen kader: het is hetzelfde veld als
+   elders in de lade, met de kop als knop. */
+.foldhead{width:100%;padding:0;border:0;background:transparent;font-family:inherit;color:inherit;cursor:pointer;text-align:left}
+.foldhead .eyebrow{display:flex;align-items:center;gap:7px}
+.foldhead .caret{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:4px;background:var(--sunken);color:var(--muted);font-size:11px;line-height:1;font-weight:600}
+.foldhead:hover .caret{background:var(--line-strong);color:var(--fg)}
+.foldhead .muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.foldbody{display:flex;flex-direction:column;gap:8px}
+
+
+/* Het leespaneel: schuift over de lade en is breder, want een wijziging lezen
+   vraagt meer ruimte dan een kaart. Links de bestanden, rechts de regels. */
+.diffpanel{position:fixed;top:0;right:0;bottom:0;width:min(920px,100vw);z-index:70;background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow-lg);display:flex;flex-direction:column}
+.diffpanel .dhead{padding:0 20px 14px;display:flex;flex-direction:column;gap:6px;flex:none}
+.diffpanel .dhead h2{margin:0;font-size:19px;font-weight:600;line-height:1.25}
+.diffpanel .dhead .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px}
+.diffpanel .plus{color:var(--green);font-size:12.5px}
+.diffpanel .minus{color:var(--red);font-size:12.5px}
+.diffsplit{flex:1;display:flex;min-height:0;border-top:1px solid var(--line)}
+.difffiles{width:260px;flex:none;border-right:1px solid var(--line);background:var(--surface-2);display:flex;flex-direction:column;min-height:0}
+.difffiles .fieldhead{padding:12px 14px 8px}
+.difflist{flex:1;overflow-y:auto;padding:0 8px 12px;display:flex;flex-direction:column;gap:2px}
+.dfile{display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;padding:8px 10px;border:0;border-radius:9px;background:transparent;font-family:inherit;text-align:left;cursor:pointer;color:var(--fg)}
+.dfile:hover{background:var(--sunken)}
+.dfile.on{background:var(--surface);box-shadow:inset 0 0 0 1px var(--line-strong)}
+.dfile .nm{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.dfile .nm b{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dfile .nm small{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.diffpatch{flex:1;min-width:0;overflow:auto}
+.hunk{border-bottom:1px solid var(--line)}
+.hunkhead{padding:7px 16px;background:var(--sunken);font-size:11.5px;color:var(--muted)}
+table.lines{width:100%;border-collapse:collapse;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.65}
+table.lines td{padding:0;vertical-align:top}
+table.lines td.n{width:44px;text-align:right;padding:0 8px 0 6px;color:var(--muted);opacity:.7;user-select:none;white-space:nowrap}
+table.lines td.s{width:16px;text-align:center;color:var(--muted);user-select:none}
+table.lines td.t{padding-right:16px;white-space:pre-wrap;word-break:break-word}
+table.lines tr.add td{background:var(--green-soft)}
+table.lines tr.del td{background:var(--red-soft)}
+.diffpanel .dfoot{justify-content:flex-end}
+@media (max-width:720px){.diffpanel{width:100vw}.difffiles{display:none}}

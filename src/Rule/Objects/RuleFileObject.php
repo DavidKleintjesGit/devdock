@@ -16,6 +16,7 @@ class RuleFileObject extends ValueObject
 	public function __construct(
 		public readonly string $project,
 		public readonly string $path,
+		public readonly ?string $summary,
 		public readonly RuleGroupEnum $group,
 		public readonly RuleOriginEnum $origin,
 		public readonly int $lines,
@@ -32,6 +33,7 @@ class RuleFileObject extends ValueObject
 		return new self(
 			project: (string) $data['project'],
 			path: (string) $data['path'],
+			summary: $data['summary'] ?? null,
 			group: RuleGroupEnum::from((string) $data['group']),
 			origin: RuleOriginEnum::from((string) $data['origin']),
 			lines: (int) $data['lines'],

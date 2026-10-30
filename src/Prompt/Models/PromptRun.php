@@ -10,10 +10,13 @@ class PromptRun extends Model
 {
 	protected $fillable = [
 		'card',
+		'review_round_id',
 		'project',
 		'branch',
+		'directory',
 		'ticket_key',
 		'session_uuid',
+		'claims_session',
 		'prompt',
 		'status',
 		'output',
@@ -26,6 +29,7 @@ class PromptRun extends Model
 	protected function casts(): array
 	{
 		return [
+			'claims_session' => 'boolean',
 			'cost' => 'float',
 			'started_at' => 'immutable_datetime',
 			'finished_at' => 'immutable_datetime',

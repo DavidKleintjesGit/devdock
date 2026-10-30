@@ -38,6 +38,8 @@ class Settings extends Component
 
 	public string $bitbucketToken = '';
 
+	public string $claudeToken = '';
+
 	public string $sitesPath = '';
 
 	public string $sessionsPath = '';
@@ -109,6 +111,7 @@ class Settings extends Component
 			'bitbucket_workspace' => $this->bitbucketWorkspace,
 			'bitbucket_me' => $this->bitbucketMe,
 			'bitbucket_token' => $this->bitbucketToken,
+			'claude_token' => $this->claudeToken,
 			'sites_path' => $this->sitesPath,
 			'sessions_path' => $this->sessionsPath,
 			'core_path' => $this->corePath,
@@ -128,6 +131,7 @@ class Settings extends Component
 
 		$this->jiraToken = '';
 		$this->bitbucketToken = '';
+		$this->claudeToken = '';
 		$this->saved = true;
 		$this->savedAt = now()->format('H:i');
 	}
@@ -145,6 +149,7 @@ class Settings extends Component
 			'sections' => $this->sections(),
 			'hasJiraToken' => $settingEntity->hasJiraToken,
 			'hasBitbucketToken' => $settingEntity->hasBitbucketToken,
+			'hasClaudeToken' => $settingEntity->hasClaudeToken,
 			'run' => GetLatestFetchRunAction::execute(),
 			'allColumns' => BoardColumnEnum::cases(),
 			'counts' => [

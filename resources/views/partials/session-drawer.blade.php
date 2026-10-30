@@ -64,7 +64,7 @@ claude --resume {{ $session->uuid }}</div>
 					@foreach ($transcript as $turn)
 						<li class="turn you">
 							<span class="who mono">{{ __('jij') }}</span>
-							<span class="what"><span>{{ $turn['text'] }}</span><span class="t mono">{{ $turn['at'] }}</span></span>
+							<span class="what"><span>{{ $turn->text }}</span><span class="t mono">{{ $turn->at }}</span></span>
 						</li>
 					@endforeach
 				</ol>

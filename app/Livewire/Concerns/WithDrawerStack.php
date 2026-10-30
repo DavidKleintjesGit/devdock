@@ -46,6 +46,11 @@ trait WithDrawerStack
 		if ($this->drawerStack !== []) {
 			$this->drawerStack[array_key_last($this->drawerStack)]['tab'] = $tab;
 		}
+
+		// the url keeps it, so a refresh leaves you where you were
+		if (property_exists($this, 'openTab')) {
+			$this->openTab = $tab;
+		}
 	}
 
 	/** @return array{type: string, id: string, tab: string}|null */

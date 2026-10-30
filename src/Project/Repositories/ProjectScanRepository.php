@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Project\Repositories;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
 use Src\Project\Contracts\ProjectScanRepositoryContract;
 use Src\Project\Objects\ProjectObject;
@@ -27,6 +28,40 @@ class ProjectScanRepository implements ProjectScanRepositoryContract
 		}
 
 		return ProjectObjectCollection::fromArray($projectObjects);
+	}
+
+	public function getBranches(string $repositoryPath): array
+	{
+		if (! is_dir($repositoryPath)) {
+			return [];
+		}
+
+		// de keuzelijst op de Worktree-tab; branches komen er niet elke seconde
+		// bij, en dit is weer een git-aanroep per klik
+		return Cache::remember(
+			'project.branches.' . md5($repositoryPath),
+			(int) config('devdock.worktree.status_seconds'),
+			fn () => $this->readBranches($repositoryPath),
+		);
+	}
+
+	/**
+	 * @return list<string>
+	 */
+	private function readBranches(string $repositoryPath): array
+	{
+		$result = Process::path($repositoryPath)
+			->run(['git', 'branch', '--format=%(refname:short)', '--sort=-committerdate']);
+
+		if (! $result->successful()) {
+			return [];
+		}
+
+		return array_values(array_filter(
+			array_map(fn (string $line) => trim($line), explode('
+', $result->output())),
+			fn (string $branch) => $branch !== '',
+		));
 	}
 
 	/**

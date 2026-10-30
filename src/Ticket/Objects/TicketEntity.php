@@ -16,6 +16,7 @@ class TicketEntity extends ValueObject
 		public readonly TicketId $ticketId,
 		public readonly string $key,
 		public readonly string $summary,
+		public readonly ?string $description,
 		public readonly ?string $status,
 		public readonly ?string $type,
 		public readonly ?string $priority,

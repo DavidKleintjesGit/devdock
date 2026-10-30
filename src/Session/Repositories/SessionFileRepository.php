@@ -6,7 +6,6 @@ namespace Src\Session\Repositories;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
-use Src\Project\Objects\ProjectEntity;
 use Src\Project\Objects\ProjectEntityCollection;
 use Src\Session\Contracts\SessionFileRepositoryContract;
 use Src\Session\Objects\SessionEntity;
@@ -15,11 +14,13 @@ use Src\Session\Objects\SessionObject;
 use Src\Session\Objects\SessionObjectCollection;
 use Src\Session\Objects\TranscriptTurnObject;
 use Src\Session\Objects\TranscriptTurnObjectCollection;
+use Src\Worktree\Objects\WorktreeEntityCollection;
 
 class SessionFileRepository implements SessionFileRepositoryContract
 {
 	public function getAll(
 		ProjectEntityCollection $projectEntities,
+		WorktreeEntityCollection $worktreeEntities,
 		SessionEntityCollection $storedSessionEntities,
 	): SessionObjectCollection {
 		$root = $this->root();
@@ -28,7 +29,7 @@ class SessionFileRepository implements SessionFileRepositoryContract
 			return SessionObjectCollection::fromArray([]);
 		}
 
-		$projectNames = $this->projectNamesByFolder($projectEntities);
+		$projectNames = $this->projectNamesByFolder($projectEntities, $worktreeEntities);
 		$stored = $this->storedByUuid($storedSessionEntities);
 		$sessionObjects = [];
 
@@ -121,7 +122,7 @@ class SessionFileRepository implements SessionFileRepositoryContract
 	}
 
 	/**
-	 * @param array<string, SessionEntity> $stored
+	 * @param  array<string, SessionEntity>  $stored
 	 */
 	private function sessionObjectOf(string $file, string $folder, ?string $project, array $stored): SessionObject
 	{
@@ -274,16 +275,27 @@ class SessionFileRepository implements SessionFileRepositoryContract
 	 *
 	 * @return array<string, string>
 	 */
-	private function projectNamesByFolder(ProjectEntityCollection $projectEntities): array
-	{
+	private function projectNamesByFolder(
+		ProjectEntityCollection $projectEntities,
+		WorktreeEntityCollection $worktreeEntities,
+	): array {
 		$names = [];
 
 		foreach ($projectEntities as $projectEntity) {
-			$folder = preg_replace('/[^A-Za-z0-9]/', '-', $projectEntity->path);
-			$names[$folder] = $projectEntity->name;
+			$names[$this->folderFor($projectEntity->path)] = $projectEntity->name;
+		}
+
+		// a working copy is the same project, so its sessions belong with it
+		foreach ($worktreeEntities as $worktreeEntity) {
+			$names[$this->folderFor($worktreeEntity->path)] = $worktreeEntity->project;
 		}
 
 		return $names;
+	}
+
+	private function folderFor(string $path): string
+	{
+		return (string) preg_replace('/[^A-Za-z0-9]/', '-', $path);
 	}
 
 	/**

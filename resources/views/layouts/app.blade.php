@@ -11,6 +11,7 @@
 	@vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
+<div class="working" aria-hidden="true"><span></span></div>
 @include('partials.icons')
 
 <div class="shell">

@@ -40,6 +40,17 @@ class RuleFileSystemRepository implements RuleFileSystemRepositoryContract
 					],
 				);
 			}
+
+			foreach ($this->memoryOf($projectEntity) as $path => $file) {
+				// de linkerkant wint bij +, en een geheugen is altijd van jou
+				$ruleFileObjects[] = RuleFileObject::from([
+					'project' => $projectEntity->name,
+					'path' => $path,
+					'summary' => $this->describedIn($file),
+					'group' => RuleGroupEnum::MEMORY->value,
+					'origin' => RuleOriginEnum::ONLY_YOURS->value,
+				] + $this->measurementsOf($file, $path));
+			}
 		}
 
 		return RuleFileObjectCollection::fromArray($ruleFileObjects);
@@ -70,7 +81,69 @@ class RuleFileSystemRepository implements RuleFileSystemRepositoryContract
 
 	private function fullPathOf(RuleFileEntity $ruleFileEntity): string
 	{
+		if ($ruleFileEntity->group === RuleGroupEnum::MEMORY) {
+			return $this->memoryDirectoryOf($this->sitesPath() . '/' . $ruleFileEntity->project)
+. '/' . basename($ruleFileEntity->path);
+		}
+
 		return $this->sitesPath() . '/' . $ruleFileEntity->project . '/' . $ruleFileEntity->path;
+	}
+
+	/**
+	 * Everything Claude wrote down about a project. It steers an agent as much
+	 * as the rules do, so it belongs on the same page instead of out of sight.
+	 *
+	 * @return array<string, string> the path on the page to the file on disk
+	 */
+	private function memoryOf(ProjectEntity $projectEntity): array
+	{
+		$directory = $this->memoryDirectoryOf($projectEntity->path);
+		$found = [];
+
+		foreach (glob($directory . '/*.md') ?: [] as $file) {
+			$found['geheugen/' . basename($file)] = $file;
+		}
+
+		return $found;
+	}
+
+	/**
+	 * Claude keeps a folder per project, named after its path with a dash in
+	 * the place of every other character.
+	 */
+	private function memoryDirectoryOf(string $projectPath): string
+	{
+		$folder = (string) preg_replace('/[^A-Za-z0-9]/', '-', $projectPath);
+
+		return rtrim((string) config('devdock.paths.sessions'), '/\\') . '/' . $folder . '/memory';
+	}
+
+	/**
+	 * The one line a memory writes about itself in its frontmatter.
+	 */
+	private function describedIn(string $file): ?string
+	{
+		$handle = fopen($file, 'r');
+
+		if ($handle === false) {
+			return null;
+		}
+
+		$description = null;
+
+		for ($line = 0; $line < 12 && ! feof($handle); $line++) {
+			$text = (string) fgets($handle);
+
+			if (preg_match('/^description:\s*(.+)$/i', trim($text), $found) === 1) {
+				$description = trim($found[1], " \t\"'");
+
+				break;
+			}
+		}
+
+		fclose($handle);
+
+		return $description;
 	}
 
 	private function sitesPath(): string

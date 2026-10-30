@@ -6,65 +6,80 @@ namespace Src\PullRequest\Actions;
 
 use Illuminate\Support\Collection;
 use Src\Packages\Cqrs\Command;
+use Src\Prompt\Actions\DescribeReportAction;
 use Src\PullRequest\Contracts\PullRequestRepositoryContract;
 use Src\PullRequest\Objects\PullRequestEntity;
 use Src\PullRequest\Objects\PullRequestId;
 use Src\PullRequest\Objects\ReviewCommentEntity;
 
 /**
- * Writes the open review remarks of one pull request out as a prompt: what was
- * said, where, and how to go about it.
+ * Writes the open review remarks of a task out as a prompt: what was said,
+ * where, and how to go about it. A task may carry several pull requests, and
+ * they end up in one prompt.
  *
- * @method static ?string execute(PullRequestId $pullRequestId)
+ * @method static ?string execute(array $pullRequestIds)
  */
 class BuildReviewPromptAction extends Command
 {
+	/**
+	 * @param  array<int, PullRequestId>  $pullRequestIds
+	 */
 	public function __construct(
-		public readonly PullRequestId $pullRequestId,
-	) {
-	}
+		public readonly array $pullRequestIds,
+	) {}
 
 	public function handle(PullRequestRepositoryContract $pullRequestRepository): ?string
 	{
-		$pullRequestEntity = $pullRequestRepository->getAll()
-			->first(fn (PullRequestEntity $entity) => $entity->pullRequestId->id === $this->pullRequestId->id);
+		$pullRequestEntities = collect($pullRequestRepository->getAll());
+		$blocks = [];
+		$total = 0;
+		$numbers = [];
+		$asked = null;
+		$branch = null;
 
-		$reviewCommentEntities = collect($pullRequestRepository->getComments($this->pullRequestId));
+		foreach ($this->pullRequestIds as $pullRequestId) {
+			$pullRequestEntity = $pullRequestEntities->first(
+				fn (PullRequestEntity $entity) => $entity->pullRequestId->id === $pullRequestId->id,
+			);
 
-		// the reviewer sometimes writes out a prompt of their own; it is not a
-		// finding, so it stays out of the list
-		$findings = $reviewCommentEntities->reject(
-			fn (ReviewCommentEntity $reviewCommentEntity) => $reviewCommentEntity->isPrompt,
-		);
+			if ($pullRequestEntity === null) {
+				continue;
+			}
 
-		if ($pullRequestEntity === null || $findings->isEmpty()) {
+			// the reviewer sometimes writes out a prompt of their own; it is not a
+			// finding, so it stays out of the list
+			$findings = collect($pullRequestRepository->getComments($pullRequestId))
+				->reject(fn (ReviewCommentEntity $reviewCommentEntity) => $reviewCommentEntity->isPrompt);
+
+			if ($findings->isEmpty()) {
+				continue;
+			}
+
+			$numbers[] = '#' . $pullRequestEntity->number;
+			$asked ??= $pullRequestEntity->changesRequestedBy;
+			$branch ??= $pullRequestEntity->sourceBranch;
+			$total += $findings->count();
+
+			$blocks[] = count($this->pullRequestIds) > 1
+				? '#' . $pullRequestEntity->number . ' — ' . $pullRequestEntity->title . "\n\n" . $this->findings($findings)
+				: $this->findings($findings);
+		}
+
+		if ($blocks === []) {
 			return null;
 		}
 
-		$parts = [
-			$this->opening($pullRequestEntity, $findings),
-			$this->findings($findings),
-			$this->howToGoAbout(),
-		];
-
-		return implode("\n\n", array_filter($parts));
-	}
-
-	/**
-	 * @param  Collection<int, ReviewCommentEntity>  $findings
-	 */
-	private function opening(PullRequestEntity $pullRequestEntity, Collection $findings): string
-	{
-		return __(':name vroeg om wijzigingen op #:number — :title (branch :branch).', [
-			'name' => $pullRequestEntity->changesRequestedBy,
-			'number' => $pullRequestEntity->number,
-			'title' => $pullRequestEntity->title,
-			'branch' => $pullRequestEntity->sourceBranch,
+		$opening = __(':name vroeg om wijzigingen op :numbers (branch :branch).', [
+			'name' => $asked,
+			'numbers' => implode(' ' . __('en') . ' ', $numbers),
+			'branch' => $branch,
 		]) . "\n\n" . trans_choice(
 			'Er staat nog :count opmerking open.|Er staan nog :count opmerkingen open.',
-			$findings->count(),
-			['count' => $findings->count()],
+			$total,
+			['count' => $total],
 		);
+
+		return implode("\n\n", [$opening, implode("\n\n", $blocks), $this->howToGoAbout()]);
 	}
 
 	/**
@@ -113,7 +128,7 @@ class BuildReviewPromptAction extends Command
 	private function reply(ReviewCommentEntity $reviewCommentEntity): string
 	{
 		return __('Reactie van :name:', ['name' => $reviewCommentEntity->author])
-			. "\n" . $reviewCommentEntity->withoutSignature();
+. "\n" . $reviewCommentEntity->withoutSignature();
 	}
 
 	/**
@@ -129,6 +144,7 @@ class BuildReviewPromptAction extends Command
 			__('- Is het nog open, pas het dan aan volgens de regels uit CLAUDE.md en draai de tests van wat je aanraakt.'),
 			__('- Ben je het ergens niet mee eens, schrijf dan een voorstel voor een antwoord en laat het aan mij zien.'),
 			__('- Plaats geen reacties in Bitbucket, vink geen opmerkingen af, commit niet en push niet zonder dat ik daar eerst ja op heb gezegd. Leg het voor, wacht op mijn akkoord en doe het daarna pas.'),
+			DescribeReportAction::execute(),
 		]);
 	}
 }

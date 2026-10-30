@@ -15,11 +15,13 @@ use Src\Packages\Markdown\RenderMarkdown;
 use Src\Project\Actions\GetProjectsAction;
 use Src\Rule\Actions\CopyRuleFileFromCoreAction;
 use Src\Rule\Actions\CopyRuleFileToProjectAction;
+use Src\Rule\Actions\GetPermissionsAction;
 use Src\Rule\Actions\GetRuleFileContentsAction;
 use Src\Rule\Actions\GetRuleFilesAction;
 use Src\Rule\Actions\UpdateRuleFilesFromCoreAction;
 use Src\Rule\Enums\RuleGroupEnum;
 use Src\Rule\Enums\RuleOriginEnum;
+use Src\Rule\Objects\PermissionRuleObject;
 use Src\Rule\Objects\RuleFileEntity;
 use Src\Rule\Objects\RuleFileId;
 
@@ -145,9 +147,50 @@ class Rules extends Component
 		$this->openFileId = null;
 	}
 
+	/**
+	 * De toestemmingen gegroepeerd per bestand waar ze in staan: die van jou
+	 * eerst, daarna per project. Alleen die van jou staat open, want die gelden
+	 * overal; de rest is één klik weg.
+	 *
+	 * @param  Collection<int, PermissionRuleObject>  $permissions
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function permissionGroups(Collection $permissions): array
+	{
+		return $permissions
+			->groupBy(fn (PermissionRuleObject $rule) => $rule->project . '|' . $rule->source)
+			->map(fn (Collection $rules) => [
+				'title' => $rules->first()->project ?? __('Van jou'),
+				'summary' => $this->permissionSummary($rules),
+				'open' => $rules->first()->project === null,
+				'rules' => $rules,
+			])
+			->values()
+			->all();
+	}
+
+	/**
+	 * @param  Collection<int, PermissionRuleObject>  $rules
+	 */
+	private function permissionSummary(Collection $rules): string
+	{
+		if (! $rules->first()->counts) {
+			return __('wordt genegeerd, want deze map is niet vertrouwd');
+		}
+
+		$refusals = $rules->where('kind', 'deny')->count();
+
+		return collect([
+			trans_choice(':count regel|:count regels', $rules->count(), ['count' => $rules->count()]),
+			$rules->first()->source,
+			$refusals === 0 ? null : trans_choice(':count weigering|:count weigeringen', $refusals, ['count' => $refusals]),
+		])->filter()->implode(' · ');
+	}
+
 	public function render(): View
 	{
 		$everything = collect(GetRuleFilesAction::execute());
+		$permissions = collect(GetPermissionsAction::execute()->toArray());
 
 		$all = $everything
 			->filter(fn (RuleFileEntity $ruleFileEntity) => ! $this->hasProjectFilter()
@@ -166,6 +209,9 @@ class Rules extends Component
 		$ruleFileEntity = $all->first(fn (RuleFileEntity $file) => $file->ruleFileId->id === $this->openFileId);
 
 		return view('livewire.rules', [
+			'permissionGroups' => $this->permissionGroups($permissions),
+			'permissionTotal' => $permissions->count(),
+			'ignoredProjects' => $permissions->where('counts', false)->pluck('project')->unique()->values()->all(),
 			'groups' => collect(RuleGroupEnum::cases())
 				->map(fn (RuleGroupEnum $group) => [
 					'case' => $group,

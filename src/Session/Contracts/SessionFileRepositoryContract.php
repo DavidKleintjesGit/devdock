@@ -8,6 +8,7 @@ use Src\Project\Objects\ProjectEntityCollection;
 use Src\Session\Objects\SessionEntityCollection;
 use Src\Session\Objects\SessionObjectCollection;
 use Src\Session\Objects\TranscriptTurnObjectCollection;
+use Src\Worktree\Objects\WorktreeEntityCollection;
 
 interface SessionFileRepositoryContract
 {
@@ -18,6 +19,7 @@ interface SessionFileRepositoryContract
 	 */
 	public function getAll(
 		ProjectEntityCollection $projectEntities,
+		WorktreeEntityCollection $worktreeEntities,
 		SessionEntityCollection $storedSessionEntities,
 	): SessionObjectCollection;
 

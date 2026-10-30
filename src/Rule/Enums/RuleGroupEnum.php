@@ -10,6 +10,7 @@ enum RuleGroupEnum: string
 	case SHARED_RULES = 'Gedeelde regels';
 	case OWN_RULES = 'Eigen regels';
 	case DESIGN = 'Ontwerp';
+	case MEMORY = 'Geheugen';
 
 	public function label(): string
 	{

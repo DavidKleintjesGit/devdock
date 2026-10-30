@@ -45,6 +45,12 @@
 				<button class="btn sm" type="button" wire:click="askUpdateAll"><x-icon name="refresh" small/>{{ __('Alles bijwerken') }}</button>
 			</div>
 		@endif
+		@include('partials.permissions', [
+			'permissionGroups' => $permissionGroups,
+			'permissionTotal' => $permissionTotal,
+			'ignoredProjects' => $ignoredProjects,
+		])
+
 		@forelse ($groups as $group)
 			<section class="section">
 				<div class="section-head">
@@ -62,7 +68,12 @@
 					@foreach ($group['files'] as $item)
 						<div class="frow fcols{{ $openFileId === $item->ruleFileId->id ? ' open' : '' }}" wire:key="rule-{{ $item->ruleFileId->id }}">
 							<button class="rowlink fname" type="button" wire:click="open({{ $item->ruleFileId->id }})">
-								<x-icon name="file" small/><span class="mono">{{ $item->path }}</span>@if ($projects === [] || count($projects) > 1)<span class="muted mono">{{ $item->project }}</span>@endif
+								<x-icon name="file" small/>
+								<span class="ftext">
+									<span class="mono">{{ $item->path }}</span>
+									@if ($item->summary)<small>{{ $item->summary }}</small>@endif
+								</span>
+								@if ($projects === [] || count($projects) > 1)<span class="muted mono">{{ $item->project }}</span>@endif
 							</button>
 							<span><span class="chip {{ $item->origin->tone() }}">{{ $item->origin->label() }}</span></span>
 							<span class="lines mono">{{ $item->lines }}</span>

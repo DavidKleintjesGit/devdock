@@ -10,6 +10,7 @@ use Src\Prompt\Enums\PromptStatusEnum;
 use Src\Prompt\Models\PromptRun as PromptRunEloquent;
 use Src\Prompt\Objects\PromptResultObject;
 use Src\Prompt\Objects\PromptRunEntity;
+use Src\Prompt\Objects\PromptRunEntityCollection;
 use Src\Prompt\Objects\PromptRunId;
 use Src\Prompt\Objects\PromptRunObject;
 
@@ -21,8 +22,10 @@ class PromptRunRepository implements PromptRunRepositoryContract
 			'card' => $promptRunObject->card,
 			'project' => $promptRunObject->project,
 			'branch' => $promptRunObject->branch,
+			'directory' => $promptRunObject->directory,
 			'ticket_key' => $promptRunObject->ticketKey,
 			'session_uuid' => $promptRunObject->sessionUuid,
+			'claims_session' => $promptRunObject->claimsSession,
 			'prompt' => $promptRunObject->prompt,
 			'status' => PromptStatusEnum::RUNNING->value,
 			'started_at' => CarbonImmutable::now(),
@@ -38,6 +41,18 @@ class PromptRunRepository implements PromptRunRepositoryContract
 		return $promptRunEloquent === null ? null : $this->mapToEntity($promptRunEloquent);
 	}
 
+	public function getAllForCard(string $card): PromptRunEntityCollection
+	{
+		$promptRunEntities = PromptRunEloquent::query()
+			->where('card', $card)
+			->orderBy('id')
+			->get()
+			->map(fn (PromptRunEloquent $promptRunEloquent) => $this->mapToEntity($promptRunEloquent))
+			->all();
+
+		return PromptRunEntityCollection::fromArray($promptRunEntities);
+	}
+
 	public function getLatestForCard(string $card): ?PromptRunEntity
 	{
 		$promptRunEloquent = PromptRunEloquent::query()
@@ -46,6 +61,23 @@ class PromptRunRepository implements PromptRunRepositoryContract
 			->first();
 
 		return $promptRunEloquent === null ? null : $this->mapToEntity($promptRunEloquent);
+	}
+
+	public function getByReviewRounds(string $card): array
+	{
+		$byRound = [];
+
+		$promptRunEloquents = PromptRunEloquent::query()
+			->where('card', $card)
+			->whereNotNull('review_round_id')
+			->orderBy('id')
+			->get();
+
+		foreach ($promptRunEloquents as $promptRunEloquent) {
+			$byRound[(int) $promptRunEloquent->review_round_id] = $this->mapToEntity($promptRunEloquent);
+		}
+
+		return $byRound;
 	}
 
 	public function markFinished(PromptRunId $promptRunId, PromptResultObject $promptResultObject): PromptRunEntity
@@ -84,10 +116,13 @@ class PromptRunRepository implements PromptRunRepositoryContract
 		return new PromptRunEntity(
 			promptRunId: new PromptRunId(id: $promptRunEloquent->id),
 			card: (string) $promptRunEloquent->card,
+			reviewRoundId: $promptRunEloquent->review_round_id === null ? null : (int) $promptRunEloquent->review_round_id,
 			project: $promptRunEloquent->project,
 			branch: $promptRunEloquent->branch,
+			directory: $promptRunEloquent->directory,
 			ticketKey: $promptRunEloquent->ticket_key,
 			sessionUuid: $promptRunEloquent->session_uuid,
+			claimsSession: (bool) $promptRunEloquent->claims_session,
 			prompt: (string) $promptRunEloquent->prompt,
 			status: PromptStatusEnum::from((string) $promptRunEloquent->status),
 			output: $promptRunEloquent->output,

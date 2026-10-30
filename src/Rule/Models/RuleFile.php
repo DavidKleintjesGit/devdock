@@ -11,6 +11,7 @@ class RuleFile extends Model
 	protected $fillable = [
 		'project',
 		'path',
+		'summary',
 		'group',
 		'origin',
 		'lines',

@@ -26,7 +26,7 @@
 		<div class="mfoot">
 			<span class="note-left">{{ __('Dit kun je niet ongedaan maken.') }}</span>
 			<button class="btn" type="button" wire:click="cancelConfirm">{{ __('Annuleren') }}</button>
-			<button class="btn danger solid" type="button" wire:click="confirmUpdate"><x-icon name="refresh" small/>{{ __('Overschrijven') }}</button>
+			<x-busy-button action="confirmUpdate" class="btn danger solid" icon="refresh" :busy="__('Overschrijven...')">{{ __('Overschrijven') }}</x-busy-button>
 		</div>
 	</div>
 </div>

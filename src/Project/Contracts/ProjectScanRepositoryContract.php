@@ -13,4 +13,11 @@ interface ProjectScanRepositoryContract
 	 * standing of its working tree.
 	 */
 	public function getAll(string $sitesPath): ProjectObjectCollection;
+
+	/**
+	 * The branches of one checkout, so a task can be tied to one of them.
+	 *
+	 * @return list<string>
+	 */
+	public function getBranches(string $repositoryPath): array;
 }

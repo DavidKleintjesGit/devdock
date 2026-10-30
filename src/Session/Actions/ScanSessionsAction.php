@@ -10,6 +10,7 @@ use Src\Session\Contracts\SessionFileRepositoryContract;
 use Src\Session\Contracts\SessionRepositoryContract;
 use Src\Session\Objects\SessionEntityCollection;
 use Src\Session\Objects\SessionThresholdObject;
+use Src\Worktree\Actions\GetWorktreesAction;
 
 /**
  * Reads the Claude Code sessions folder and brings the stored sessions in
@@ -27,6 +28,7 @@ class ScanSessionsAction extends Command
 
 		$sessionObjects = $sessionFileRepository->getAll(
 			GetProjectsAction::execute(),
+			GetWorktreesAction::execute(),
 			$sessionRepository->getAll($thresholds),
 		);
 

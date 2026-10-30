@@ -116,12 +116,18 @@ class SessionRepository implements SessionRepositoryContract
 		);
 	}
 
+	/**
+	 * A session only counts as abandoned once it stayed short and a day went
+	 * by; one that started an hour ago may still be going somewhere.
+	 */
 	private function statusOf(
 		int $promptCount,
 		?CarbonImmutable $lastActiveAt,
 		SessionThresholdObject $thresholds,
 	): SessionStatusEnum {
-		if ($promptCount <= $thresholds->abandonedUpToPrompts) {
+		$sleptOnIt = $lastActiveAt?->isBefore(CarbonImmutable::now()->subDay()) ?? true;
+
+		if ($promptCount <= $thresholds->abandonedUpToPrompts && $sleptOnIt) {
 			return SessionStatusEnum::ABANDONED;
 		}
 

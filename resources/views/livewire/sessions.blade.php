@@ -32,7 +32,7 @@
 			</div>
 
 			@foreach ($cleanupOptions as $option)
-				<button class="btn sm" type="button" aria-pressed="{{ $cleanup === $option['case']->value ? 'true' : 'false' }}" wire:click="toggleCleanup('{{ $option['case']->value }}')">
+				<button class="btn" type="button" aria-pressed="{{ $cleanup === $option['case']->value ? 'true' : 'false' }}" wire:click="toggleCleanup('{{ $option['case']->value }}')">
 					<span class="dot {{ $option['case']->tone() }}"></span>{{ $option['case']->label() }}<span class="n">{{ $option['count'] }}</span>
 				</button>
 			@endforeach

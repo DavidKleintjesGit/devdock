@@ -7,12 +7,13 @@ use App\Livewire\Board;
 use App\Livewire\Rules;
 use App\Livewire\Sessions;
 use App\Livewire\Skills;
+use App\Livewire\Workflows;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', Board::class)->name('board');
 
 Route::get('/sessies', Sessions::class)->name('sessions');
-Route::view('/workflows', 'pages.placeholder', ['page' => 'Workflows', 'icon' => 'workflows'])->name('workflows');
+Route::get('/workflows', Workflows::class)->name('workflows');
 Route::get('/regels', Rules::class)->name('rules');
 Route::get('/skills', Skills::class)->name('skills');
 
