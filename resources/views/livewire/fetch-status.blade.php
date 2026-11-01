@@ -1,29 +1,27 @@
-<div @class(['statusbox', 'running' => $running])
+<div class="nav"
 	@if ($running)
-		wire:poll.2s
-	@elseif ($refreshSeconds > 0)
-		wire:poll.{{ $refreshSeconds }}s="refreshWhenStale"
+		wire:poll.2s="followRun"
+	@elseif ($lookEvery > 0)
+		wire:poll.{{ $lookEvery }}s="refreshWhenStale"
 	@endif
 >
-	<div class="statusrow">
-		<span class="dot {{ $connected === 4 ? 'green' : 'amber' }}"></span>
-		<span class="k">{{ __('Koppelingen') }}</span>
-		<span class="v">{{ __(':done van :total', ['done' => $connected, 'total' => 4]) }}</span>
-		<span class="slot"></span>
-	</div>
 	@if ($running)
-		<button class="statusrow" type="button" disabled>
-			<span class="dot amber pulse"></span>
-			<span class="k">{{ __('Ophalen') }}</span>
-			<span class="v">{{ $run->source ?? '…' }}</span>
-			<span class="slot"></span>
+		<button type="button" disabled>
+			<x-icon name="refresh"/>
+			<span class="nav-label">{{ __('Ophalen: :source', ['source' => $run->source ?? '…']) }}</span>
+			<span class="state"><span class="dot amber pulse"></span></span>
+		</button>
+	@elseif ($failed !== null)
+		<button class="fail" type="button" wire:click="fetchNow" title="{{ __(':source gaf een fout terug; opnieuw proberen', ['source' => $failed]) }}">
+			<x-icon name="alert"/>
+			<span class="nav-label"><b>{{ __(':source niet bereikbaar', ['source' => $failed]) }}</b><small>{{ __('de rest om :time bijgewerkt', ['time' => $updated ?? __('nooit')]) }}</small></span>
+			<span class="state">{{ $connected }}/4</span>
 		</button>
 	@else
-		<button class="statusrow" type="button" wire:click="fetchNow" title="{{ __('Nu ophalen') }}">
-			<span class="dot"></span>
-			<span class="k">{{ $refreshSeconds > 0 ? __('Werkt vanzelf bij') : __('Bijgewerkt') }}</span>
-			<span class="v">{{ $updated ?? __('nooit') }}</span>
-			<span class="slot"><x-icon name="refresh" small/></span>
+		<button type="button" wire:click="fetchNow" title="{{ __('Nu ophalen') }}">
+			<x-icon name="refresh"/>
+			<span class="nav-label">{{ __('Bijgewerkt :time', ['time' => $updated ?? __('nooit')]) }}</span>
+			<span class="state"><span class="dot {{ $connected === 4 ? 'green' : 'amber' }}"></span>{{ $connected }}/4</span>
 		</button>
 	@endif
 </div>

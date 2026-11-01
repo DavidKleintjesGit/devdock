@@ -54,10 +54,19 @@ class TaskRepository implements TaskRepositoryContract
 			->where('is_active', true)
 			->exists();
 
-		// a value belongs to one task, so pinning it here takes it off the other
-		TaskLinkEloquent::query()->updateOrCreate(
-			['kind' => $kind->value, 'value' => $value],
-			['task_id' => $taskId->id, 'is_active' => ! $hasActive],
+		// a ticket, branch or pull request belongs to one task, so pinning it here takes it off the other
+		if ($kind->isExclusive()) {
+			TaskLinkEloquent::query()
+				->where('kind', $kind->value)
+				->where('value', $value)
+				->where('task_id', '!=', $taskId->id)
+				->delete();
+		}
+
+		// tying the same value again leaves it as active as it was
+		TaskLinkEloquent::query()->firstOrCreate(
+			['task_id' => $taskId->id, 'kind' => $kind->value, 'value' => $value],
+			['is_active' => ! $hasActive],
 		);
 
 		return $this->byId($taskId);

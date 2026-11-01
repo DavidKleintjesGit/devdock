@@ -20,9 +20,19 @@ class TicketEntity extends ValueObject
 		public readonly ?string $status,
 		public readonly ?string $type,
 		public readonly ?string $priority,
+		public readonly ?string $sprint,
+		public readonly ?CarbonImmutable $sprintEndsAt,
 		public readonly ?string $url,
 		public readonly ?CarbonImmutable $changedAt,
 	) {
 		parent::__construct();
+	}
+
+	/**
+	 * Whether the ticket is planned in the sprint that is running now.
+	 */
+	public function isInSprint(): bool
+	{
+		return $this->sprint !== null;
 	}
 }

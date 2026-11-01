@@ -10,6 +10,9 @@ use Livewire\Component;
 use Src\Board\Enums\BoardColumnEnum;
 use Src\Fetch\Actions\GetLatestFetchRunAction;
 use Src\Fetch\Actions\StartFetchAction;
+use Src\Library\Actions\GetLibrariesAction;
+use Src\Library\Actions\UpdateLibraryAction;
+use Src\Library\Objects\LibraryEntity;
 use Src\Project\Actions\GetProjectsAction;
 use Src\PullRequest\Actions\GetPullRequestsAction;
 use Src\Rule\Actions\GetRuleFilesAction;
@@ -63,9 +66,19 @@ class Settings extends Component
 
 	public string $language = 'en';
 
-	public bool $showBranch = true;
+	public bool $backlogHidden = true;
+
+	public int $staleDays = 5;
 
 	public bool $saved = false;
+
+	public ?int $editingLibrary = null;
+
+	public string $libraryName = '';
+
+	public string $libraryFolder = '';
+
+	public string $librarySkillsFolder = '';
 
 	public ?string $savedAt = null;
 
@@ -122,7 +135,8 @@ class Settings extends Component
 			'large_from_mb' => $this->largeFromMegabytes,
 			'old_after_days' => $this->oldAfterDays,
 			'theme' => $this->theme,
-			'show_branch' => $this->showBranch,
+			'backlog_hidden' => $this->backlogHidden,
+			'stale_days' => $this->staleDays,
 			'language' => $this->language,
 		]));
 
@@ -136,36 +150,28 @@ class Settings extends Component
 		$this->savedAt = now()->format('H:i');
 	}
 
+	public function editLibrary(int $library): void
+	{
+		$libraryEntity = collect(GetLibrariesAction::execute())->first(fn (LibraryEntity $item) => $item->id === $library);
+
+		$this->editingLibrary = $libraryEntity?->id;
+		$this->libraryName = (string) $libraryEntity?->name;
+		$this->libraryFolder = (string) $libraryEntity?->folder;
+		$this->librarySkillsFolder = (string) $libraryEntity?->skillsFolder;
+	}
+
+	public function saveLibrary(): void
+	{
+		if ($this->editingLibrary !== null && trim($this->libraryName) !== '') {
+			UpdateLibraryAction::execute($this->editingLibrary, $this->libraryName, $this->libraryFolder, $this->librarySkillsFolder);
+		}
+
+		$this->editingLibrary = null;
+	}
+
 	public function fetchNow(): void
 	{
 		StartFetchAction::execute();
-	}
-
-	public function render(): View
-	{
-		$settingEntity = GetSettingsAction::execute();
-
-		return view('livewire.settings', [
-			'sections' => $this->sections(),
-			'hasJiraToken' => $settingEntity->hasJiraToken,
-			'hasBitbucketToken' => $settingEntity->hasBitbucketToken,
-			'hasClaudeToken' => $settingEntity->hasClaudeToken,
-			'run' => GetLatestFetchRunAction::execute(),
-			'allColumns' => BoardColumnEnum::cases(),
-			'counts' => [
-				'tickets' => count(GetTicketsAction::execute()),
-				'pullRequests' => count(GetPullRequestsAction::execute()),
-				'projects' => count(GetProjectsAction::execute()),
-				'sessions' => count(GetSessionsAction::execute()),
-				'rules' => count(GetRuleFilesAction::execute()),
-				'skills' => count(GetSkillsAction::execute()),
-			],
-			'folders' => [
-				'sites' => is_dir($this->sitesPath),
-				'sessions' => is_dir($this->sessionsPath),
-				'core' => is_dir($this->corePath),
-			],
-		]);
 	}
 
 	/**
@@ -179,11 +185,11 @@ class Settings extends Component
 			'Bronnen' => [
 				'koppelingen' => [__('Koppelingen'), 'plug'],
 				'mappen' => [__('Mappen'), 'folder'],
-				'ophalen' => [__('Ophalen'), 'refresh'],
+				'bibliotheken' => [__('Bibliotheken'), 'library'],
 			],
-			'Bord' => [
-				'kolommen' => [__('Kolommen'), 'bord'],
-				'drempels' => [__('Drempels'), 'sliders'],
+			'Werkbord' => [
+				'bord' => [__('Bord'), 'bord'],
+				'sessies' => [__('Sessies'), 'sessies'],
 			],
 			'Dit apparaat' => [
 				'weergave' => [__('Weergave'), 'weergave'],
@@ -210,7 +216,44 @@ class Settings extends Component
 		$this->largeFromMegabytes = $settingEntity->largeFromMegabytes;
 		$this->oldAfterDays = $settingEntity->oldAfterDays;
 		$this->theme = $settingEntity->theme;
-		$this->showBranch = $settingEntity->showBranch;
+		$this->backlogHidden = $settingEntity->backlogHidden;
+		$this->staleDays = $settingEntity->staleDays;
 		$this->language = $settingEntity->language;
+	}
+
+	public function render(): View
+	{
+		// dicht is het venster een lege houder op elke pagina; wat erin staat
+		// wordt pas opgehaald als je het opent
+		if (! $this->open) {
+			return view('livewire.settings');
+		}
+
+		$settingEntity = GetSettingsAction::execute();
+
+		return view('livewire.settings', [
+			'sections' => $this->sections(),
+			'hasJiraToken' => $settingEntity->hasJiraToken,
+			'hasBitbucketToken' => $settingEntity->hasBitbucketToken,
+			'hasClaudeToken' => $settingEntity->hasClaudeToken,
+			'run' => GetLatestFetchRunAction::execute(),
+			'bitbucketRestMinutes' => intdiv((int) config('devdock.bitbucket.refresh_seconds'), 60),
+			'allColumns' => BoardColumnEnum::sprint(),
+			'libraries' => $this->section === 'bibliotheken' ? GetLibrariesAction::execute() : [],
+			'database' => str_replace(base_path() . DIRECTORY_SEPARATOR, '', (string) config('database.connections.' . config('database.default') . '.database')),
+			'counts' => [
+				'tickets' => count(GetTicketsAction::execute()),
+				'pullRequests' => count(GetPullRequestsAction::execute()),
+				'projects' => count(GetProjectsAction::execute()),
+				'sessions' => count(GetSessionsAction::execute()),
+				'rules' => count(GetRuleFilesAction::execute()),
+				'skills' => count(GetSkillsAction::execute()),
+			],
+			'folders' => [
+				'sites' => is_dir($this->sitesPath),
+				'sessions' => is_dir($this->sessionsPath),
+				'core' => is_dir($this->corePath),
+			],
+		]);
 	}
 }

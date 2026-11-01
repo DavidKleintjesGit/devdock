@@ -1,130 +1,102 @@
 # Ontwerptaal van DevDock
 
-> Status: **voorstel**. De app draait nog op `resources/css/app.css`; dit is wat we ervoor in de plaats
-> willen. Het levende voorbeeld staat in [`mockups/stijl.html`](mockups/stijl.html), de stylesheet in
-> [`mockups/stijl.css`](mockups/stijl.css). Lees die twee naast dit document — wat daar niet in staat,
-> bestaat niet.
+> Het ontwerpcanvas is leidend: wat daar onder **Bouwstenen** staat, staat hier in code. Alle stijl zit in
+> één bestand, [`resources/css/app.css`](../resources/css/app.css). Bouw je iets nieuws, kijk dan eerst
+> of een bouwsteen hieronder het al doet.
 
-## Waarom
+## De regels
 
-DevDock is één gereedschap met vijf plekken. Je moet je op Sessies net zo thuis voelen als op het
-bord, zonder opnieuw te leren hoe een rij werkt. Dat is nu niet zo:
+### 1. Een pagina vult het hele scherm
 
-- **Tien soorten rij** doen het werk van vier: `kcard`, `linkrow`, `frow`, `krow`, `srow`, `lrow`,
-  `wrow`, `dfile`, `set`, `statusrow`. Elke pagina heeft zijn eigen variant gekregen.
-- **Twee woordenschatten voor status.** `dot` praat in kleuren (green, amber, red, teal, gray),
-  `ldot` in betekenis (pass, fail, run, wait, skip). Een `chip` krijgt zijn kleur van de aanroeper mee.
-- **Vier soorten kop** die hetzelfde doen: `section-head`, `fieldhead`, `panelhead`, `listhead`.
-- **Losse maten in de views.** `style="font-size:12.5px"` staat tientallen keren in Blade. Dat is geen
-  slordigheid maar een ontbrekende naam.
-- **Op een smal scherm verdwijnt er van alles**, zie hieronder.
+De schil is een zijbalk links en de pagina rechts. De kop (`head`) blijft staan; alleen de inhoud
+schuift. Details komen nooit op een eigen pagina maar als **lade** van rechts (`drawer`), zodat je
+altijd ziet waar je vandaan kwam.
 
-## De twee regels
+### 2. Status heet naar wat hij betekent
 
-### 1. Status heet naar wat hij betekent, nooit naar een kleur
+Een kaart, rij of label krijgt zijn stand van een enum, nooit een kleur van de aanroeper. De enum
+geeft de toon (`tone()`, `dotTone()`), de view zet hem alleen neer.
 
-Vijf standen, en meer komen er niet:
-
-| Stand | Wanneer |
+| Bouwsteen | Standen |
 | --- | --- |
-| `goed` | af, geslaagd, niets meer te doen |
-| `bezig` | loopt nu, beweegt uit zichzelf |
-| `wacht` | nog niet begonnen, of wacht op iemand |
-| `stuk` | mislukt, of het blokkeert iets anders |
-| `uit` | telt niet mee, staat er ter informatie |
+| `sdot` (stip op een kaart) | `yours` jouw beurt · `busy` er loopt iets · `quiet` wacht · `red` vast |
+| `ldot` (stip van een lens) | `pass` · `fail` · `busy` |
+| `label` (rechthoekig, zes hoeken) | `green` · `amber` · `red` · `teal` · `blue` · `muted` |
+| `path` (toestemming) | standaard mag · `ask` vraagt eerst · `deny` nooit · `skip` doet niet mee |
 
-Drie vormen uit diezelfde woordenschat: `status-dot` (bolletje), `status-chip` (pil met tekst) en
-`status-bar` (streepje, voor een reeks naast elkaar zoals de lenzen van een ronde). `note` gebruikt
-dezelfde namen voor een melding met een zin erbij.
+### 3. Een rij die ergens heen gaat, is zelf de knop
 
-Een component kiest zijn stand nooit zelf uit een kleur. Een enum geeft `goed`, niet `green`.
+Een regel met één bestemming (een taak, sessie, bestand, bevinding) is als geheel klikbaar:
+`button.row` of `a.row`, nooit een losse knop "openen" aan het eind. Wat ín de rij iets anders doet
+(een vinkje, ontkoppelen) houdt zijn eigen klik.
 
-### 2. Een rij die ergens heen gaat, is zelf de knop
+### 4. Niets verdwijnt op een smal scherm
 
-Een regel in een lijst die één bestemming heeft — een taak, een sessie, een
-bestand, een bevinding — is in zijn geheel klikbaar. Er komt geen knop "openen"
-of "lezen" aan het eind. Die knop maakt het aanklikgebied kleiner in plaats van
-groter, en hij herhaalt wat de rij al is.
+Een onderdeel verandert van vorm, het wordt niet weggelaten.
 
-Dat geldt op elke pagina, zodat je nergens hoeft te zoeken waar je moet drukken:
-een kaart op het bord, een sessie, een gewijzigd bestand, een gevallen lens.
+- onder **1180 px** wordt de zijbalk smaller en de rand van de pagina kleiner;
+- onder **900 px** wordt de zijbalk een tabbalk onderaan (`tabbar`), staan de bordkolommen naast
+  elkaar om doorheen te vegen, en wordt een lijst-met-pagina (`split`) eerst de lijst en dan de pagina
+  met een terugknop.
 
-Wat ín die rij staat en iets ánders doet houdt de klik bij zich: een vinkje dat
-kiest, een knop die ontkoppelt. Een rij met meerdere bestemmingen — de
-koppelingen, bijvoorbeeld, met openen, wijzigen en ontkoppelen naast elkaar — is
-geen klikbare rij maar een rij met knoppen.
+### 5. Elke klik laat zien dat er iets gebeurt
 
-Elke klikbare rij draagt `role="button"`, een `tabindex` en dezelfde reactie op
-muis en toetsenbord.
+Bij elk Livewire-verzoek loopt de laadbalk bovenaan (`body.is-working`). Een knop die lang kan duren is
+een `<x-busy-button>`.
 
-### 3. Niets verdwijnt op een smal scherm
+## Tokens
 
-Een onderdeel verandert van vorm; het wordt nooit weggelaten. Een kolom wordt een stap, een tabel
-wordt een lijst, een lijst naast de inhoud wordt een laag eroverheen met een terugknop.
+Kleuren, schaduwen en lettertypes staan als custom properties op `:root`, met een donkere set onder
+`data-wb-theme="dark"` en `"system"`. Gebruik altijd een token, nooit een losse hexwaarde.
 
-Daarom is elk component geschreven op de breedte van **zijn houder** (`@container`), niet op die van
-het venster. Eén markup, twee vormen — geen tweede blok dat alleen op mobiel meedoet.
+| Groep | Tokens |
+| --- | --- |
+| Vlakken | `--bg` `--surface` `--surface-2` `--sunken` `--column` |
+| Lijnen | `--line` `--line-strong` `--faint` |
+| Tekst | `--fg` `--fg-2` `--muted` |
+| Accent | `--accent` `--accent-fg` `--accent-soft` `--accent-ink` `--accent-light` `--accent-wash` |
+| Signaal | `--red*` `--amber*` `--green*` `--blue*`, elk met `-soft` (achtergrond) en waar nodig `-dot` |
+| Code | `--code-bg` `--code-fg` |
+| Diepte | `--shadow` `--shadow-head` `--shadow-lg` `--shadow-pop` `--scrim` |
+| Letter | `--font` (Geist) `--mono` (Geist Mono) |
+| Maat | `--side` (zijbalk) `--gutter` (rand van de pagina) |
 
-Wat nu wél verdwijnt onder 900 pixels, en dus terug moet:
+## Bouwstenen
 
-- het kolommenmenu op het bord (`menu.desk`) — je kunt op een telefoon niet kiezen wélke kolommen je ziet
-- de kolomkop, inclusief waar de kolom op wacht
-- de tabelkop en de tabelcellen op Sessies — die staan daarnaast nóg een keer in de markup als `m-meta`
-- regels en woorden op de regelspagina (`frow .lines`, `frow .read`)
-- onder 720 px: de bestandenlijst in het diff-paneel (`difffiles`), waardoor je op een telefoon geen
-  ander bestand kunt kiezen
-
-## De onderdelen
-
-### Vier rijen, meer niet
-
-| Component | Waarvoor | Vervangt |
+| Groep | Klassen | Waarvoor |
 | --- | --- | --- |
-| `card` | een ding op het bord | `kcard` |
-| `list-row` | een regel in een lijst: status, naam met subregel, kenmerken, actie | `linkrow`, `krow`, `lrow`, `wrow`, `dfile`, `statusrow` |
-| `table-row` | kolommen die je naast elkaar wilt lezen | `srow`, `frow`, `scols`, `fcols`, `m-meta` |
-| `setting-row` | uitleg links, één besturing rechts | `set` |
+| Schil | `shell` `side` `nav` `side-foot` `tabbar` `brand` `wordmark` `working` | zijbalk, tabbalk op een telefoon, laadbalk |
+| Pagina | `main` `head` `head-inner` `head-title` `toolbar` `page` `stack` | kop met titel en filters, inhoud eronder |
+| Lijst en pagina | `split` `index` `index-group` | Regels, Skills en Workflows: lijst links, pagina rechts |
+| Bediening | `btn` (`primary` `danger` `text` `sm` `xs`) `icon-btn` `fbtn` `seg` `switch` `tick` `pick` `choice(s)` `tchip` | knoppen, filters, keuzes |
+| Velden | `field` `input` `textarea` `search` | invoer met label erboven |
+| Labels | `label` `count` `badge-n` `chips` `path` | korte standen en tellingen |
+| Vlakken | `card` `list` `list-head` `row` `section` `section-head` `empty` `alert` `banner` `notebox` `facts` `kv` | lijsten, secties, meldingen |
+| Menu's | `menu` `menu-pop` `picker-*` `popt` | menu achter ⋯ en de projectkiezer |
+| Bord | `board-scroll` `cols` `col` `col-head` `kcard` `prio` | kolommen en kaarten van 116 px hoog |
+| Lade | `drawer` `dhead` `tabs` `dbody` `dsec` `dfoot` `scrim` | detail van een kaart, sessie, lens of bevinding |
+| Agent | `chat` `chat-banner` `chat-turn` (`you` `agent`) `answer` `agent-steps` `step-list` `caret` `reportbar` (`green` `amber` `red`) `mockup` `composer` | gesprek met de agent: hele antwoorden, ingeklapte stappen, getekende mockups en antwoordknoppen |
+| Sessie | `talk` `say` `turns` `turn` | een gelezen Claude-sessie |
+| Werkkopie | `filerow` `commitrow` `dbar` `progress` | gewijzigde bestanden, commit, database |
+| Review | `steps` `chain` `loop` `lens-row` `verdict` `finding` `checkpath` | rondes, lenzen en bevindingen |
+| Code | `code-block` `diff` `diffsplit` `difffiles` `diffpatch` `md` | diff en gelezen markdown |
+| Instellingen | `settings` `settings-rail` `settings-main` `setlist` `set` | venster met een rail links |
+| Venster | `dialog-wrap` `dialog` `toast` | vragen en meldingen boven de pagina |
 
-`list-row` heeft altijd dezelfde volgorde: **status · naam met subregel · kenmerken · actie.** In een
-smalle houder zakken de kenmerken onder de naam.
+## Blade-componenten
 
-`table-row` draagt de kolomnaam mee als `data-kolom`, zodat die op een telefoon vóór de waarde komt
-te staan in plaats van te verdwijnen.
-
-### Koppen
-
-Eén `section-header`: titel links, telling of hint rechts. Het niveau bepaalt alleen welke titel erin
-staat — `heading` voor een sectie, `eyebrow` voor een veld. Binnen een vlak krijgt hij `inside`.
-
-### De actiebalk
-
-Onderaan elk paneel. Links wat je kunt doen, rechts **altijd hetzelfde soort regel**: waar dit werk
-staat (de branch, het pad, het ticket). Nu zegt die regel per tab iets anders — een agentnaam, een
-status, een branch — waardoor je hem niet kunt lezen zonder eerst te kijken wat er staat.
-
-### Filters
-
-Twee vormen, met een regel erbij:
-
-- een groep waarin precies één ding aan staat → **segment**
-- iets wat je los aan en uit zet → **filterknop** met een telling
-- een lijst die te lang is om uit te spreiden → **menu**
-
-Drie vormen door elkaar op één balk, zoals nu, is er één te veel.
+| Component | Doet |
+| --- | --- |
+| `<x-app-layout>` | de schil: zijbalk, tabbalk, laadbalk |
+| `<x-icon name="…" small/>` | een icoon uit `partials/icons` |
+| `<x-mark :size="…"/>` | het beeldmerk |
+| `<x-project-picker>` | de projectkiezer in de kop |
+| `<x-busy-button>` | een knop die laat zien dat hij bezig is |
+| `<x-diff>` | een diff, per blok met de gewijzigde regels |
+| `<x-mockup :mockup="…" :run="…"/>` | een mockup van de agent in een frame met de stylesheets van het project |
 
 ## Namen
 
-Namen worden voluit geschreven, ook in CSS. `kdesc`, `ldesc`, `fcols`, `scols` en `m-meta` zeggen de
-lezer niets. Een klasse heet naar wat het onderdeel is (`list-row-meta`), niet naar waar het toevallig
-voor het eerst stond.
-
-Maten komen uit de tokens. Zes tekstmaten (`--text-micro` tot `--text-page`), afstanden in stappen van
-vier (`--space-1` tot `--space-6`). Een losse `px` in een view betekent dat er een token ontbreekt.
-
-## Wat nog niet beslist is
-
-- **De schil.** De linkerbalk klapt onder 1180 px dicht tot iconen en valt onder 900 px helemaal weg
-  voor een tabbalk. Dat is nog niet tegen regel 2 gehouden.
-- **De lade.** Of een taak een lade over het bord moet zijn, of iets anders, is een routevraag die per
-  plek aan bod komt.
-- **Donker.** De tokens staan er, maar de donkere kant is nog niet nagelopen op de nieuwe onderdelen.
+Klassen zijn kort en heten naar wat het onderdeel is. Een losse `style=""` in een view is toegestaan
+voor een eenmalige plaatsing (een marge, een uitlijning), niet voor een kleur of lettermaat: die komt
+uit een token of een bouwsteen. Komt dezelfde inline stijl drie keer terug, dan is het een bouwsteen.

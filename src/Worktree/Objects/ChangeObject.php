@@ -31,6 +31,19 @@ class ChangeObject extends ValueObject
 		);
 	}
 
+	/**
+	 * Whether the file did not exist before this change.
+	 */
+	public function isNew(): bool
+	{
+		return in_array($this->kind, [ChangeKindEnum::ADDED, ChangeKindEnum::UNTRACKED], true);
+	}
+
+	public function isGone(): bool
+	{
+		return $this->kind === ChangeKindEnum::DELETED;
+	}
+
 	public function name(): string
 	{
 		return basename($this->path);

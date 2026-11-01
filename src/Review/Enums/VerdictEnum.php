@@ -44,6 +44,27 @@ enum VerdictEnum: string
 		};
 	}
 
+	/**
+	 * The colour of the dot in front of a lens in a round.
+	 */
+	public function dotTone(): string
+	{
+		return match ($this) {
+			self::PASS => 'pass',
+			self::FAIL, self::ERROR => 'fail',
+			self::RUNNING => 'busy',
+			default => '',
+		};
+	}
+
+	/**
+	 * Whether this lens left something to open: points, or why it fell over.
+	 */
+	public function hasFinding(): bool
+	{
+		return $this === self::FAIL || $this === self::ERROR;
+	}
+
 	public function chipTone(): string
 	{
 		return match ($this) {

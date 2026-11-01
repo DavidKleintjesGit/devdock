@@ -52,7 +52,19 @@ class ComposeAgentContextAction extends Command
 			$this->theRoute($step),
 			$this->whereTheReportsAre($agentContextRepository),
 			"## What is asked of you now\n\n" . ($blocks[$step->value] ?? ''),
+			$this->forThisProject($cardObject->project),
 		])));
+	}
+
+	/**
+	 * What the project adds to the way of working. It comes after the
+	 * standard and never replaces it.
+	 */
+	private function forThisProject(?string $project): ?string
+	{
+		$context = GetWorkflowSettingAction::execute($project)->context;
+
+		return $context === null ? null : "## In this project\n\n" . $context;
 	}
 
 	/**

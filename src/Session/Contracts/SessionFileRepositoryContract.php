@@ -32,6 +32,17 @@ interface SessionFileRepositoryContract
 	public function delete(string $relativePath): bool;
 
 	/**
+	 * How many sessions Claude Code keeps for this folder.
+	 */
+	public function countFor(string $workingDirectory): int;
+
+	/**
+	 * Throws away every session Claude Code keeps for this folder, and says
+	 * how many there were.
+	 */
+	public function deleteFor(string $workingDirectory): int;
+
+	/**
 	 * The first turns of a session file, to show in the panel.
 	 */
 	public function getTurns(string $relativePath, int $limit): TranscriptTurnObjectCollection;

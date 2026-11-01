@@ -6,6 +6,7 @@ namespace Src\PullRequest\Repositories;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
@@ -20,6 +21,12 @@ use Src\PullRequest\Objects\ReviewCommentObjectCollection;
 
 class BitbucketPullRequestRepository implements PullRequestSourceRepositoryContract
 {
+	/**
+	 * How many listings are asked for at the same time; Bitbucket allows a
+	 * thousand calls an hour per token, not a flood in one second.
+	 */
+	private const CONCURRENT_REQUESTS = 8;
+
 	public function isConfigured(): bool
 	{
 		return filled(config('devdock.bitbucket.workspace'))
@@ -31,14 +38,7 @@ class BitbucketPullRequestRepository implements PullRequestSourceRepositoryContr
 	{
 		$pullRequestObjects = [];
 
-		foreach ($this->repositorySlugs() as $repository) {
-			$pullRequests = [
-				...$this->pullRequests($repository, 'OPEN'),
-				...$this->pullRequests($repository, 'MERGED', [
-					'q' => 'updated_on>=' . $mergedSince->toIso8601String(),
-				]),
-			];
-
+		foreach ($this->pullRequestListings($this->repositorySlugs(), $mergedSince) as $repository => $pullRequests) {
 			foreach ($pullRequests as $pullRequest) {
 				$role = $this->roleOf($pullRequest, $reviewerName);
 
@@ -115,24 +115,66 @@ class BitbucketPullRequestRepository implements PullRequestSourceRepositoryContr
 			->all();
 	}
 
-	private function pullRequests(string $repository, string $state, array $query = []): array
+	/**
+	 * The open pull requests and the ones merged since the given moment, per
+	 * repository. The first page of every listing is asked for at once; only a
+	 * listing that failed or runs over a page goes on one request at a time.
+	 *
+	 * @param  list<string>  $repositories
+	 * @return array<string, array>
+	 */
+	private function pullRequestListings(array $repositories, CarbonImmutable $mergedSince): array
 	{
-		$workspace = config('devdock.bitbucket.workspace');
+		$listings = collect($repositories)->flatMap(fn (string $repository) => [
+			$repository . '|OPEN' => [$repository, $this->pullRequestQuery('OPEN')],
+			$repository . '|MERGED' => [$repository, $this->pullRequestQuery('MERGED') + [
+				'q' => 'updated_on>=' . $mergedSince->toIso8601String(),
+			]],
+		]);
 
-		return $this->pages("/2.0/repositories/{$workspace}/{$repository}/pullrequests", $query + [
+		$responses = Http::pool(fn (Pool $pool) => $listings->map(
+			fn (array $listing, string $key) => $this->authorized($pool->as($key))
+				->get($this->pullRequestPath($listing[0]), $listing[1] + ['page' => 1]),
+		)->all(), self::CONCURRENT_REQUESTS);
+
+		$pullRequests = array_fill_keys($repositories, []);
+
+		foreach ($listings as $key => [$repository, $query]) {
+			$response = $responses[$key] ?? null;
+
+			$values = $response instanceof Response && $response->successful()
+				? [
+					...($response->json('values') ?? []),
+					...(filled($response->json('next')) ? $this->pages($this->pullRequestPath($repository), $query, 2) : []),
+				]
+				: $this->pages($this->pullRequestPath($repository), $query);
+
+			$pullRequests[$repository] = [...$pullRequests[$repository], ...$values];
+		}
+
+		return $pullRequests;
+	}
+
+	private function pullRequestPath(string $repository): string
+	{
+		return '/2.0/repositories/' . config('devdock.bitbucket.workspace') . "/{$repository}/pullrequests";
+	}
+
+	private function pullRequestQuery(string $state): array
+	{
+		return [
 			'state' => $state,
 			'pagelen' => 50,
 
 			// the list endpoint leaves participants out by default; without this
 			// extension there is no reviewer verdict at all to sort on
 			'fields' => '+values.participants,-values.description,-values.summary',
-		]);
+		];
 	}
 
-	private function pages(string $path, array $query): array
+	private function pages(string $path, array $query, int $page = 1): array
 	{
 		$values = [];
-		$page = 1;
 
 		do {
 			$result = $this->client()->get($path, $query + ['page' => $page]);
@@ -213,10 +255,14 @@ class BitbucketPullRequestRepository implements PullRequestSourceRepositoryContr
 
 	private function client(): PendingRequest
 	{
-		return Http::baseUrl('https://api.bitbucket.org')
+		return $this->authorized(Http::createPendingRequest())->retry(2, 200, throw: false);
+	}
+
+	private function authorized(PendingRequest $pendingRequest): PendingRequest
+	{
+		return $pendingRequest->baseUrl('https://api.bitbucket.org')
 			->withBasicAuth(config('devdock.atlassian.email'), config('devdock.bitbucket.token'))
 			->acceptJson()
-			->timeout(20)
-			->retry(2, 200, throw: false);
+			->timeout(20);
 	}
 }

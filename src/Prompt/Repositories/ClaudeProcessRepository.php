@@ -82,15 +82,27 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	}
 
 	/**
-	 * Runs Claude Code in the project folder, without a screen. The json output
-	 * carries the session id next to the answer, so a fresh session can be tied
-	 * to the board and renamed afterwards.
+	 * Runs Claude Code in the project folder, without a screen. Every event is
+	 * written to the log as it comes in, text included while it is being
+	 * typed, so the page can follow along. The closing event carries the
+	 * session id next to the answer, so a fresh session can be tied to the
+	 * board and renamed afterwards.
 	 */
-	public function run(PromptRunEntity $promptRunEntity, array $alsoReads = []): PromptResultObject
+	public function run(PromptRunEntity $promptRunEntity, array $alsoReads, string $logPath, string $instructions): PromptResultObject
 	{
 		$directory = $promptRunEntity->directory ?? base_path();
 
-		$arguments = [...$this->alsoReads($alsoReads), '-p', $promptRunEntity->prompt, '--output-format', 'json'];
+		$arguments = [
+			...$this->alsoReads($alsoReads),
+			'-p',
+			$promptRunEntity->prompt,
+			'--output-format',
+			'stream-json',
+			'--verbose',
+			'--include-partial-messages',
+			'--append-system-prompt',
+			$instructions,
+		];
 
 		if (filled($promptRunEntity->sessionUuid)) {
 			// the key is ours: the first round claims it, every one after resumes it
@@ -99,12 +111,45 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 				: ['--resume', $promptRunEntity->sessionUuid, ...$arguments];
 		}
 
+		File::ensureDirectoryExists(dirname($logPath));
+		File::put($logPath, '');
+
+		$answer = null;
+		$rest = '';
+
 		$result = Process::path($directory)
 			->env($this->environment())
 			->timeout((int) config('devdock.prompt_timeout'))
-			->run([$this->claudeBinary(), ...$arguments]);
+			->run(
+				[$this->claudeBinary(), ...$arguments],
+				function (string $type, string $output) use (&$answer, &$rest, $logPath): void {
+					if ($type !== 'out') {
+						return;
+					}
 
-		$answer = json_decode($result->output(), true);
+					$rest .= $output;
+
+					// a chunk breaks wherever it breaks, so only whole lines are written
+					while (($break = strpos($rest, "\n")) !== false) {
+						$line = trim(substr($rest, 0, $break));
+						$rest = substr($rest, $break + 1);
+
+						if ($line === '') {
+							continue;
+						}
+
+						File::append($logPath, $line . PHP_EOL);
+
+						$event = json_decode($line, true);
+
+						if (is_array($event) && ($event['type'] ?? null) === 'result') {
+							$answer = $event;
+						}
+					}
+				},
+			);
+
+		$this->compact($logPath);
 
 		// Claude Code also exits with an error code when it answers politely that
 		// something is wrong, and that explanation is more useful than the raw
@@ -114,8 +159,22 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 		}
 
 		throw new RuntimeException(
-			trim($result->errorOutput() ?: $result->output()) ?: __('Claude Code gaf geen antwoord.'),
+			trim($result->errorOutput() ?: $rest) ?: __('Claude Code gaf geen antwoord.'),
 		);
+	}
+
+	/**
+	 * Drops the typing from a finished log: the whole messages are in it as
+	 * well, and the deltas make up most of its size.
+	 */
+	private function compact(string $logPath): void
+	{
+		$lines = file($logPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+
+		File::put($logPath, implode(PHP_EOL, array_filter(
+			$lines,
+			fn (string $line) => ! str_starts_with($line, '{"type":"stream_event"'),
+		)) . PHP_EOL);
 	}
 
 	/**

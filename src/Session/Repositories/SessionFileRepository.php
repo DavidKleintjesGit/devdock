@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Src\Session\Repositories;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Src\Project\Objects\ProjectEntityCollection;
 use Src\Session\Contracts\SessionFileRepositoryContract;
@@ -81,6 +82,23 @@ class SessionFileRepository implements SessionFileRepositoryContract
 		return ! is_file($path) || @unlink($path);
 	}
 
+	public function countFor(string $workingDirectory): int
+	{
+		return count(glob($this->sessionFolderOf($workingDirectory) . '/*.jsonl') ?: []);
+	}
+
+	public function deleteFor(string $workingDirectory): int
+	{
+		$count = $this->countFor($workingDirectory);
+		$folder = $this->sessionFolderOf($workingDirectory);
+
+		if (is_dir($folder)) {
+			File::deleteDirectory($folder);
+		}
+
+		return $count;
+	}
+
 	public function getTurns(string $relativePath, int $limit): TranscriptTurnObjectCollection
 	{
 		$path = $this->root() . '/' . $relativePath;
@@ -116,6 +134,14 @@ class SessionFileRepository implements SessionFileRepositoryContract
 		return TranscriptTurnObjectCollection::fromArray($transcriptTurnObjects);
 	}
 
+	/**
+	 * Where Claude Code keeps the sessions of a folder on disk.
+	 */
+	private function sessionFolderOf(string $workingDirectory): string
+	{
+		return rtrim($this->root(), '/\\') . '/' . $this->folderFor($workingDirectory);
+	}
+
 	private function root(): string
 	{
 		return (string) config('devdock.paths.sessions');
@@ -131,7 +157,17 @@ class SessionFileRepository implements SessionFileRepositoryContract
 		$known = $stored[$uuid] ?? null;
 
 		$contents = $known !== null && $this->fingerprintMatches($known, $fingerprint)
-			? ['title' => $known->title, 'branch' => $known->branch, 'prompt_count' => $known->promptCount]
+			? [
+				'title' => $known->title,
+				'branch' => $known->branch,
+				'prompt_count' => $known->promptCount,
+				'cwd' => $known->cwd,
+				'first_active_at' => $known->firstActiveAt,
+				'active_days' => $known->activeDays,
+				'has_commit' => $known->hasCommit,
+				'is_interrupted' => $known->isInterrupted,
+				'is_unanswered' => $known->isUnanswered,
+			]
 			: $this->contentsOf($file);
 
 		return SessionObject::from($contents + [
@@ -157,7 +193,8 @@ class SessionFileRepository implements SessionFileRepositoryContract
 
 	private function fingerprintMatches(SessionEntity $sessionEntity, string $fingerprint): bool
 	{
-		return $sessionEntity->fingerprint === $fingerprint;
+		// a row from before the traits were read has to be read once more
+		return $sessionEntity->fingerprint === $fingerprint && $sessionEntity->firstActiveAt !== null;
 	}
 
 	/**
@@ -175,7 +212,13 @@ class SessionFileRepository implements SessionFileRepositoryContract
 
 		$title = null;
 		$branch = null;
+		$cwd = null;
 		$promptCount = 0;
+		$firstAt = null;
+		$days = [];
+		$hasCommit = false;
+		$lastPrompt = null;
+		$answered = true;
 
 		while (($line = fgets($handle)) !== false) {
 			if (str_contains($line, '"custom-title"')) {
@@ -185,11 +228,29 @@ class SessionFileRepository implements SessionFileRepositoryContract
 				continue;
 			}
 
-			if (! str_contains($line, '"type":"user"')) {
+			$isUser = str_contains($line, '"type":"user"');
+			$isAssistant = str_contains($line, '"type":"assistant"');
+
+			if (! $isUser && ! $isAssistant) {
 				continue;
 			}
 
 			$record = json_decode($line, true);
+
+			if (isset($record['timestamp'])) {
+				$moment = CarbonImmutable::parse($record['timestamp']);
+				$firstAt ??= $moment;
+				$days[$moment->toDateString()] = true;
+			}
+
+			$cwd ??= $record['cwd'] ?? null;
+
+			if (($record['type'] ?? null) === 'assistant') {
+				$answered = true;
+				$hasCommit = $hasCommit || (str_contains($line, '"tool_use"') && str_contains($line, 'git commit'));
+
+				continue;
+			}
 
 			if (($record['type'] ?? null) !== 'user') {
 				continue;
@@ -199,15 +260,26 @@ class SessionFileRepository implements SessionFileRepositoryContract
 
 			if ($this->isPrompt($record)) {
 				$promptCount++;
+				$lastPrompt = $this->textOf($record);
+				$answered = false;
 			}
 		}
 
 		fclose($handle);
 
+		// Claude Code writes this line itself when you break off a turn
+		$isInterrupted = str_starts_with(trim((string) $lastPrompt), '[Request interrupted');
+
 		return [
 			'title' => $title,
 			'branch' => $branch ?: null,
 			'prompt_count' => $promptCount,
+			'cwd' => $cwd === null ? null : str_replace('\\', '/', $cwd),
+			'first_active_at' => $firstAt,
+			'active_days' => max(1, count($days)),
+			'has_commit' => $hasCommit,
+			'is_interrupted' => $isInterrupted,
+			'is_unanswered' => ! $answered && ! $isInterrupted,
 		];
 	}
 

@@ -16,4 +16,10 @@ interface SettingRepositoryContract
 	 * command read them at once.
 	 */
 	public function update(SettingObject $settingObject): SettingEntity;
+
+	/**
+	 * Writes the threshold of the standard workflow: how many rounds, and
+	 * what happens after.
+	 */
+	public function saveThreshold(int $maxRounds, string $afterRounds): void;
 }

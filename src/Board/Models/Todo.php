@@ -12,11 +12,15 @@ class Todo extends Model
 		'title',
 		'note',
 		'project',
+		'is_later',
 		'done_at',
 	];
 
 	protected function casts(): array
 	{
-		return ['done_at' => 'immutable_datetime'];
+		return [
+			'is_later' => 'boolean',
+			'done_at' => 'immutable_datetime',
+		];
 	}
 }

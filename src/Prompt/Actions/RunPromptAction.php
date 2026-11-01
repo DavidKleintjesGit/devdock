@@ -45,6 +45,8 @@ class RunPromptAction extends Command
 			$promptResultObject = $claudeProcessRepository->run(
 				$promptRunEntity,
 				GetReadableDirectoriesAction::execute($promptRunEntity->card),
+				$promptRunRepository->logPath($this->promptRunId),
+				DescribeChatAction::execute(),
 			);
 		} catch (Throwable $failure) {
 			return $promptRunRepository->markFailed($this->promptRunId, $failure->getMessage());

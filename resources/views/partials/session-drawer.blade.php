@@ -1,81 +1,77 @@
-<aside class="drawer" role="dialog" aria-labelledby="drawer-title">
-	<div class="grab" aria-hidden="true"></div>
-
+<aside class="drawer" role="dialog" aria-labelledby="session-title">
 	<div class="dbar">
-		@if ($previous)
-			<button class="back" type="button" wire:click="back"><x-icon name="back" small/><span>{{ $previous }}</span></button>
+		@if ($previous ?? null)
+			<button class="back kind" type="button" wire:click="back"><x-icon name="back" small/>{{ $previous }}</button>
 		@else
-			<span class="kind">{{ __('Sessie') }}</span>
+			<span class="kind">{{ __('Sessie') }} · {{ $session->project ?? __('geen project') }}</span>
 		@endif
 
-		<div class="dactions">
-			<button class="btn icon ghost" type="button" wire:click="toggleActions" aria-label="{{ __('Acties') }}" aria-expanded="{{ $actionsOpen ? 'true' : 'false' }}"><x-icon name="meer"/></button>
-			@if ($actionsOpen)
-				<div class="actionmenu">
-					<button type="button" wire:click="startRename('{{ $session->uuid }}')"><x-icon name="pencil" small/>{{ __('Hernoemen') }}</button>
-					<button type="button" class="danger" wire:click="deleteSession('{{ $session->uuid }}')"><x-icon name="alert" small/>{{ $confirmingDelete ? __('Weet je het zeker?') : __('Verwijderen') }}</button>
-				</div>
-			@endif
+		<details class="menu" x-data="{ open: false }" :open="open" @click.outside="open = false">
+			<summary class="icon-btn filled" aria-label="{{ __('Acties') }}" @click.prevent="open = ! open"><x-icon name="meer"/></summary>
+			<div class="menu-pop" role="menu">
+				<button type="button" role="menuitem" wire:click="startRename('{{ $session->uuid }}')">{{ __('Hernoemen') }}</button>
+				<button type="button" role="menuitem" wire:click="pin('{{ $session->uuid }}', {{ $session->isPinned ? 'false' : 'true' }})">{{ $session->isPinned ? __('Losmaken, mag weer opgeruimd') : __('Vastzetten, nooit opruimen') }}</button>
+			</div>
+		</details>
+		<button class="icon-btn" type="button" wire:click="closeDrawer" aria-label="{{ __('Sluiten') }}"><x-icon name="x"/></button>
+	</div>
+
+	<div class="dhead" style="padding-bottom:16px">
+		<h2 id="session-title">{{ $session->name() }}</h2>
+		<span class="sub">{{ $session->project ?? __('geen project') }} · {{ $session->branch ?? __('geen branch') }} · {{ $session->ticketKey() ?? __('geen ticket') }}</span>
+	</div>
+
+	<div class="dbody" style="gap:20px;padding:0 24px 24px">
+		<div class="banner {{ $verdict['tone'] }}" style="border-radius:12px;padding:16px 18px">
+			<div class="grow" style="display:flex;flex-direction:column;gap:2px;min-width:200px">
+				<b style="font-size:15px">{{ $verdict['title'] }}</b>
+				<span>{{ $verdict['text'] }}</span>
+			</div>
 		</div>
 
-		<button class="btn icon ghost close" type="button" wire:click="closeDrawer" aria-label="{{ __('Sluiten') }}"><x-icon name="x"/></button>
-	</div>
-
-	<div class="dhead">
-		<div class="row">
-			<span class="mono" style="color:var(--accent-ink)">{{ $session->uuid }}</span>
-			<span class="chip {{ $session->status->tone() }}">{{ $session->status->label() }}</span>
-			@if ($session->mismatchedTicket())<span class="chip red">{{ __('Naam ≠ :ticket', ['ticket' => $session->mismatchedTicket()]) }}</span>@endif
-			<span class="right">{{ $session->lastActiveLabel() }}</span>
-		</div>
-		<h2 id="drawer-title"><span class="{{ $session->title ? '' : 'muted' }}">{{ $session->name() }}</span></h2>
-		<p class="sub">{{ $session->project ?? __('Zonder project') }} · {{ __(':count prompts', ['count' => $session->promptCount]) }} · {{ $session->sizeLabel() }}</p>
-	</div>
-
-	<div class="tabs" role="tablist">
-		@foreach (['Overzicht', 'Rondes', 'Transcript'] as $name)
-			<button type="button" role="tab" aria-selected="{{ $tab === $name ? 'true' : 'false' }}" wire:click="setDrawerTab('{{ $name }}')">{{ __($name) }}</button>
-		@endforeach
-	</div>
-
-	<div class="dbody">
-		@if ($tab === 'Overzicht')
-			<dl class="facts">
-				<div><dt>{{ __('Project') }}</dt><dd>{{ $session->project ?? __('Zonder project') }}<small class="mono">{{ $projectPath ?? $session->folder }}</small></dd></div>
-				<div><dt>{{ __('Branch') }}</dt><dd>{!! $session->branch ? '<span class="mono">' . e($session->branch) . '</span>' : e(__('Geen branch')) !!}@if ($session->ticketKey())<small>{{ __('Ticket uit de branch: :ticket', ['ticket' => $session->ticketKey()]) }}</small>@endif</dd></div>
-				<div><dt>{{ __('Omvang') }}</dt><dd>{{ __(':count prompts', ['count' => $session->promptCount]) }}<small>{{ __(':size op schijf', ['size' => $session->sizeLabel()]) }}</small></dd></div>
-				<div><dt>{{ __('Status') }}</dt><dd>{{ $session->status->label() }}<small>{{ __('Laatst actief: :when', ['when' => $session->lastActiveLabel()]) }}</small></dd></div>
-			</dl>
-			<div class="resume">
-				<b>{{ __('Verder in Claude Code') }}</b>
-				<span style="color:var(--fg-2);font-size:13.5px">{{ __('Dit opent de sessie buiten het bord. Claude Code start in de projectmap en pakt het gesprek op waar het ophield.') }}</span>
-				<div class="code mono">cd {{ $projectPath ?? '.' }}
-claude --resume {{ $session->uuid }}</div>
+		@if ($traits !== [])
+			<div class="list" style="border-radius:12px">
+				@foreach ($traits as $trait)
+					<div class="row" style="min-height:42px;padding:0 14px">
+						<span style="flex:none;width:150px"><span @class(['label', 'green' => $trait->protects()])>{{ $trait->label() }}</span></span>
+						<span class="hint" style="font-size:13px">{{ $trait->explanation() }}</span>
+					</div>
+				@endforeach
 			</div>
-		@elseif ($tab === 'Rondes')
-			<div class="empty">
-				<span class="bubble"><x-icon name="workflows"/></span>
-				<b>{{ __('Nog geen rondes') }}</b>
-				<span>{{ __('Deze sessie heeft nog geen ronde door de lenzen gehad.') }}</span>
-			</div>
-		@else
-			@if ($transcript->isNotEmpty())
-				<ol class="turns">
-					@foreach ($transcript as $turn)
-						<li class="turn you">
-							<span class="who mono">{{ __('jij') }}</span>
-							<span class="what"><span>{{ $turn->text }}</span><span class="t mono">{{ $turn->at }}</span></span>
-						</li>
-					@endforeach
-				</ol>
-				<span class="muted" style="font-size:12.5px">{{ __('De eerste :shown van :total prompts. Het bord leest ze uit het sessiebestand en schrijft er niets in.', ['shown' => $transcript->count(), 'total' => $session->promptCount]) }}</span>
-			@else
-				<div class="empty">
-					<span class="bubble"><x-icon name="chat"/></span>
-					<b>{{ __('Nog geen transcript') }}</b>
-					<span>{{ __('Het gesprek van deze sessie is nog niet ingeladen.') }}</span>
-				</div>
-			@endif
 		@endif
+
+		<dl style="margin:0;display:grid;grid-template-columns:128px 1fr;gap:10px 14px;font-size:13.5px">
+			<dt class="muted">{{ __('Laatst actief') }}</dt><dd style="margin:0">{{ $session->lastActiveLabel() }} · {{ trans_choice(':count dag gebruikt|:count dagen gebruikt', $session->activeDays, ['count' => $session->activeDays]) }}</dd>
+			<dt class="muted">{{ __('Omvang') }}</dt><dd style="margin:0">{{ trans_choice(':count bericht|:count berichten', $session->promptCount, ['count' => $session->promptCount]) }} · {{ __(':size op schijf', ['size' => $size]) }}</dd>
+			<dt class="muted">{{ __('Opgeleverd') }}</dt><dd style="margin:0">{{ $session->hasCommit ? __('minstens één commit') : __('geen enkele commit') }}</dd>
+			<dt class="muted">{{ __('Map') }}</dt><dd style="margin:0" class="mono">{{ $session->cwd ?? __('onbekend') }}</dd>
+		</dl>
+
+		<section style="display:flex;flex-direction:column;gap:14px">
+			<div style="display:flex;align-items:center;gap:10px">
+				<h3 class="eyebrow grow">{{ __('Het gesprek') }}</h3>
+				@if ($hiddenTurns > 0)
+					<button class="btn text xs" type="button" wire:click="$set('wholeTranscript', true)">{{ __('Alles tonen') }}</button>
+				@endif
+			</div>
+
+			@forelse ($transcript as $turn)
+				<div class="say you" style="max-width:100%">
+					<span class="who">{{ $turn->who }} · {{ $turn->at }}</span>
+					<div class="bubble">{{ $turn->text }}</div>
+				</div>
+				@if ($hiddenTurns > 0 && $loop->iteration === 2)
+					<span class="label" style="align-self:center;border-radius:999px;padding:4px 12px">{{ trans_choice(':count bericht ertussen|:count berichten ertussen', $hiddenTurns, ['count' => $hiddenTurns]) }}</span>
+				@endif
+			@empty
+				<p class="hint" style="margin:0">{{ __('Geen berichten van jou in deze sessie.') }}</p>
+			@endforelse
+		</section>
+	</div>
+
+	<div class="dfoot">
+		<button class="btn danger" type="button" wire:click="deleteSession('{{ $session->uuid }}')">{{ $confirmingDelete ? __('Zeker weten? Verwijderen') : __('Verwijderen') }}</button>
+		<button class="btn" type="button" wire:click="resume('{{ $session->uuid }}')" @disabled($session->cwd === null)>{{ __('Verder in Claude Code') }}</button>
+		<span class="mono muted" style="margin-left:auto;font-size:12px">{{ $size }}</span>
 	</div>
 </aside>

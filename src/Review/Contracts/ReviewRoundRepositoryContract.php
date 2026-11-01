@@ -38,7 +38,7 @@ interface ReviewRoundRepositoryContract
 	 *
 	 * @param  array<int, array{lens_id: LensId, verdict: VerdictEnum, touched_files: int}>  $lenses
 	 */
-	public function open(string $card, ?string $commitSha, ?string $directory, array $lenses): ReviewRoundEntity;
+	public function open(string $card, ?string $commitSha, ?string $directory, array $lenses, ?string $fingerprint = null): ReviewRoundEntity;
 
 	public function markResultRunning(ReviewRoundId $reviewRoundId, LensId $lensId, ?string $sessionUuid): void;
 
@@ -79,4 +79,20 @@ interface ReviewRoundRepositoryContract
 	 * Takes every round of a task off, for when the task itself goes.
 	 */
 	public function deleteForCard(string $card): void;
+
+	/**
+	 * Where everything the lenses of a round sent back is kept.
+	 */
+	public function logFolder(ReviewRoundId $reviewRoundId): string;
+
+	/**
+	 * How many rounds of a task still keep their lens logs on disk.
+	 */
+	public function countLogsForCard(string $card): int;
+
+	/**
+	 * Throws away the lens logs of every round of a task, and says of how many
+	 * rounds.
+	 */
+	public function deleteLogsForCard(string $card): int;
 }

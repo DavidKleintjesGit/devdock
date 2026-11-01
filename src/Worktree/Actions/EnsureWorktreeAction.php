@@ -53,7 +53,7 @@ class EnsureWorktreeAction extends Command
 			'project' => $this->project,
 			'repository_path' => $projectEntity->path,
 			'branch' => $this->branch,
-			'path' => $this->pathFor($projectEntity->path),
+			'path' => self::folderFor($projectEntity->path, $this->branch),
 			'card' => $this->card,
 		]));
 
@@ -73,9 +73,9 @@ class EnsureWorktreeAction extends Command
 	 * are then one folder up instead of across the disk, and the branch name
 	 * becomes one folder name, so nothing is left behind when it goes.
 	 */
-	private function pathFor(string $repositoryPath): string
+	public static function folderFor(string $repositoryPath, string $branch): string
 	{
-		$folder = str_replace(['/', '\\'], '-', $this->branch);
+		$folder = str_replace(['/', '\\'], '-', $branch);
 		$worktrees = trim((string) config('devdock.worktree.folder'), '/');
 
 		return rtrim(str_replace('\\', '/', $repositoryPath), '/') . '/' . $worktrees . '/' . $folder;

@@ -6,6 +6,7 @@ namespace Src\Ticket\Repositories;
 
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Src\Ticket\Contracts\TicketSourceRepositoryContract;
@@ -29,13 +30,14 @@ class JiraTicketRepository implements TicketSourceRepositoryContract
 	public function getAssigned(): TicketObjectCollection
 	{
 		$site = rtrim((string) config('devdock.jira.base_url'), '/');
+		$sprintField = $this->sprintField();
 		$ticketObjects = [];
 		$nextPageToken = null;
 
 		do {
 			$result = $this->client()->get('/rest/api/3/search/jql', array_filter([
 				'jql' => 'assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC',
-				'fields' => 'summary,description,status,issuetype,priority,updated',
+				'fields' => 'summary,description,status,issuetype,priority,updated' . ($sprintField === null ? '' : ',' . $sprintField),
 				'maxResults' => 100,
 				'nextPageToken' => $nextPageToken,
 			]));
@@ -51,6 +53,7 @@ class JiraTicketRepository implements TicketSourceRepositoryContract
 				$ticketObjects[] = TicketObject::from($issue + [
 					'url' => $site . '/browse/' . $issue['key'],
 					'description' => $this->plainText($issue['fields']['description'] ?? null),
+					'sprint' => $this->activeSprint($sprintField === null ? null : $issue['fields'][$sprintField] ?? null),
 				]);
 			}
 
@@ -58,6 +61,23 @@ class JiraTicketRepository implements TicketSourceRepositoryContract
 		} while ($nextPageToken !== null);
 
 		return TicketObjectCollection::fromArray($ticketObjects);
+	}
+
+	/**
+	 * The sprint that is running now, out of every sprint the ticket was ever
+	 * planned in. Jira keeps the closed ones on the ticket as well.
+	 *
+	 * @return array{name: string, endDate: ?string}|null
+	 */
+	private function activeSprint(mixed $sprints): ?array
+	{
+		$active = collect(is_array($sprints) ? $sprints : [])
+			->first(fn (mixed $sprint) => is_array($sprint) && ($sprint['state'] ?? null) === 'active');
+
+		return $active === null ? null : [
+			'name' => (string) ($active['name'] ?? ''),
+			'endDate' => $active['endDate'] ?? null,
+		];
 	}
 
 	/**
@@ -160,6 +180,22 @@ class JiraTicketRepository implements TicketSourceRepositoryContract
 		return $result->status() === 401
 			? __(':service weigert het token. Controleer het token en zijn scopes.', ['service' => 'Jira'])
 			: __(':service gaf status :status.', ['service' => 'Jira', 'status' => $result->status()]);
+	}
+
+	/**
+	 * The custom field this site keeps the sprint in. Its id differs per Jira
+	 * site, so unless the .env names it, it is found once by its type.
+	 */
+	private function sprintField(): ?string
+	{
+		$configured = (string) config('devdock.jira.sprint_field');
+
+		if ($configured !== '') {
+			return $configured;
+		}
+
+		return Cache::rememberForever('jira.sprint-field.' . $this->baseUrl(), fn () => collect($this->client()->get('/rest/api/3/field')->json() ?? [])
+			->first(fn (array $field) => ($field['schema']['custom'] ?? null) === 'com.pyxis.greenhopper.jira:gh-sprint')['id'] ?? null);
 	}
 
 	private function client(): PendingRequest

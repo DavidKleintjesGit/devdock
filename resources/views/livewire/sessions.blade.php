@@ -1,100 +1,135 @@
-<div class="page{{ $session ? ' drawer-open' : '' }}">
-	<header class="pagebar">
-		<div class="logo m-logo" aria-hidden="true">D</div>
-		<h1>{{ __('Sessies') }}</h1>
-		<span class="count">{{ __(':count sessies · :disk MB op schijf', ['count' => $all->count(), 'disk' => $diskTotal]) }}</span>
-		<x-page-actions/>
-	</header>
-
-	<div class="toolbar">
-		<div class="tb-search">
-			<label class="search">
-				<x-icon name="search"/><span class="sr">{{ __('Zoeken') }}</span>
-				<input type="search" wire:model.live.debounce.300ms="query" placeholder="{{ __('Zoek op sessie of branch') }}" autocomplete="off">
-			</label>
-		</div>
-		<div class="tb-filters">
-			<x-project-picker
-				:options="$projectOptions"
-				:selected="$projects"
-				:total="$projectTotal"
-				:query="$projectQuery"
-				query-property="projectQuery"
-				toggle="toggleProject"
-				clear="clearProjects"
-			/>
-
-			<div class="seg" role="group" aria-label="{{ __('Wanneer') }}">
-				<button type="button" aria-pressed="{{ $when === '' ? 'true' : 'false' }}" wire:click="$set('when', '')">{{ __('Alles') }} <span class="n">{{ $all->count() }}</span></button>
-				@foreach ($whenOptions as $option)
-					<button type="button" aria-pressed="{{ $when === $option['case']->value ? 'true' : 'false' }}" wire:click="toggleWhen('{{ $option['case']->value }}')">{{ $option['case']->label() }} <span class="n">{{ $option['count'] }}</span></button>
-				@endforeach
+<div class="page">
+	<header class="head">
+		<div class="head-inner">
+			<div class="head-title">
+				<h1>{{ __('Sessies') }}</h1>
+				<span class="context">{{ $summary }}</span>
 			</div>
 
-			@foreach ($cleanupOptions as $option)
-				<button class="btn" type="button" aria-pressed="{{ $cleanup === $option['case']->value ? 'true' : 'false' }}" wire:click="toggleCleanup('{{ $option['case']->value }}')">
-					<span class="dot {{ $option['case']->tone() }}"></span>{{ $option['case']->label() }}<span class="n">{{ $option['count'] }}</span>
-				</button>
-			@endforeach
-		</div>
-	</div>
+			<div style="display:flex;flex-direction:column;gap:10px">
+				<div class="toolbar">
+					<label class="search">
+						<x-icon name="search" small/>
+						<span class="sr">{{ __('Zoeken') }}</span>
+						<input type="search" wire:model.live.debounce.300ms="query" placeholder="{{ __('Zoek op naam, project, branch of ticket') }}" autocomplete="off">
+					</label>
 
-	<div class="content">
-		@include('partials.active-filters')
-		@if ($selected)
-			<div class="bulk" role="region" aria-label="{{ __('Selectie') }}">
-				<b>{{ __(':count geselecteerd', ['count' => count($selected)]) }}</b>
-				<span style="flex:1"></span>
-				<button class="btn sm" type="button" wire:click="clearSelection">{{ __('Selectie wissen') }}</button>
-				<button class="btn sm danger solid" type="button" wire:click="deleteSelected">{{ $confirmingDelete ? __('Weet je het zeker?') : __('Verwijderen') }}</button>
-			</div>
-		@endif
+					<x-project-picker
+						:options="$projectOptions"
+						:selected="$projects"
+						:total="$projectTotal"
+						:query="$projectQuery"
+						query-property="projectQuery"
+						toggle="toggleProject"
+						clear="clearProjects"
+					/>
 
-		<div class="box list">
-			@if ($shown->isNotEmpty())
-				<label class="selectbar">
-					<input class="check" type="checkbox" wire:click="toggleAllShown" @checked($shown->pluck('uuid')->diff($selected)->isEmpty())>
-					{{ __('Alles selecteren') }}<span class="muted">{{ __(':count in beeld', ['count' => $shown->count()]) }}</span>
-				</label>
-				<div class="listhead scols">
-					<span></span>
-					<span>{{ __('Sessie') }}</span>
-					<span class="c-status">{{ __('Status') }}</span>
-					<span class="c-proj">{{ __('Project') }}</span>
-					<span class="c-branch">{{ __('Branch') }}</span>
-					<span class="r">{{ __('Prompts') }}</span>
-					<span class="r">{{ __('Omvang') }}</span>
-					<span class="r c-last">{{ __('Laatst actief') }}</span>
-					<span></span>
-				</div>
-				@foreach ($groups as $group)
-					<div class="group">
-						<h2>{{ $group['case']->label() }}</h2>
-						<span class="n">{{ __(':count sessies', ['count' => $filtered ? $group['sessions']->count() : $group['total']]) }}</span>
-					</div>
-					@foreach ($group['sessions'] as $row)
-						@include('partials.session-row', ['row' => $row])
-					@endforeach
-				@endforeach
-			@else
-				<div class="empty">
-					<span class="bubble"><x-icon name="sessies"/></span>
-					<b>{{ $filtered ? __('Geen sessies gevonden') : __('Nog geen sessies') }}</b>
+					<button class="pick" type="button" aria-expanded="{{ $traitsOpen ? 'true' : 'false' }}" wire:click="$toggle('traitsOpen')">
+						<x-icon name="filter" small/>{{ __('Kenmerken') }}
+						@if ($activeTraits !== [])<span class="badge-n">{{ count($activeTraits) }}</span>@endif
+						<x-icon :name="$traitsOpen ? 'up' : 'down'" small/>
+					</button>
+
+					<span class="spacer"></span>
+					<span class="result">{{ $result }}</span>
 					@if ($filtered)
-						<span>{{ __('Er zijn geen sessies die bij dit filter passen.') }}</span>
-						<button class="btn sm" type="button" wire:click="resetFilters">{{ __('Filters wissen') }}</button>
+						<button class="btn text" type="button" style="height:38px" wire:click="resetFilters">{{ __('Alles wissen') }}</button>
 					@endif
 				</div>
-			@endif
-		</div>
-	</div>
 
-	@if ($session && $renaming)
-		@include('partials.session-rename', ['session' => $session])
+				@if (! $traitsOpen && $activeTraits !== [])
+					<div class="chips" style="align-items:center">
+						<span class="hint" style="margin-right:4px">{{ __('Aan:') }}</span>
+						@foreach ($activeTraits as $trait)
+							<button class="tchip on" type="button" wire:click="toggleTrait('{{ $trait->value }}')" aria-label="{{ __(':trait uitzetten', ['trait' => $trait->label()]) }}">{{ $trait->label() }}<x-icon name="x" small/></button>
+						@endforeach
+					</div>
+				@endif
+			</div>
+		</div>
+	</header>
+
+	@if ($traitsOpen)
+		<div class="tray">
+			@foreach ($traitGroups as $group => $traits)
+				<div class="tray-group">
+					<h2 class="eyebrow">{{ $group }}</h2>
+					<div class="chips">
+						@foreach ($traits as $trait)
+							<button @class(['tchip', 'keep' => $trait['case']->protects()]) type="button" aria-pressed="{{ $trait['isOn'] ? 'true' : 'false' }}" wire:click="toggleTrait('{{ $trait['case']->value }}')" title="{{ $trait['case']->explanation() }}">{{ $trait['case']->label() }} <span class="n">{{ $trait['count'] }}</span></button>
+						@endforeach
+					</div>
+				</div>
+			@endforeach
+		</div>
 	@endif
 
-	@if ($session)
+	<main class="main">
+		@if ($rows->isEmpty())
+			<div class="empty">
+				<b>{{ $activeTraits !== [] ? trans_choice('Geen sessie past bij dit kenmerk|Geen sessie past bij alle :count', count($activeTraits), ['count' => count($activeTraits)]) : __('Geen sessies gevonden') }}</b>
+				<span>{{ $activeTraits !== [] ? __('Kenmerken stapelen: een sessie moet ze allemaal hebben. Zet er een uit om meer te zien.') : __('Niets past bij je zoekopdracht.') }}</span>
+				<button class="btn sm" type="button" wire:click="resetFilters">{{ $activeTraits !== [] ? __('Kenmerken wissen') : __('Alles wissen') }}</button>
+			</div>
+		@else
+			<div class="list">
+				<div class="list-head">
+					<label class="tick">
+						<input type="checkbox" wire:click="toggleAllShown" @checked($selectableCount > 0 && count($selected) >= $selectableCount)>
+						<span class="mark"></span>
+						<b>{{ __('Alles kiezen (:count)', ['count' => $selectableCount]) }}</b>
+					</label>
+					@if ($protectedCount > 0)
+						<span class="hint">{{ trans_choice(':count is beschermd en blijft staan|:count zijn beschermd en blijven staan', $protectedCount, ['count' => $protectedCount]) }}</span>
+					@endif
+				</div>
+
+				@foreach ($rows as $row)
+					<div class="row" style="gap:14px;padding:0 18px;{{ $row['isSelected'] ? 'background:var(--accent-wash)' : '' }}" wire:key="session-{{ $row['session']->uuid }}">
+						@if ($row['isProtected'])
+							<span class="tick cell" title="{{ __('Beschermd') }}"><x-icon name="lock" small/></span>
+						@else
+							<label class="tick cell">
+								<input type="checkbox" @checked($row['isSelected']) wire:click="toggleSelected('{{ $row['session']->uuid }}')" aria-label="{{ __(':name kiezen', ['name' => $row['session']->name()]) }}">
+								<span class="mark"></span>
+							</label>
+						@endif
+						<button class="row grow" type="button" style="padding:0;min-height:66px;gap:14px" wire:click="open('{{ $row['session']->uuid }}')">
+							<span class="sdot {{ $row['canGo'] ? 'red' : 'quiet' }}"></span>
+							<span class="title" style="flex:1 1 220px">
+								<b class="ellipsis">{{ $row['session']->name() }}</b>
+								<small class="mono ellipsis">{{ $row['session']->project ?? __('geen project') }}{{ $row['session']->branch ? ' · ' . $row['session']->branch : '' }}</small>
+							</span>
+							<span class="chips" style="flex:1 1 260px">
+								@foreach ($row['traits'] as $trait)<span class="label">{{ $trait->label() }}</span>@endforeach
+								@if ($row['moreTraits'] > 0)<span class="label muted">+{{ $row['moreTraits'] }}</span>@endif
+							</span>
+							<span style="flex:none;width:210px;display:flex;justify-content:flex-end;gap:14px;font-size:12.5px;color:var(--muted)">
+								<span>{{ trans_choice(':count bericht|:count berichten', $row['session']->promptCount, ['count' => $row['session']->promptCount]) }}</span>
+								<span class="mono" style="font-size:12px">{{ $row['session']->sizeLabel() }}</span>
+								<span>{{ $row['age'] }}</span>
+							</span>
+						</button>
+					</div>
+				@endforeach
+			</div>
+		@endif
+	</main>
+
+	@if ($selected !== [])
+		<div style="position:sticky;bottom:0;z-index:15;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px var(--gutter);background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(0,0,0,.05)">
+			<button class="btn danger" type="button" wire:click="deleteSelected">{{ $confirmingDelete ? __('Zeker weten? Verwijderen') : __('Verwijderen') }}</button>
+			<button class="btn text" type="button" style="color:var(--fg-2)" wire:click="clearSelection">{{ __('Selectie wissen') }}</button>
+			<span class="hint" style="font-size:13px">{{ $pickedLine }}</span>
+		</div>
+	@endif
+
+	@if ($drawer)
 		<div class="scrim" wire:click="closeDrawer"></div>
-		@include('partials.session-drawer', ['session' => $session, 'tab' => $drawerTab, 'transcript' => $transcript, 'previous' => null, 'projectPath' => $projectPath])
+		@include('partials.session-drawer', $drawer)
+
+		@if ($renaming)
+			@include('partials.session-rename', ['session' => $drawer['session']])
+		@endif
 	@endif
 </div>

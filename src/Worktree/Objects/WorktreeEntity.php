@@ -6,6 +6,7 @@ namespace Src\Worktree\Objects;
 
 use Carbon\CarbonImmutable;
 use Src\Packages\ValueObject\ValueObject;
+use Src\Worktree\Enums\WorktreeOriginEnum;
 
 /**
  * A working copy of one branch, standing apart from the checkout you work in
@@ -17,11 +18,18 @@ class WorktreeEntity extends ValueObject
 		public readonly WorktreeId $worktreeId,
 		public readonly string $project,
 		public readonly string $branch,
+		public readonly bool $branchCreated,
 		public readonly string $path,
+		public readonly WorktreeOriginEnum $origin,
 		public readonly ?string $site,
+		public readonly ?string $ownDatabase,
 		public readonly ?string $card,
 		public readonly int $changedFiles,
 		public readonly int $ahead,
+		public readonly int $behind,
+		public readonly ?string $upstream,
+		public readonly string $mainBranch,
+		public readonly ?CarbonImmutable $lastCommitAt,
 		public readonly bool $dependenciesMissing,
 		public readonly bool $hasCommits,
 		public readonly ?CarbonImmutable $createdAt,

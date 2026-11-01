@@ -31,20 +31,16 @@ class ContinueReviewAction extends Command
 
 	public function handle(): ?PromptRunEntity
 	{
-		if (! $this->keepsGoing()) {
+		$cardObject = collect(BuildBoardAction::execute())
+			->first(fn (CardObject $cardObject) => $cardObject->id === $this->reviewRoundEntity->card);
+
+		if ($cardObject?->branch === null || ! $this->keepsGoing($cardObject->project)) {
 			return null;
 		}
 
 		$prompt = BuildRoundPromptAction::execute($this->reviewRoundEntity);
 
 		if ($prompt === null) {
-			return null;
-		}
-
-		$cardObject = collect(BuildBoardAction::execute())
-			->first(fn (CardObject $cardObject) => $cardObject->id === $this->reviewRoundEntity->card);
-
-		if ($cardObject?->branch === null) {
 			return null;
 		}
 
@@ -58,10 +54,10 @@ class ContinueReviewAction extends Command
 		]));
 	}
 
-	private function keepsGoing(): bool
+	private function keepsGoing(?string $project): bool
 	{
 		return $this->reviewRoundEntity->status === RoundStatusEnum::FAILED
 			&& $this->reviewRoundEntity->openFindings() > 0
-			&& $this->reviewRoundEntity->number < (int) config('devdock.review.max_rounds');
+			&& $this->reviewRoundEntity->number < GetWorkflowSettingAction::execute($project)->maxRounds;
 	}
 }

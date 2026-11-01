@@ -20,6 +20,7 @@ class TodoRepository implements TodoRepositoryContract
 			'title' => $todoObject->title,
 			'note' => $todoObject->note,
 			'project' => $todoObject->project,
+			'is_later' => $todoObject->isLater,
 		]);
 
 		return $this->mapToEntity($todoEloquent);
@@ -52,6 +53,15 @@ class TodoRepository implements TodoRepositoryContract
 		return $this->mapToEntity($todoEloquent);
 	}
 
+	public function planLater(TodoId $todoId, bool $isLater): TodoEntity
+	{
+		$todoEloquent = TodoEloquent::query()->findOrFail($todoId->id);
+
+		$todoEloquent->update(['is_later' => $isLater]);
+
+		return $this->mapToEntity($todoEloquent);
+	}
+
 	public function delete(TodoId $todoId): void
 	{
 		TodoEloquent::query()->whereKey($todoId->id)->delete();
@@ -64,6 +74,7 @@ class TodoRepository implements TodoRepositoryContract
 			title: (string) $todoEloquent->title,
 			note: $todoEloquent->note,
 			project: $todoEloquent->project,
+			isLater: (bool) $todoEloquent->is_later,
 			doneAt: $todoEloquent->done_at,
 			changedAt: $todoEloquent->updated_at?->toImmutable(),
 		);

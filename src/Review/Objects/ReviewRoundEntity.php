@@ -23,6 +23,7 @@ class ReviewRoundEntity extends ValueObject
 		public readonly string $card,
 		public readonly int $number,
 		public readonly ?string $commitSha,
+		public readonly ?string $fingerprint,
 		public readonly ?string $directory,
 		public readonly RoundStatusEnum $status,
 		public readonly array $results,
@@ -30,6 +31,18 @@ class ReviewRoundEntity extends ValueObject
 		public readonly ?CarbonImmutable $finishedAt,
 	) {
 		parent::__construct();
+	}
+
+	/**
+	 * Whether the work changed after this round judged it, so its verdict no
+	 * longer holds.
+	 */
+	public function isExpiredBy(?string $fingerprint): bool
+	{
+		return ! $this->isRunning()
+			&& $this->fingerprint !== null
+			&& $fingerprint !== null
+			&& $this->fingerprint !== $fingerprint;
 	}
 
 	public function isRunning(): bool

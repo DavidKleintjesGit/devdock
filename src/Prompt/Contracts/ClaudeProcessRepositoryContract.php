@@ -35,9 +35,13 @@ interface ClaudeProcessRepositoryContract
 	public function stop(PromptRunId $promptRunId): bool;
 
 	/**
-	 * Carries out the prompt and waits for the answer.
+	 * Carries out the prompt and waits for the answer, writing every event to
+	 * the log on the way. The instructions go along as an addition to the
+	 * system prompt, so they hold for every round and not only a built one.
+	 *
+	 * @param  array<int, string>  $alsoReads
 	 */
-	public function run(PromptRunEntity $promptRunEntity, array $alsoReads = []): PromptResultObject;
+	public function run(PromptRunEntity $promptRunEntity, array $alsoReads, string $logPath, string $instructions): PromptResultObject;
 
 	/**
 	 * Asks one short question and waits for the answer. Meant for something

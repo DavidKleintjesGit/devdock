@@ -1,58 +1,33 @@
-<aside class="diffpanel" role="dialog" aria-label="{{ __('Wijziging lezen') }}">
+<div class="scrim" style="z-index:65" wire:click="closeDiff"></div>
+<aside class="drawer wide over diff-drawer" role="dialog" aria-labelledby="diff-title">
+	<div class="resize-edge" data-resize="--diff-width" data-edge="start" data-min="560" aria-hidden="true" title="{{ __('Sleep om breder of smaller te maken') }}"></div>
 	<div class="dbar">
-		<button class="back" type="button" wire:click="closeDiff"><x-icon name="back" small/><span>{{ $card->ticketKey ?? $card->title }}</span></button>
-		<button class="btn icon ghost close" type="button" wire:click="closeDiff" aria-label="{{ __('Sluiten') }}"><x-icon name="x"/></button>
+		<span class="kind">{{ __('Wijziging') }} · {{ $card->ticketKey ?? $card->title }}</span>
+		<span class="hint">{{ __(':number van :total', ['number' => $diffPosition, 'total' => count($diffFiles)]) }}</span>
+		<button class="icon-btn" type="button" wire:click="closeDiff" aria-label="{{ __('Sluiten') }}"><x-icon name="x"/></button>
 	</div>
 
 	<div class="dhead">
-		<h2 class="mono">{{ basename($openDiffFile) }}</h2>
-		<div class="row">
-			<span class="muted mono">{{ dirname($openDiffFile) }}</span>
-			<span class="plus">+{{ $diffAdded }}</span>
-			<span class="minus">−{{ $diffRemoved }}</span>
-		</div>
+		<h2 id="diff-title" class="mono" style="font-size:18px">{{ basename($openDiffFile) }}</h2>
+		<span class="meta"><span class="mono muted">{{ dirname($openDiffFile) }}</span><span class="plus">+{{ $diffAdded }}</span><span class="minus">−{{ $diffRemoved }}</span><span class="label">{{ __('Tegenover :main', ['main' => $worktree?->mainBranch ?? 'master']) }}</span></span>
 	</div>
 
-	<div class="diffsplit">
-		<div class="difffiles">
-			<div class="fieldhead">
-				<h3 class="eyebrow">{{ __('Bestanden') }}</h3>
-				<span class="muted">{{ count($diffFiles) }}</span>
-			</div>
-			<div class="difflist">
-				@foreach ($diffFiles as $file)
-					<button class="dfile {{ $openDiffFile === $file ? 'on' : '' }}" type="button" wire:click="openDiff('{{ $file }}')" wire:key="dfile-{{ $loop->index }}">
-						<span class="nm">
-							<b class="mono">{{ basename($file) }}</b>
-							<small class="mono">{{ dirname($file) }}</small>
-						</span>
-					</button>
-				@endforeach
-			</div>
-		</div>
-
+	<div class="diffsplit" style="border-top:1px solid var(--line)">
+		<nav class="difffiles" aria-label="{{ __('Bestanden') }}">
+			@foreach ($diffFiles as $file)
+				<button type="button" aria-current="{{ $openDiffFile === $file ? 'true' : 'false' }}" wire:click="openDiff('{{ $file }}')" wire:key="dfile-{{ $loop->index }}" title="{{ $file }}"><span class="ellipsis">{{ basename($file) }}</span></button>
+			@endforeach
+		</nav>
+		<div class="resize-bar" data-resize="--diff-files" data-edge="end" data-min="140" data-max="520" aria-hidden="true" title="{{ __('Sleep om breder of smaller te maken') }}"></div>
 		<div class="diffpatch">
-			@forelse ($diffHunks as $hunk)
-				<div class="hunk">
-					<div class="hunkhead mono">{{ $hunk->header }}</div>
-					<table class="lines">
-						@foreach ($hunk->lines as $line)
-							<tr class="{{ $line->kind }}">
-								<td class="n">{{ $line->oldNumber }}</td>
-								<td class="n">{{ $line->newNumber }}</td>
-								<td class="s">{{ $line->sign() }}</td>
-								<td class="t">{{ $line->text }}</td>
-							</tr>
-						@endforeach
-					</table>
-				</div>
-			@empty
-				<div class="prose empty-prose">{{ __('Git heeft over dit bestand niets te melden tegenover de hoofdlijn.') }}</div>
-			@endforelse
+			<x-diff :hunks="$diffHunks" :empty="__('Git heeft over dit bestand niets te melden tegenover de hoofdlijn.')"/>
 		</div>
 	</div>
 
 	<div class="dfoot">
-		<span class="hint">{{ __('Tegenover de hoofdlijn, gecommit en ongecommit samen.') }}</span>
+		<span class="hint">{{ __('Gecommit en ongecommit samen, tegenover de hoofdlijn.') }}</span>
+		@if ($nextDiffFile)
+			<button class="btn primary" type="button" wire:click="openDiff('{{ $nextDiffFile }}')">{{ __('Volgend bestand') }}<x-icon name="arrow" small/></button>
+		@endif
 	</div>
 </aside>

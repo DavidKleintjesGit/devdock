@@ -55,6 +55,70 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 	 * git's own exclude file and not in .gitignore, which is shared with
 	 * everyone else on the project.
 	 */
+	public function getCarried(string $path): array
+	{
+		return array_values(array_filter(
+			(array) config('devdock.worktree.copy'),
+			fn (string $entry) => file_exists($path . '/' . $entry),
+		));
+	}
+
+	public function carryOverAgain(string $repositoryPath, string $path): void
+	{
+		foreach ((array) config('devdock.worktree.copy') as $entry) {
+			$from = $repositoryPath . '/' . $entry;
+			$to = $path . '/' . $entry;
+
+			if (! file_exists($from)) {
+				continue;
+			}
+
+			File::ensureDirectoryExists(dirname($to));
+
+			// the .env keeps the database and address this copy was given
+			if ($entry === '.env' && is_file($to)) {
+				continue;
+			}
+
+			is_dir($from) ? File::copyDirectory($from, $to) : File::copy($from, $to);
+		}
+	}
+
+	public function getPackages(string $repositoryPath, string $path): array
+	{
+		$packages = [];
+
+		foreach ((array) config('devdock.worktree.share') as $folder => $lock) {
+			if (! is_dir($repositoryPath . '/' . $folder)) {
+				continue;
+			}
+
+			$packages[] = [
+				'folder' => $folder,
+				'lock' => $lock,
+				'isBorrowed' => is_link($path . '/' . $folder) || $this->isJunction($path . '/' . $folder),
+				'isSameLock' => $this->sameFile($repositoryPath . '/' . $lock, $path . '/' . $lock),
+			];
+		}
+
+		return $packages;
+	}
+
+	/**
+	 * On Windows a borrowed folder is a junction, which php does not call a
+	 * link.
+	 */
+	private function isJunction(string $path): bool
+	{
+		if (! is_dir($path)) {
+			return false;
+		}
+
+		$real = realpath($path);
+
+		return $real !== false && str_replace('\\', '/', $real) !== str_replace('\\', '/', $path);
+	}
+
 	private function exclude(string $repositoryPath): void
 	{
 		$file = $repositoryPath . '/.git/info/exclude';

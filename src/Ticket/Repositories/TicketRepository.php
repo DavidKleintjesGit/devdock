@@ -24,6 +24,8 @@ class TicketRepository implements TicketRepositoryContract
 				'status' => $ticketObject->status,
 				'type' => $ticketObject->type,
 				'priority' => $ticketObject->priority,
+				'sprint' => $ticketObject->sprint,
+				'sprint_ends_at' => $ticketObject->sprintEndsAt,
 				'url' => $ticketObject->url,
 				'changed_at' => $ticketObject->changedAt,
 			],
@@ -76,6 +78,8 @@ class TicketRepository implements TicketRepositoryContract
 			status: $ticketEloquent->status,
 			type: $ticketEloquent->type,
 			priority: $ticketEloquent->priority,
+			sprint: $ticketEloquent->sprint,
+			sprintEndsAt: $ticketEloquent->sprint_ends_at,
 			url: $ticketEloquent->url,
 			changedAt: $ticketEloquent->changed_at,
 		);

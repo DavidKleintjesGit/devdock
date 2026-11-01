@@ -10,10 +10,10 @@ use Src\Packages\Process\DetachedCommand;
 
 class FetchProcessRepository implements FetchProcessRepositoryContract
 {
-	public function startDetached(FetchRunId $fetchRunId): void
+	public function startDetached(FetchRunId $fetchRunId, bool $dueOnly): void
 	{
 		resolve(DetachedCommand::class)->artisan(
-			sprintf('devdock:fetch --run=%d', (int) $fetchRunId->id),
+			sprintf('devdock:fetch --run=%d', (int) $fetchRunId->id) . ($dueOnly ? ' --due' : ''),
 		);
 	}
 

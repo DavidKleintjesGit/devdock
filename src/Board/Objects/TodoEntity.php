@@ -17,6 +17,7 @@ class TodoEntity extends ValueObject
 		public readonly string $title,
 		public readonly ?string $note,
 		public readonly ?string $project,
+		public readonly bool $isLater,
 		public readonly ?CarbonImmutable $doneAt,
 		public readonly ?CarbonImmutable $changedAt,
 	) {

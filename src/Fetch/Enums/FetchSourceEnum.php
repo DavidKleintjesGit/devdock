@@ -16,6 +16,17 @@ enum FetchSourceEnum: string
 	case TICKETS = 'tickets';
 	case PULL_REQUESTS = 'pull-requests';
 
+	/**
+	 * How long this source rests between two automatic rounds.
+	 */
+	public function restSeconds(): int
+	{
+		return match ($this) {
+			self::PULL_REQUESTS => (int) config('devdock.bitbucket.refresh_seconds'),
+			default => 0,
+		};
+	}
+
 	public function label(): string
 	{
 		return __(match ($this) {

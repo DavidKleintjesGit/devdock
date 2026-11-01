@@ -14,7 +14,8 @@ class FetchCommand extends Command
 {
 	protected $signature = 'devdock:fetch
 		{--only= : One source only: projects, sessions, rules, skills, tickets or pull-requests}
-		{--run= : The fetch_runs row to report progress into}';
+		{--run= : The fetch_runs row to report progress into}
+		{--due : Leave out a source that is still resting, as an automatic round does}';
 
 	protected $description = 'Read the sources into the board: Jira, Bitbucket, the disk and the Claude sessions';
 
@@ -30,7 +31,7 @@ class FetchCommand extends Command
 		}
 
 		$fetchRunId = $this->fetchRunId();
-		$fetchRunEntity = RunFetchAction::execute($fetchRunId, $source);
+		$fetchRunEntity = RunFetchAction::execute($fetchRunId, $source, (bool) $this->option('due'));
 
 		$this->components->info($fetchRunEntity->resultLine());
 

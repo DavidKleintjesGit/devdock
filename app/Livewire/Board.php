@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Livewire\Concerns\WithDrawerStack;
-use App\Livewire\Concerns\WithFilterChips;
 use App\Livewire\Concerns\WithProjectFilter;
 use App\Livewire\Concerns\WithSessionActions;
+use App\Livewire\Concerns\WithSetup;
+use App\Livewire\Concerns\WithWorkingCopy;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Session;
 use Livewire\Attributes\Url;
@@ -18,12 +22,16 @@ use Src\Board\Actions\BuildBoardAction;
 use Src\Board\Actions\BuildTaskPromptAction;
 use Src\Board\Actions\CreateTodoAction;
 use Src\Board\Actions\DeleteTodoAction;
+use Src\Board\Actions\PlanTodoLaterAction;
 use Src\Board\Enums\BoardColumnEnum;
 use Src\Board\Enums\BoardSignalEnum;
+use Src\Board\Enums\CardStatusEnum;
 use Src\Board\Enums\PromptSourceEnum;
 use Src\Board\Objects\CardObject;
 use Src\Board\Objects\TodoId;
 use Src\Board\Objects\TodoObject;
+use Src\Fetch\Actions\GetLatestFetchRunAction;
+use Src\Fetch\Actions\StartFetchAction;
 use Src\Packages\Markdown\RenderMarkdown;
 use Src\Project\Actions\GetBranchesAction;
 use Src\Project\Actions\GetProjectsAction;
@@ -42,20 +50,20 @@ use Src\PullRequest\Actions\BuildReviewPromptAction;
 use Src\PullRequest\Actions\GetReviewCommentsAction;
 use Src\PullRequest\Objects\PullRequestEntity;
 use Src\PullRequest\Objects\ReviewCommentEntity;
-use Src\Review\Actions\ComposeAgentContextAction;
 use Src\Review\Actions\GetRoundsAction;
+use Src\Review\Actions\GetWorkflowSettingAction;
 use Src\Review\Actions\ResolveWorkflowStepAction;
 use Src\Review\Actions\RetryLensAction;
 use Src\Review\Actions\StartRoundAction;
 use Src\Review\Actions\StopRoundAction;
-use Src\Review\Contracts\AgentContextRepositoryContract;
 use Src\Review\Contracts\ReviewRoundRepositoryContract;
 use Src\Review\Enums\RoundStatusEnum;
 use Src\Review\Enums\WorkflowStepEnum;
 use Src\Review\Objects\LensId;
+use Src\Review\Objects\ReviewResultEntity;
 use Src\Review\Objects\ReviewRoundEntity;
-use Src\Session\Actions\GetTranscriptAction;
-use Src\Session\Objects\SessionEntity;
+use Src\Review\Objects\ReviewRoundId;
+use Src\Session\Actions\GetSessionTraitsAction;
 use Src\Task\Actions\ActivateAgentAction;
 use Src\Task\Actions\ActivateLinkAction;
 use Src\Task\Actions\DeleteTaskAction;
@@ -68,15 +76,16 @@ use Src\Task\Enums\TaskLinkKindEnum;
 use Src\Task\Objects\TaskEntity;
 use Src\Ticket\Actions\GetTicketsAction;
 use Src\Ticket\Objects\TicketEntity;
-use Src\Worktree\Actions\CommitChangesAction;
+use Src\Worktree\Actions\CreateWorktreeDatabaseAction;
 use Src\Worktree\Actions\EnsureWorktreeAction;
 use Src\Worktree\Actions\GetChangesAction;
 use Src\Worktree\Actions\GetWorktreesAction;
-use Src\Worktree\Actions\PushBranchAction;
 use Src\Worktree\Actions\ReadDiffAction;
 use Src\Worktree\Actions\RemoveWorktreeAction;
 use Src\Worktree\Actions\RenameToTicketAction;
+use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
+use Src\Worktree\Enums\DatabaseFillEnum;
 use Src\Worktree\Objects\ChangeObject;
 use Src\Worktree\Objects\DiffHunkObjectCollection;
 use Src\Worktree\Objects\WorktreeEntity;
@@ -84,10 +93,28 @@ use Throwable;
 
 class Board extends Component
 {
+	/**
+	 * How many backlog cards stand in the column before "Nog n in de backlog".
+	 */
+	private const BACKLOG_SHOWN = 8;
+
 	use WithDrawerStack;
-	use WithFilterChips;
 	use WithProjectFilter;
 	use WithSessionActions;
+	use WithSetup;
+	use WithWorkingCopy;
+
+	/**
+	 * A finished round of fetching brings the page up to date.
+	 */
+	protected $listeners = ['fetched' => '$refresh'];
+
+	/**
+	 * The board as built in this request; never sent to the browser.
+	 *
+	 * @var Collection<int, CardObject>|null
+	 */
+	private ?Collection $cardObjects = null;
 
 	#[Session(key: 'devdock.board.query')]
 	public string $query = '';
@@ -95,8 +122,8 @@ class Board extends Component
 	#[Session(key: 'devdock.board.attention')]
 	public string $attention = '';
 
-	#[Session(key: 'devdock.board.role')]
-	public string $role = '';
+	#[Session(key: 'devdock.board.backlog')]
+	public ?bool $showBacklog = null;
 
 	/** @var array<int, string> */
 	#[Session(key: 'devdock.board.columns')]
@@ -111,6 +138,16 @@ class Board extends Component
 	public string $openTab = 'Overzicht';
 
 	public string $prompt = '';
+
+	/** @var array<int, string> */
+	public array $pickedSources = [];
+
+	public bool $composing = false;
+
+	/**
+	 * What the open panel last showed of a running agent or lens round.
+	 */
+	public string $progressSeen = '';
 
 	public string $commitMessage = '';
 
@@ -138,8 +175,6 @@ class Board extends Component
 
 	public bool $linking = false;
 
-	public bool $confirmingPush = false;
-
 	public ?string $committed = null;
 
 	public bool $addingTodo = false;
@@ -149,6 +184,25 @@ class Board extends Component
 	public string $todoNote = '';
 
 	public string $todoProject = '';
+
+	public bool $todoLater = false;
+
+	public bool $backlogExpanded = false;
+
+	public string $newDatabaseMode = 'own';
+
+	/**
+	 * Any write to the database can change what the board shows, so it
+	 * also clears the board this request already built.
+	 */
+	public function boot(): void
+	{
+		DB::listen(function (QueryExecuted $queryExecuted): void {
+			if (! str_starts_with(ltrim(strtolower($queryExecuted->sql)), 'select')) {
+				$this->cardObjects = null;
+			}
+		});
+	}
 
 	public function mount(): void
 	{
@@ -161,18 +215,23 @@ class Board extends Component
 		));
 
 		if ($this->shownColumns === []) {
-			$this->shownColumns = (array) config('devdock.board.columns');
+			$this->shownColumns = array_values(array_filter(
+				(array) config('devdock.board.columns'),
+				fn (string $column) => BoardColumnEnum::tryFrom($column) !== null,
+			)) ?: array_column(BoardColumnEnum::sprint(), 'value');
 		}
 
+		$this->showBacklog ??= ! config('devdock.board.backlog_hidden');
 		$this->mobileColumn = $this->shownColumns[0] ?? BoardColumnEnum::TO_DO->value;
 
 		// a link with ?card=... opens that panel at once
 		if ($this->openCard !== null) {
-			$cardObject = $this->cardById(collect(BuildBoardAction::execute()), $this->openCard);
+			$cardObject = $this->cardById($this->board(), $this->openCard);
 
 			$this->commitMessage = $this->suggestedCommitMessage($this->openCard);
 			$this->newBranch = $this->branchSuggestion($cardObject);
 			$this->renameBranch = (string) $this->renameSuggestion($cardObject);
+			$this->resetSetup($cardObject);
 			$this->replaceDrawer('card', $this->openCard, $this->openTab);
 		}
 	}
@@ -181,7 +240,8 @@ class Board extends Component
 	{
 		$this->openCard = $card;
 		$this->prompt = '';
-		$this->confirmingPush = false;
+		$this->pickedSources = [];
+		$this->composing = false;
 		$this->confirmingDeleteTask = false;
 		$this->failure = null;
 		$this->openDiffFile = null;
@@ -190,10 +250,11 @@ class Board extends Component
 		$this->commitBody = '';
 		$this->openTab = 'Overzicht';
 
-		$cardObject = $this->cardById(collect(BuildBoardAction::execute()), $card);
+		$cardObject = $this->cardById($this->board(), $card);
 
 		$this->newBranch = $this->branchSuggestion($cardObject);
 		$this->renameBranch = (string) $this->renameSuggestion($cardObject);
+		$this->resetSetup($cardObject);
 		$this->replaceDrawer('card', $card);
 	}
 
@@ -216,6 +277,7 @@ class Board extends Component
 		$this->todoTitle = '';
 		$this->todoNote = '';
 		$this->todoProject = '';
+		$this->todoLater = false;
 		$this->resetValidation();
 	}
 
@@ -237,6 +299,7 @@ class Board extends Component
 			'title' => $this->todoTitle,
 			'note' => $this->todoNote ?: null,
 			'project' => $this->todoProject ?: null,
+			'is_later' => $this->todoLater,
 		]));
 
 		$this->addingTodo = false;
@@ -253,7 +316,7 @@ class Board extends Component
 			'prompt.required' => __('Schrijf eerst een prompt.'),
 		]);
 
-		$cardObject = $this->cardById(collect(BuildBoardAction::execute()), (string) $this->openCard);
+		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
 
 		if ($cardObject === null) {
 			return;
@@ -287,6 +350,16 @@ class Board extends Component
 	}
 
 	/**
+	 * One of the answers the agent offered, sent back as your message.
+	 */
+	public function answer(string $choice): void
+	{
+		$this->prompt = $choice;
+
+		$this->send();
+	}
+
+	/**
 	 * Hands this task a fresh agent. The one that was in charge stays on the
 	 * task, so you can always read back what it did.
 	 */
@@ -303,7 +376,7 @@ class Board extends Component
 	{
 		$this->failure = null;
 
-		$cardObject = $this->cardById(collect(BuildBoardAction::execute()), (string) $this->openCard);
+		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
 		$worktreeEntity = $this->worktreeFor($cardObject);
 
 		// never the checkout itself: a round judges what this task delivered,
@@ -370,7 +443,7 @@ class Board extends Component
 	{
 		$this->failure = null;
 
-		$cardObject = $this->cardById(collect(BuildBoardAction::execute()), (string) $this->openCard);
+		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
 		$to = trim($this->renameBranch);
 
 		if ($cardObject?->branch === null) {
@@ -485,7 +558,7 @@ class Board extends Component
 			return;
 		}
 
-		$cardObject = $this->cardById(collect(BuildBoardAction::execute()), (string) $this->openCard);
+		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
 
 		resolve(ClaudeProcessRepositoryContract::class)->openInTerminal(
 			$directory,
@@ -502,7 +575,7 @@ class Board extends Component
 	{
 		$this->failure = null;
 
-		$cardObject = $this->cardById(collect(BuildBoardAction::execute()), (string) $this->openCard);
+		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
 
 		if ($cardObject === null) {
 			$this->failure = __('Deze kaart is niet meer op het bord te vinden. Ververs even.');
@@ -525,7 +598,7 @@ class Board extends Component
 		}
 
 		try {
-			EnsureWorktreeAction::execute($cardObject->project, $branch, $cardObject->id);
+			$worktreeEntity = EnsureWorktreeAction::execute($cardObject->project, $branch, $cardObject->id);
 		} catch (Throwable $failure) {
 			$this->failure = $failure->getMessage();
 
@@ -537,6 +610,15 @@ class Board extends Component
 		ActivateLinkAction::execute($cardObject->id, TaskLinkKindEnum::BRANCH, $branch);
 
 		$this->newBranch = '';
+
+		// sharing is what a fresh copy does by itself; anything else is made now
+		if ($this->newDatabaseMode !== 'shared') {
+			$this->failure = CreateWorktreeDatabaseAction::execute(
+				$worktreeEntity,
+				(string) $this->databaseSuggestionFor($cardObject),
+				$this->newDatabaseMode === 'own' ? DatabaseFillEnum::COPY : DatabaseFillEnum::EMPTY,
+			);
+		}
 	}
 
 	/**
@@ -547,7 +629,7 @@ class Board extends Component
 	{
 		$this->failure = null;
 
-		$cardObject = $this->cardById(collect(BuildBoardAction::execute()), (string) $this->openCard);
+		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
 		$worktreeEntity = $this->worktreeFor($cardObject);
 
 		if ($cardObject === null || $worktreeEntity === null) {
@@ -565,7 +647,15 @@ class Board extends Component
 			return;
 		}
 
-		RemoveWorktreeAction::execute($worktreeEntity->worktreeId);
+		if (! RemoveWorktreeAction::execute($worktreeEntity->worktreeId)) {
+			$this->failure = __('Git weigerde de werkkopie weg te halen: er staat nog werk in dat niet gecommit is.');
+
+			return;
+		}
+
+		// de lenzen schreven hun antwoorden buiten de werkkopie weg; die horen bij de taak en gaan nu mee
+		resolve(ReviewRoundRepositoryContract::class)->deleteLogsForCard($cardObject->id);
+		resolve(PromptRunRepositoryContract::class)->deleteLogsForCard($cardObject->id);
 	}
 
 	public function confirmDeleteTask(): void
@@ -639,16 +729,84 @@ class Board extends Component
 	}
 
 	/**
-	 * Builds a first prompt from what the task already carries, so you start
-	 * from something instead of from an empty field.
+	 * Builds a prompt from the parts of the context you ticked, so you start
+	 * from something instead of from an empty field. You read it before it
+	 * goes anywhere.
 	 */
-	public function fillPromptFrom(string $source): void
+	public function buildPrompt(): void
 	{
-		$prompt = BuildTaskPromptAction::execute((string) $this->openCard, PromptSourceEnum::from($source));
+		$sources = array_values(array_filter(array_map(
+			fn (string $source) => PromptSourceEnum::tryFrom($source),
+			$this->pickedSources,
+		)));
+
+		$prompt = $sources === [] ? null : BuildTaskPromptAction::execute((string) $this->openCard, $sources);
 
 		if ($prompt !== null) {
 			$this->prompt = $prompt;
+			$this->composing = false;
 		}
+	}
+
+	/**
+	 * The poll while an agent or a lens round runs. The board is only drawn
+	 * again when something in that run moved; otherwise the answer is empty.
+	 */
+	public function followProgress(): void
+	{
+		$card = (string) $this->openCard;
+		$promptRunEntity = GetLatestPromptRunAction::execute($card);
+		$reviewRoundEntity = $this->latestRound($card);
+
+		$logPath = $promptRunEntity === null ? null : resolve(PromptRunRepositoryContract::class)->logPath($promptRunEntity->promptRunId);
+		clearstatcache();
+
+		$progress = md5((string) json_encode([
+			$promptRunEntity?->status,
+			$promptRunEntity?->finishedAt,
+			// the agent writes its events as they come, so a growing log is progress too
+			$logPath !== null && is_file($logPath) ? filesize($logPath) : null,
+			$reviewRoundEntity?->status,
+			$reviewRoundEntity?->results,
+		]));
+
+		if ($progress === $this->progressSeen) {
+			$this->skipRender();
+
+			return;
+		}
+
+		$this->progressSeen = $progress;
+	}
+
+	/**
+	 * Opening the composer ticks what most likely matters now: the remarks
+	 * and findings waiting on the task, or else everything there is.
+	 */
+	public function toggleComposing(): void
+	{
+		$this->composing = ! $this->composing;
+
+		if (! $this->composing || $this->pickedSources !== []) {
+			return;
+		}
+
+		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
+		$available = collect($this->promptSources($cardObject, $cardObject === null ? collect() : $this->reviewCommentsOn($cardObject)))
+			->map(fn (array $source) => $source['case']);
+		$waiting = $available->filter(fn (PromptSourceEnum $source) => in_array($source, [PromptSourceEnum::REVIEW, PromptSourceEnum::ROUND], true));
+
+		$this->pickedSources = ($waiting->isNotEmpty() ? $waiting : $available)
+			->map(fn (PromptSourceEnum $source) => $source->value)
+			->values()
+			->all();
+	}
+
+	public function togglePromptSource(string $source): void
+	{
+		$this->pickedSources = in_array($source, $this->pickedSources, true)
+			? array_values(array_diff($this->pickedSources, [$source]))
+			: [...$this->pickedSources, $source];
 	}
 
 	/**
@@ -659,7 +817,7 @@ class Board extends Component
 	{
 		$this->failure = null;
 
-		$cardObject = $this->cardById(collect(BuildBoardAction::execute()), (string) $this->openCard);
+		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
 		$pullRequestIds = $this->pullRequestsAskingForChanges($cardObject)
 			->map(fn (PullRequestEntity $pullRequestEntity) => $pullRequestEntity->pullRequestId)
 			->all();
@@ -718,63 +876,34 @@ class Board extends Component
 	}
 
 	/**
-	 * Writes what is standing in the working copy down as one commit. It
-	 * stays on the machine until you push it yourself.
+	 * Opens what one lens found in one round, on top of the card.
 	 */
-	public function commitChanges(): void
+	public function openFinding(int $round, int $lens): void
 	{
-		$this->failure = null;
-
-		$this->validate(['commitMessage' => ['required', 'min:5']], [
-			'commitMessage.required' => __('Schrijf eerst een commitbericht.'),
-			'commitMessage.min' => __('Schrijf eerst een commitbericht.'),
-		]);
-
-		$directory = $this->workingDirectory();
-
-		if ($directory === null) {
-			$this->failure = __('Er is geen werkkopie om in te committen.');
-
-			return;
-		}
-
-		$this->committed = CommitChangesAction::execute($directory, $this->commitMessage, $this->commitBody)
-			? __('Vastgelegd in een commit.')
-			: __('Committen lukte niet.');
-
-		$this->commitMessage = $this->suggestedCommitMessage((string) $this->openCard);
-		$this->commitBody = '';
+		$this->openDrawer('finding', $round . ':' . $lens);
 	}
 
 	/**
-	 * Pushing is the step that leaves the machine, so it takes a second
-	 * press.
+	 * Fetches Jira and Bitbucket again, for when the card looks behind.
 	 */
-	public function pushBranch(): void
+	public function fetchNow(): void
 	{
-		$this->failure = null;
-
-		if (! $this->confirmingPush) {
-			$this->confirmingPush = true;
-
-			return;
-		}
-
-		$directory = $this->workingDirectory();
-		$this->confirmingPush = false;
-
-		if ($directory === null) {
-			return;
-		}
-
-		$this->committed = PushBranchAction::execute($directory)
-			? __('Gepusht naar origin.')
-			: __('Pushen lukte niet.');
+		StartFetchAction::execute();
 	}
 
-	public function toggleRole(string $role): void
+	public function toggleBacklog(): void
 	{
-		$this->role = $this->role === $role ? '' : $role;
+		$this->showBacklog = ! $this->showBacklog;
+	}
+
+	/**
+	 * Moves the open to-do between the sprint and the backlog.
+	 */
+	public function planLater(bool $isLater): void
+	{
+		if ($this->openCard !== null && str_starts_with($this->openCard, 'todo:')) {
+			PlanTodoLaterAction::execute(new TodoId(id: (int) substr($this->openCard, 5)), $isLater);
+		}
 	}
 
 	public function toggleAttention(string $filter): void
@@ -791,59 +920,50 @@ class Board extends Component
 
 	public function showAllColumns(): void
 	{
-		$this->shownColumns = array_column(BoardColumnEnum::cases(), 'value');
+		$this->shownColumns = array_column(BoardColumnEnum::sprint(), 'value');
 	}
 
 	public function resetFilters(): void
 	{
 		$this->query = '';
-		$this->role = '';
 		$this->attention = '';
 		$this->clearProjects();
 	}
 
-	public function render(): View
+	/**
+	 * The line under the title: the sprint, how long it still runs, and how
+	 * much of it waits on you.
+	 *
+	 * @param  Collection<int, CardObject>  $cardObjects
+	 */
+	private function summary(Collection $cardObjects): string
 	{
-		$cardObjects = collect(BuildBoardAction::execute());
-		$visible = $this->visible($cardObjects);
+		$sprintEntity = collect(GetTicketsAction::execute())
+			->first(fn (TicketEntity $ticketEntity) => $ticketEntity->isInSprint());
 
-		$columns = collect(BoardColumnEnum::cases())
-			->filter(fn (BoardColumnEnum $column) => in_array($column->value, $this->shownColumns, true))
-			->map(fn (BoardColumnEnum $column) => [
-				'case' => $column,
-				'total' => $cardObjects->filter(fn (CardObject $card) => $card->column === $column)->count(),
-				'cards' => $visible->filter(fn (CardObject $card) => $card->column === $column)->values(),
-			])
-			->values();
+		$tasks = $cardObjects->filter(
+			fn (CardObject $card) => ! in_array($card->column, [BoardColumnEnum::LATER, BoardColumnEnum::DONE], true),
+		);
+		$yours = $tasks->filter(fn (CardObject $card) => $card->isYourTurn())->count();
 
-		if (! $columns->contains(fn (array $column) => $column['case']->value === $this->mobileColumn) && $columns->isNotEmpty()) {
-			$this->mobileColumn = $columns->first()['case']->value;
+		$parts = [];
+
+		if ($sprintEntity !== null) {
+			$parts[] = $sprintEntity->sprint;
+
+			if ($sprintEntity->sprintEndsAt !== null) {
+				$workdays = (int) CarbonImmutable::today()->diffInWeekdays($sprintEntity->sprintEndsAt->startOfDay(), absolute: false);
+
+				$parts[] = $workdays > 0
+					? trans_choice('nog :count werkdag|nog :count werkdagen', $workdays, ['count' => $workdays])
+					: __('laatste dag');
+			}
 		}
 
-		return view('livewire.board', [
-			'columns' => $columns,
-			'allColumns' => collect(BoardColumnEnum::cases())->map(fn (BoardColumnEnum $column) => [
-				'case' => $column,
-				'total' => $cardObjects->filter(fn (CardObject $card) => $card->column === $column)->count(),
-			]),
-			'projectOptions' => $this->projectOptions($this->countsByProject($cardObjects)),
-			'projectTotal' => $cardObjects->count(),
-			'signals' => $this->signals($cardObjects),
-			'chips' => $this->chips(),
-			'allProjectNames' => GetProjectsAction::execute()->pluck('name')->sort()->values(),
-			'roles' => [
-				'author' => $cardObjects->filter(fn (CardObject $card) => $card->myRole === 'author')->count(),
-				'reviewer' => $cardObjects->filter(fn (CardObject $card) => $card->myRole === 'reviewer')->count(),
-			],
-			'visibleCount' => $visible->count(),
-			'totalCount' => $cardObjects->count(),
-			'drawer' => $this->drawerContents($cardObjects),
-			'claudeAvailable' => resolve(ClaudeProcessRepositoryContract::class)->isAvailable(),
-			'filtered' => filled($this->query)
-				|| $this->hasProjectFilter()
-				|| filled($this->role)
-				|| filled($this->attention),
-		]);
+		$parts[] = trans_choice(':count taak|:count taken', $tasks->count(), ['count' => $tasks->count()]);
+		$parts[] = __(':count jouw beurt', ['count' => $yours]);
+
+		return implode(' · ', $parts);
 	}
 
 	/**
@@ -857,6 +977,9 @@ class Board extends Component
 		return collect(BoardSignalEnum::cases())->map(fn (BoardSignalEnum $signal) => [
 			'case' => $signal,
 			'count' => $cardObjects->filter(fn (CardObject $card) => $signal->matches($card))->count(),
+			'title' => $signal === BoardSignalEnum::STALLED
+				? __(':days dagen geen commit, agentbericht, reviewronde of reactie', ['days' => (int) config('devdock.board.stale_days')])
+				: null,
 		]);
 	}
 
@@ -873,9 +996,6 @@ class Board extends Component
 			// bij: die hoort nergens bij
 			->when($this->hasProjectFilter(), fn (Collection $all) => $all->filter(
 				fn (CardObject $card) => in_array($card->project, $this->projects, true),
-			))
-			->when(filled($this->role), fn (Collection $all) => $all->filter(
-				fn (CardObject $card) => $card->myRole === $this->role,
 			))
 			->when(filled($this->attention), fn (Collection $all) => $all->filter(
 				fn (CardObject $card) => BoardSignalEnum::from($this->attention)->matches($card),
@@ -906,16 +1026,13 @@ class Board extends Component
 		if ($top['type'] === 'session') {
 			$sessionEntity = $this->sessionByUuid($top['id']);
 
-			return $sessionEntity === null ? null : [
-				'type' => 'session',
-				'session' => $sessionEntity,
-				'projectPath' => $this->projectPathOf($sessionEntity),
-				'tab' => $top['tab'],
-				'transcript' => $top['tab'] === 'Transcript'
-					? collect(GetTranscriptAction::execute($sessionEntity->sessionId))
-					: collect(),
-				'previous' => $previousLabel,
-			];
+			return $sessionEntity === null
+				? null
+				: $this->sessionDrawer($sessionEntity, GetSessionTraitsAction::execute()[$sessionEntity->uuid] ?? [], $previousLabel);
+		}
+
+		if ($top['type'] === 'finding') {
+			return $this->findingContents($top['id'], $previousLabel);
 		}
 
 		$cardObject = $this->cardById($cardObjects, $top['id']);
@@ -930,9 +1047,15 @@ class Board extends Component
 		$promptRunEntity = GetLatestPromptRunAction::execute($cardObject->id);
 		$ticketEntity = $this->ticketFor($cardObject);
 		$latestRound = $this->latestRound($cardObject->id);
-		$changes = $tab === 'Worktree' ? $this->changesFor($cardObject) : collect();
-		$step = ResolveWorkflowStepAction::execute($cardObject, $latestRound);
+		$worktreeEntity = $this->worktreeFor($cardObject);
+		$changes = $tab === 'Werkkopie' && $worktreeEntity !== null ? $this->changesFor($cardObject) : collect();
+		// a task with a working copy but without an agent is not set up yet: the panel stays until all three steps are done
+		$isSetup = in_array($cardObject->column, [BoardColumnEnum::TO_DO, BoardColumnEnum::LATER], true)
+			|| ($cardObject->column === BoardColumnEnum::BUILDING && $cardObject->agent === null && $promptRunEntity === null);
 		$diffHunks = ReadDiffAction::execute($this->diffFor($cardObject));
+		$diffFiles = $this->openDiffFile === null ? [] : $this->branchFiles($cardObject);
+		$workflowSetting = GetWorkflowSettingAction::execute($cardObject->project);
+		$promptSources = $tab === 'Agent' ? $this->promptSources($cardObject, $reviewCommentEntities) : [];
 		$pullRequests = $cardObject->pullRequests
 			->map(fn (PullRequestEntity $pullRequestEntity) => $pullRequestEntity->repository . '#' . $pullRequestEntity->number)
 			->all();
@@ -941,70 +1064,172 @@ class Board extends Component
 			'type' => 'card',
 			'card' => $cardObject,
 			'task' => $taskEntity,
-			'tab' => $tab,
+			'tab' => $isSetup ? 'Inrichten' : $tab,
+			'isSetup' => $isSetup,
 			'previous' => $previousLabel,
+			'cardSteps' => $this->cardSteps($cardObject),
+			'nextStep' => $this->nextStep($cardObject, $worktreeEntity, $latestRound),
+			...($isSetup ? $this->setupData($cardObject, $worktreeEntity) : []),
+			'databaseSuggestion' => $worktreeEntity === null && ($isSetup || $tab === 'Werkkopie') ? $this->databaseSuggestionFor($cardObject) : null,
 			'run' => $promptRunEntity,
 			'lastReport' => ReadReportAction::execute($promptRunEntity?->output),
-			'links' => $this->activeLinks($cardObject),
-			'rounds' => $tab === 'Workflow' ? collect(GetRoundsAction::execute($cardObject->id))->reverse()->values() : collect(),
-			'agentTurns' => $tab === 'Workflow'
+			'rounds' => $tab === 'Review' ? collect(GetRoundsAction::execute($cardObject->id))->reverse()->values() : collect(),
+			'agentTurns' => $tab === 'Review'
 				? resolve(PromptRunRepositoryContract::class)->getByReviewRounds($cardObject->id)
 				: [],
-			'branchFiles' => $tab === 'Worktree' ? $this->branchFiles($cardObject) : [],
+			'isExpired' => $latestRound?->isExpiredBy($worktreeEntity === null ? null : resolve(WorktreeRepositoryContract::class)->getFingerprint($worktreeEntity->path)) ?? false,
 			'openDiffFile' => $this->openDiffFile,
-			'diffFiles' => $this->openDiffFile === null ? [] : $this->branchFiles($cardObject),
+			'diffFiles' => $diffFiles,
+			'diffPosition' => array_search($this->openDiffFile, $diffFiles, true) === false ? 1 : array_search($this->openDiffFile, $diffFiles, true) + 1,
+			'nextDiffFile' => $diffFiles[array_search($this->openDiffFile, $diffFiles, true) + 1] ?? null,
 			'diffHunks' => $diffHunks,
 			'diffAdded' => $this->countLines($diffHunks, 'add'),
 			'diffRemoved' => $this->countLines($diffHunks, 'del'),
 			'latestRound' => $latestRound,
-			'step' => $step,
-			'steps' => WorkflowStepEnum::cases(),
-			'buildSteps' => $tab === 'Workflow' ? $this->buildSteps($cardObject, $ticketEntity) : [],
 			'renameTo' => $this->renameSuggestion($cardObject),
-			'canDeliver' => $tab === 'Workflow' ? $this->canDeliver($cardObject) : false,
-			'maxRounds' => (int) config('devdock.review.max_rounds'),
-			'agentContext' => $tab === 'Workflow'
-				? ComposeAgentContextAction::execute($cardObject->id, $this->worktreeFor($cardObject)?->path)
-				: null,
-			'contextPath' => resolve(AgentContextRepositoryContract::class)->relativePath(),
+			'canDeliver' => $tab === 'Review' ? $this->canDeliver($cardObject) : false,
+			'maxRounds' => $workflowSetting->maxRounds,
+			'afterRounds' => $workflowSetting->afterRounds,
 			'agents' => $taskEntity?->agents,
 			'conversation' => $tab === 'Agent' ? GetConversationAction::execute($cardObject->id) : [],
-			'promptSources' => $tab === 'Agent' ? $this->promptSources($cardObject, $reviewCommentEntities) : [],
-			'worktree' => $this->worktreeFor($cardObject),
-			'changes' => $changes,
-			'uncommittedSummary' => $changes->isEmpty()
-				? __('niets open')
-				: trans_choice(':count bestand|:count bestanden', $changes->count(), ['count' => $changes->count()])
-. sprintf(' · +%d −%d', $changes->sum('added'), $changes->sum('removed')),
-			'branchSummary' => $this->branchSummary($cardObject, $tab),
-			'pushLabel' => $this->pushLabel($cardObject),
-			'openOnWorktree' => $this->openOnWorktree($this->worktreeFor($cardObject), $step, $changes),
-			'readyToCommit' => $tab === 'Worktree'
-				&& $changes->isNotEmpty()
-				&& $latestRound?->status === RoundStatusEnum::PASSED,
-			'branchRows' => $this->linkRows($taskEntity, TaskLinkKindEnum::BRANCH, array_filter([$cardObject->branch]), $cardObject->branch),
+			'promptSources' => $promptSources,
+			'promptSourceSummary' => collect($promptSources)->map(fn (array $source) => $source['case']->label())->implode(', '),
+			'pickedSourceCount' => count(array_intersect(
+				$this->pickedSources,
+				collect($promptSources)->map(fn (array $source) => $source['case']->value)->all(),
+			)),
+			'claudeAvailable' => resolve(ClaudeProcessRepositoryContract::class)->isAvailable(),
+			...($tab === 'Werkkopie' ? $this->workingCopyData($cardObject, $worktreeEntity, $changes) : ['worktree' => $worktreeEntity]),
+			'branchSuggestion' => $this->newBranch,
 			'readableProjects' => $taskEntity?->valuesFor(TaskLinkKindEnum::READABLE_PROJECT) ?? [],
-			'projectChoices' => $tab === 'Worktree' ? GetProjectsAction::execute()->pluck('name')->sort()->values() : collect(),
-			'branchChoices' => $tab === 'Worktree' && $cardObject->project !== null
+			'projectChoices' => GetProjectsAction::execute()->pluck('name')->sort()->values(),
+			'branchChoices' => $cardObject->project !== null && ($tab === 'Koppelingen' || $isSetup)
 				? GetBranchesAction::execute($cardObject->project)
 				: [],
 			'ticket' => $ticketEntity,
 			'description' => $cardObject->description,
 			'ticketRows' => $this->linkRows($taskEntity, TaskLinkKindEnum::TICKET, array_filter([$cardObject->ticketKey]), $cardObject->ticketKey),
-			'activePullRequestUrl' => $cardObject->pullRequests->first(
+			'branchRows' => $this->linkRows($taskEntity, TaskLinkKindEnum::BRANCH, array_filter([$cardObject->branch]), $cardObject->branch),
+			'activePullRequest' => $cardObject->pullRequests->first(
 				fn (PullRequestEntity $pullRequestEntity) => $pullRequestEntity->repository . '#' . $pullRequestEntity->number === $cardObject->activePullRequest,
-			)?->url,
+			),
 			'pullRequestRows' => $this->linkRows($taskEntity, TaskLinkKindEnum::PULL_REQUEST, $pullRequests, $cardObject->activePullRequest),
 			'reviewComments' => $reviewCommentEntities->reject(
 				fn (ReviewCommentEntity $reviewCommentEntity) => $reviewCommentEntity->isPrompt,
 			)->values(),
-			'hasReviewPrompt' => $reviewCommentEntities->contains(
-				fn (ReviewCommentEntity $reviewCommentEntity) => $reviewCommentEntity->isPrompt,
-			),
+			'changesRequestedBy' => $cardObject->pullRequests->first(
+				fn (PullRequestEntity $pullRequestEntity) => $pullRequestEntity->hasChangesRequested(),
+			)?->changesRequestedBy,
+			'fetchedAt' => GetLatestFetchRunAction::execute()?->finishedAt?->format('H:i'),
 			'report' => $promptRunEntity?->output === null
 				? null
 				: resolve(RenderMarkdown::class)->toHtml($promptRunEntity->output),
 		];
+	}
+
+	/**
+	 * A finding of one lens in one round, opened on top of its card.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	private function findingContents(string $id, ?string $previousLabel): ?array
+	{
+		[$roundId, $lensId] = array_map('intval', explode(':', $id) + [1 => 0]);
+
+		$reviewRoundEntity = resolve(ReviewRoundRepositoryContract::class)->getById(new ReviewRoundId(id: $roundId));
+		$resultEntity = collect($reviewRoundEntity?->results ?? [])
+			->first(fn (ReviewResultEntity $resultEntity) => $resultEntity->lensId->id === $lensId);
+
+		return $resultEntity === null ? null : [
+			'type' => 'finding',
+			'round' => $reviewRoundEntity,
+			'result' => $resultEntity,
+			'report' => $resultEntity->report === null ? null : resolve(RenderMarkdown::class)->toHtml($resultEntity->report),
+			'previous' => $previousLabel,
+		];
+	}
+
+	/**
+	 * The four steps on top of a card, with the one it stands on.
+	 *
+	 * @return array<int, array{label: string, state: string, number: int}>
+	 */
+	private function cardSteps(CardObject $cardObject): array
+	{
+		$order = [BoardColumnEnum::BUILDING, BoardColumnEnum::REVIEW, BoardColumnEnum::PULL_REQUEST, BoardColumnEnum::DONE];
+		$current = array_search($cardObject->column, $order, true);
+
+		return array_map(fn (BoardColumnEnum $column, int $index) => [
+			'label' => $column->label(),
+			'number' => $index + 1,
+			'state' => match (true) {
+				$current === false => 'todo',
+				$index < $current || $column === BoardColumnEnum::DONE && $current === $index => 'done',
+				$index === $current => 'now',
+				default => 'todo',
+			},
+		], $order, array_keys($order));
+	}
+
+	/**
+	 * What comes next on this task, in a line and with the tab where it is
+	 * done.
+	 *
+	 * @return array{title: string, text: string, tone: string, hint: string, tab: ?string, button: ?string, url: ?string}
+	 */
+	private function nextStep(CardObject $cardObject, ?WorktreeEntity $worktreeEntity, ?ReviewRoundEntity $latestRound): array
+	{
+		$ahead = $worktreeEntity?->ahead ?? 0;
+		$tone = match ($cardObject->status) {
+			CardStatusEnum::YOURS => 'teal',
+			CardStatusEnum::BUSY => 'amber',
+			CardStatusEnum::QUIET => 'gray',
+		};
+
+		[$text, $hint, $tab, $button] = match ($cardObject->column) {
+			BoardColumnEnum::BUILDING => $worktreeEntity?->holdsWork()
+				? [__('Lees na wat er veranderd is en leg het vast in een commit.'), __('Volgende stap: committen, op Werkkopie'), 'Werkkopie', __('Naar de werkkopie')]
+				: [__('De agent bouwt in zijn eigen werkkopie; jij stuurt bij.'), __('Volgende stap: een opdracht, op Agent'), 'Agent', __('Naar de agent')],
+			BoardColumnEnum::REVIEW => $latestRound?->status === RoundStatusEnum::PASSED
+				? [__('Review is schoon. Na het pushen wacht de pull request op jou; mergen doe je in Bitbucket.'), __('Volgende stap: pushen, op Werkkopie'), 'Werkkopie', __('Naar de werkkopie')]
+				: [__('De lenzen kijken naar wat deze branch veranderde.'), __('Volgende stap: de lenzen, op Review'), 'Review', __('Naar de review')],
+			BoardColumnEnum::PULL_REQUEST => $cardObject->pullRequests->first(fn (PullRequestEntity $pullRequestEntity) => $pullRequestEntity->hasChangesRequested()) !== null
+				? [__('Geef de opmerkingen aan de agent, of pak ze zelf op.'), __('Volgende stap: bijwerken, op Agent'), 'Agent', __('Naar de agent')]
+				: [__('Collega\'s kijken; mergen doe je in Bitbucket.'), __('Volgende stap: de merge, in Bitbucket'), null, null],
+			BoardColumnEnum::DONE => [__('Gemerged. De werkkopie mag weg.'), __('Volgende stap: opruimen, op Werkkopie'), 'Werkkopie', __('Naar de werkkopie')],
+			default => [__('Nog niet ingericht.'), '', null, null],
+		};
+
+		return [
+			'title' => $ahead > 0 && $cardObject->column === BoardColumnEnum::REVIEW
+				? trans_choice(':count commit nog niet gepusht|:count commits nog niet gepusht', $ahead, ['count' => $ahead])
+				: $cardObject->statusText,
+			'text' => $text,
+			'tone' => $tone,
+			'hint' => $hint,
+			'tab' => $tab,
+			'button' => $button,
+			'url' => $tab === null ? $cardObject->pullRequests->first()?->url : null,
+		];
+	}
+
+	/**
+	 * The name a database of this task would get: the one of the project with
+	 * the ticket behind it.
+	 */
+	private function databaseSuggestionFor(CardObject $cardObject): ?string
+	{
+		$projectPath = GetProjectsAction::execute()
+			->first(fn (ProjectEntity $projectEntity) => $projectEntity->name === $cardObject->project)
+			?->path;
+
+		if ($projectPath === null) {
+			return null;
+		}
+
+		return resolve(WorktreeDatabaseRepositoryContract::class)
+			->describe($projectPath, $projectPath)
+			->suggestionFor($cardObject->ticketKey ?? Str::slug(Str::limit($cardObject->title, 24, ''), '_'));
 	}
 
 	/**
@@ -1019,6 +1244,10 @@ class Board extends Component
 			return $this->sessionByUuid($entry['id'])?->name() ?? __('Sessie');
 		}
 
+		if ($entry['type'] === 'finding') {
+			return __('Bevinding');
+		}
+
 		$cardObject = $this->cardById($cardObjects, $entry['id']);
 
 		return $cardObject?->ticketKey ?? $cardObject?->title ?? __('Taak');
@@ -1030,7 +1259,7 @@ class Board extends Component
 	 */
 	private function suggestedCommitMessage(string $card): string
 	{
-		$cardObject = $this->cardById(collect(BuildBoardAction::execute()), $card);
+		$cardObject = $this->cardById($this->board(), $card);
 
 		return $cardObject?->suggestedCommitMessage() ?? '';
 	}
@@ -1041,7 +1270,7 @@ class Board extends Component
 	 */
 	private function workingDirectory(): ?string
 	{
-		$cardObject = $this->cardById(collect(BuildBoardAction::execute()), (string) $this->openCard);
+		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
 
 		if ($cardObject === null) {
 			return null;
@@ -1127,63 +1356,6 @@ class Board extends Component
 	}
 
 	/**
-	 * What has to stand before an agent can build. In this order, because
-	 * everything is named after the ticket number: the number first, then the
-	 * task, then the agent, and only then the working copy.
-	 *
-	 * @return array<int, array{key: string, label: string, detail: string, isDone: bool, action: ?string, button: ?string}>
-	 */
-	private function buildSteps(CardObject $cardObject, ?TicketEntity $ticketEntity): array
-	{
-		$worktreeEntity = $this->worktreeFor($cardObject);
-
-		return [
-			[
-				'key' => 'ticket',
-				'label' => __('Ticketnummer'),
-				'detail' => $cardObject->ticketKey ?? __('nog geen nummer; alles heet hiernaar'),
-				'isDone' => $cardObject->ticketKey !== null,
-				'action' => $cardObject->ticketKey === null ? "setDrawerTab('Jira')" : null,
-				'button' => $cardObject->ticketKey === null ? __('Nummer toewijzen') : null,
-			],
-			[
-				'key' => 'task',
-				'label' => __('Taak'),
-				'detail' => $ticketEntity !== null ? __('op het bord en in Jira') : __('op het bord, niet in Jira'),
-				'isDone' => true,
-				'action' => null,
-				'button' => null,
-			],
-			[
-				'key' => 'agent',
-				'label' => __('Agent'),
-				'detail' => $cardObject->agent?->name ?? __('nog geen sessie geopend'),
-				'isDone' => $cardObject->agent !== null,
-				'action' => $cardObject->agent === null ? 'openAgent' : null,
-				'button' => $cardObject->agent === null ? __('Agent openen') : null,
-			],
-			[
-				'key' => 'worktree',
-				'label' => __('Werkkopie'),
-				'detail' => $worktreeEntity?->path ?? __('nog geen eigen map'),
-				'isDone' => $worktreeEntity !== null,
-				'action' => $worktreeEntity === null ? "setDrawerTab('Worktree')" : null,
-				'button' => $worktreeEntity === null ? __('Werkkopie maken') : null,
-			],
-			[
-				'key' => 'build',
-				'label' => __('Bouwen'),
-				'detail' => $cardObject->agent !== null && $worktreeEntity !== null
-					? __('alles staat, de agent kan beginnen')
-					: __('pas als het bovenstaande staat'),
-				'isDone' => false,
-				'action' => $cardObject->agent !== null && $worktreeEntity !== null ? "setDrawerTab('Agent')" : null,
-				'button' => $cardObject->agent !== null && $worktreeEntity !== null ? __('Naar de agent') : null,
-			],
-		];
-	}
-
-	/**
 	 * Whether there is something to hand over: a working copy of its own with
 	 * work standing in it. Without that a round would judge thin air, or worse,
 	 * the checkout itself.
@@ -1221,30 +1393,6 @@ class Board extends Component
 	}
 
 	/**
-	 * Welke blokken op de Worktree-tab openstaan. Dat hangt af van waar de
-	 * taak staat: aan het begin zet je de koppelingen goed, daarna kijk je
-	 * alleen nog naar wat er veranderd is, en na de merge ruim je op.
-	 *
-	 * @return array<string, bool>
-	 */
-	private function openOnWorktree(
-		?WorktreeEntity $worktreeEntity,
-		WorkflowStepEnum $step,
-		Collection $changes,
-	): array {
-		$building = $step === WorkflowStepEnum::BUILDING;
-		$merged = $step === WorkflowStepEnum::MERGED;
-
-		return [
-			'links' => $building && $worktreeEntity === null,
-			'worktree' => $merged || $worktreeEntity === null,
-			'uncommitted' => ! $merged && $changes->isNotEmpty(),
-			'branch' => ! $merged && ! $building && $changes->isEmpty(),
-			'message' => ! $merged && $changes->isNotEmpty(),
-		];
-	}
-
-	/**
 	 * Hoeveel regels er bij kwamen of af gingen, over alle stukken heen.
 	 */
 	private function countLines(DiffHunkObjectCollection $diffHunks, string $kind): int
@@ -1258,40 +1406,6 @@ class Board extends Component
 		}
 
 		return $total;
-	}
-
-	/**
-	 * Wat er op de branch staat, in één regel voor de kop van het blok.
-	 */
-	private function branchSummary(CardObject $cardObject, string $tab): string
-	{
-		if ($tab !== 'Worktree') {
-			return '';
-		}
-
-		$files = count($this->branchFiles($cardObject));
-
-		return $files === 0
-			? __('nog niets')
-			: trans_choice(
-				':count bestand sinds de hoofdlijn|:count bestanden sinds de hoofdlijn',
-				$files,
-				['count' => $files],
-			);
-	}
-
-	/**
-	 * Wat er op de pushknop staat: zonder commits is er niets te sturen.
-	 */
-	private function pushLabel(CardObject $cardObject): string
-	{
-		if ($this->confirmingPush) {
-			return __('Zeker weten? Pushen');
-		}
-
-		$ahead = $this->worktreeFor($cardObject)?->ahead ?? 0;
-
-		return $ahead === 0 ? __('Pushen') : __('Pushen (:count)', ['count' => $ahead]);
 	}
 
 	/**
@@ -1358,7 +1472,7 @@ class Board extends Component
 	 * Which sources this task can build a first prompt from.
 	 *
 	 * @param  Collection<int, ReviewCommentEntity>  $reviewCommentEntities
-	 * @return array<int, array{case: PromptSourceEnum, count: ?int}>
+	 * @return array<int, array{case: PromptSourceEnum, label: string}>
 	 */
 	private function promptSources(?CardObject $cardObject, Collection $reviewCommentEntities): array
 	{
@@ -1373,21 +1487,29 @@ class Board extends Component
 		$sources = [];
 
 		if ($cardObject->ticketKey !== null) {
-			$sources[] = ['case' => PromptSourceEnum::TICKET, 'count' => null];
+			$sources[] = ['case' => PromptSourceEnum::TICKET, 'label' => PromptSourceEnum::TICKET->label()];
 		}
 
-		if (filled($cardObject->description)) {
-			$sources[] = ['case' => PromptSourceEnum::NOTE, 'count' => null];
+		// bij een ticket is de omschrijving het ticket zelf, alleen een to-do heeft een eigen notitie
+		if ($cardObject->ticketKey === null && filled($cardObject->description)) {
+			$sources[] = ['case' => PromptSourceEnum::NOTE, 'label' => PromptSourceEnum::NOTE->label()];
 		}
 
 		if ($findings->isNotEmpty()) {
-			$sources[] = ['case' => PromptSourceEnum::REVIEW, 'count' => $findings->count()];
+			$reviewer = $cardObject->pullRequests->first(
+				fn (PullRequestEntity $pullRequestEntity) => $pullRequestEntity->hasChangesRequested(),
+			)?->changesRequestedBy;
+
+			$sources[] = ['case' => PromptSourceEnum::REVIEW, 'label' => $reviewer === null
+				? trans_choice('Review · :count open opmerking|Review · :count open opmerkingen', $findings->count(), ['count' => $findings->count()])
+				: trans_choice(':name · :count open opmerking|:name · :count open opmerkingen', $findings->count(), ['name' => $reviewer, 'count' => $findings->count()])];
 		}
 
-		$open = $this->latestRound($cardObject->id)?->openFindings() ?? 0;
+		$latestRound = $this->latestRound($cardObject->id);
+		$open = $latestRound?->openFindings() ?? 0;
 
 		if ($open > 0) {
-			$sources[] = ['case' => PromptSourceEnum::ROUND, 'count' => $open];
+			$sources[] = ['case' => PromptSourceEnum::ROUND, 'label' => trans_choice('Bevindingen ronde :number · :count open|Bevindingen ronde :number · :count open', $open, ['number' => $latestRound->number, 'count' => $open])];
 		}
 
 		return $sources;
@@ -1425,23 +1547,20 @@ class Board extends Component
 	/**
 	 * @param  Collection<int, CardObject>  $cardObjects
 	 */
+	/**
+	 * The board of this request. Building it reads every source, so it is
+	 * built once and shared by the actions and the render that follows.
+	 *
+	 * @return Collection<int, CardObject>
+	 */
+	private function board(): Collection
+	{
+		return $this->cardObjects ??= collect(BuildBoardAction::execute());
+	}
+
 	private function cardById(Collection $cardObjects, string $id): ?CardObject
 	{
 		return $cardObjects->first(fn (CardObject $cardObject) => $cardObject->id === $id);
-	}
-
-	/**
-	 * Where the project of this session stands on disk; that is what you type in
-	 * the terminal to carry on there.
-	 */
-	private function projectPathOf(SessionEntity $sessionEntity): ?string
-	{
-		if ($sessionEntity->project === null) {
-			return null;
-		}
-
-		return GetProjectsAction::execute()
-			->first(fn (ProjectEntity $projectEntity) => $projectEntity->name === $sessionEntity->project)?->path;
 	}
 
 	/**
@@ -1458,18 +1577,57 @@ class Board extends Component
 			->countBy();
 	}
 
-	/**
-	 * What is switched on now, so you can let it go again.
-	 *
-	 * @return array<int, array{label: string, filter: string}>
-	 */
-	private function chips(): array
+
+	public function render(): View
 	{
-		return array_values(array_filter([
-			filled($this->query) ? ['label' => __('Zoeken: :term', ['term' => $this->query]), 'filter' => 'query'] : null,
-			filled($this->role) ? ['label' => $this->role === 'author' ? __('Van mij') : __('Ter review'), 'filter' => 'role'] : null,
-			filled($this->attention) ? ['label' => BoardSignalEnum::from($this->attention)->label(), 'filter' => 'attention'] : null,
-			...$this->projectChips(),
-		]));
+		$cardObjects = $this->board();
+		$visible = $this->visible($cardObjects);
+
+		$columns = collect(BoardColumnEnum::cases())
+			->filter(fn (BoardColumnEnum $column) => $column === BoardColumnEnum::LATER
+				? $this->showBacklog
+				: in_array($column->value, $this->shownColumns, true))
+			->map(function (BoardColumnEnum $column) use ($cardObjects, $visible): array {
+				$cards = $visible->filter(fn (CardObject $card) => $card->column === $column)->values();
+
+				// de backlog kan lang zijn; de rest staat een klik verder
+				$limit = $column === BoardColumnEnum::LATER && ! $this->backlogExpanded ? self::BACKLOG_SHOWN : null;
+
+				return [
+					'case' => $column,
+					'total' => $cardObjects->filter(fn (CardObject $card) => $card->column === $column)->count(),
+					'yours' => $cards->filter(fn (CardObject $card) => $card->isYourTurn())->count(),
+					'cards' => $limit === null ? $cards : $cards->take($limit),
+					'hidden' => $limit === null ? 0 : max(0, $cards->count() - $limit),
+				];
+			})
+			->values();
+
+		if (! $columns->contains(fn (array $column) => $column['case']->value === $this->mobileColumn) && $columns->isNotEmpty()) {
+			$this->mobileColumn = $columns->first()['case']->value;
+		}
+
+		return view('livewire.board', [
+			'columns' => $columns,
+			'allColumns' => collect(BoardColumnEnum::sprint())->map(fn (BoardColumnEnum $column) => [
+				'case' => $column,
+				'total' => $cardObjects->filter(fn (CardObject $card) => $card->column === $column)->count(),
+				'isShown' => in_array($column->value, $this->shownColumns, true),
+			]),
+			'shownCount' => count($this->shownColumns) + ($this->showBacklog ? 1 : 0),
+			'projectOptions' => $this->projectOptions($this->countsByProject($cardObjects)),
+			'projectTotal' => $cardObjects->count(),
+			'signals' => $this->signals($cardObjects),
+			'allProjectNames' => GetProjectsAction::execute()->pluck('name')->sort()->values(),
+			'backlogCount' => $cardObjects->filter(fn (CardObject $card) => $card->column === BoardColumnEnum::LATER)->count(),
+			'summary' => $this->summary($cardObjects),
+			'visibleCount' => $visible->count(),
+			'totalCount' => $cardObjects->count(),
+			'drawer' => $this->drawerContents($cardObjects),
+			'claudeAvailable' => resolve(ClaudeProcessRepositoryContract::class)->isAvailable(),
+			'filtered' => filled($this->query)
+				|| $this->hasProjectFilter()
+				|| filled($this->attention),
+		]);
 	}
 }

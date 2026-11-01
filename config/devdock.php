@@ -25,6 +25,10 @@ return [
 	'jira' => [
 		'base_url' => env('JIRA_BASE_URL'),
 		'token' => env('JIRA_TOKEN'),
+
+		// Jira Cloud keeps the sprint in a custom field whose id differs per site;
+		// left empty, DevDock looks it up itself
+		'sprint_field' => env('JIRA_SPRINT_FIELD'),
 	],
 
 	'bitbucket' => [
@@ -36,6 +40,10 @@ return [
 
 		// een eigen token, met Bitbucket-scopes
 		'token' => env('BITBUCKET_TOKEN'),
+
+		// Bitbucket staat ongeveer duizend verzoeken per uur toe en een ronde kost
+		// er één per repository; bij automatisch ophalen rust deze bron zo lang
+		'refresh_seconds' => (int) env('DEVDOCK_BITBUCKET_REFRESH_SECONDS', 300),
 	],
 
 	/*
@@ -126,8 +134,14 @@ return [
 
 	'board' => [
 		'done_days' => (int) env('DEVDOCK_DONE_DAYS', 14),
-		'show_branch' => filter_var(env('DEVDOCK_SHOW_BRANCH', true), FILTER_VALIDATE_BOOL),
-		'columns' => array_values(array_filter(explode(',', (string) env('DEVDOCK_COLUMNS', 'todo,busy,review,merge,done')))),
+		'columns' => array_values(array_filter(explode(',', (string) env('DEVDOCK_COLUMNS', 'todo,building,review,pull_request,done')))),
+
+		// the backlog is the column you look at least; it starts folded away
+		'backlog_hidden' => filter_var(env('DEVDOCK_BACKLOG_HIDDEN', true), FILTER_VALIDATE_BOOL),
+
+		// a task under way with no commit, agent message, review round or
+		// reaction for this many days has stalled
+		'stale_days' => (int) env('DEVDOCK_STALE_DAYS', 5),
 	],
 
 	/*
@@ -150,6 +164,9 @@ return [
 	'review' => [
 		'max_rounds' => (int) env('DEVDOCK_MAX_ROUNDS', 3),
 
+		// what happens once the rounds run out: back, continue or blocking
+		'after_rounds' => env('DEVDOCK_AFTER_ROUNDS', 'back'),
+
 		// een lens mag lang nadenken; stilte betekent dat hij weg is. Daarom
 		// telt niet de klok maar de tijd sinds het laatste teken van leven
 		'lens_timeout' => (int) env('DEVDOCK_LENS_TIMEOUT', 1800),
@@ -168,7 +185,7 @@ return [
 	// hoe lang één prompt mag duren voordat het bord hem afbreekt
 	'prompt_timeout' => (int) env('DEVDOCK_PROMPT_TIMEOUT', 900),
 
-	'refresh_seconds' => (int) env('DEVDOCK_REFRESH_SECONDS', 0),
+	'refresh_seconds' => (int) env('DEVDOCK_REFRESH_SECONDS', 60),
 
 	/*
 	|--------------------------------------------------------------------------

@@ -26,6 +26,7 @@ class ComposeLensContextAction extends Command
 		public readonly LensEntity $lensEntity,
 		public readonly array $files,
 		public readonly ?string $previousReport = null,
+		public readonly array $rules = [],
 	) {}
 
 	public function handle(): string
@@ -72,6 +73,10 @@ class ComposeLensContextAction extends Command
 			__('- Lees de bestanden die je noemt echt, en noem bestand en regelnummer.'),
 			__('- CLAUDE.md en CLAUDE.local.md staan in deze map; die lees je zelf en ze gaan voor je eigen smaak.'),
 		];
+
+		if ($this->rules !== []) {
+			$lines[] = __('- Beoordeel tegen deze regelbestanden: :files', ['files' => implode(', ', $this->rules)]);
+		}
 
 		if ($this->lensEntity->command !== null) {
 			$lines[] = __('- Draai :command en neem de uitkomst mee in je oordeel.', [

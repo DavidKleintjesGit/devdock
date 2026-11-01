@@ -29,5 +29,10 @@ interface SessionRepositoryContract
 
 	public function updateTitle(SessionId $sessionId, string $title, string $fingerprint): void;
 
+	/**
+	 * Keeps a session out of every clean-up, or lets it go again.
+	 */
+	public function pin(SessionId $sessionId, bool $isPinned): void;
+
 	public function delete(SessionId $sessionId): void;
 }

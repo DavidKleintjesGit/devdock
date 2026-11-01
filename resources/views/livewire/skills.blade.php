@@ -1,86 +1,105 @@
-<div class="page{{ $skill || $creating ? ' drawer-open' : '' }}">
-	<header class="pagebar">
-		<div class="logo m-logo" aria-hidden="true">D</div>
-		<h1>{{ __('Skills') }}</h1>
-		<span class="count">{{ trans_choice(':count skill|:count skills', $total, ['count' => $total]) }}</span>
-		<x-page-actions/>
-	</header>
+<div class="split{{ $page['kind'] === 'none' ? '' : ' has-page' }}">
+	<nav class="index" aria-label="{{ __('Skills') }}">
+		<label class="search" style="flex:none;max-width:none">
+			<x-icon name="search" small/>
+			<span class="sr">{{ __('Zoek een skill of project') }}</span>
+			<input type="search" wire:model.live.debounce.250ms="search" placeholder="{{ __('Zoek een skill of project') }}" autocomplete="off">
+		</label>
 
-	<div class="toolbar">
-		<div class="tb-search">
-			<label class="search">
-				<x-icon name="search"/><span class="sr">{{ __('Zoeken') }}</span>
-				<input type="search" wire:model.live.debounce.300ms="query" placeholder="{{ __('Zoek op naam of omschrijving') }}" autocomplete="off">
-			</label>
+		<a class="block" href="#" wire:click.prevent="showSection('global')" @if ($section === 'global') aria-current="page" @endif style="flex-direction:row;align-items:center">
+			<span class="grow" style="display:flex;flex-direction:column"><b>{{ __('Globaal') }}</b><small>{{ __('alleen jij, in elk project') }}</small></span>
+			<span class="side-note">{{ $globalCount }}</span>
+		</a>
+
+		<div class="index-group">
+			<div class="eyebrow">{{ __('Bibliotheken') }}</div>
+			@foreach ($libraries as $libraryEntity)
+				<a class="block" href="#" wire:click.prevent="showLibrary({{ $libraryEntity->id }})" wire:key="slib-{{ $libraryEntity->id }}" @if ($library === $libraryEntity->id) aria-current="page" @endif>
+					<b>{{ $libraryEntity->name }}</b>
+					<small>{{ $libraryEntity->skills() === [] ? __('nog leeg') : trans_choice(':count skill|:count skills', count($libraryEntity->skills()), ['count' => count($libraryEntity->skills())]) }}</small>
+				</a>
+			@endforeach
+			<button class="item" type="button" style="color:var(--accent)" wire:click="startLibrary"><x-icon name="plus" small/>{{ __('Bibliotheek toevoegen') }}</button>
 		</div>
-		<div class="tb-filters">
-			<x-project-picker
-				:options="$projectOptions"
-				:selected="$projects"
-				:total="$projectTotal"
-				:query="$projectQuery"
-				query-property="projectQuery"
-				toggle="toggleProject"
-				clear="clearProjects"
-			/>
 
-			<div class="seg" role="group" aria-label="{{ __('Waar') }}">
-				<button type="button" aria-pressed="{{ $scope === '' ? 'true' : 'false' }}" wire:click="$set('scope', '')">{{ __('Alles') }} <span class="n">{{ $total }}</span></button>
-				@foreach ($scopes as $option)
-					<button type="button" aria-pressed="{{ $scope === $option['case']->value ? 'true' : 'false' }}" wire:click="toggleScope('{{ $option['case']->value }}')">{{ $option['case']->label() }} <span class="n">{{ $option['count'] }}</span></button>
+		<a class="block" href="#" wire:click.prevent="showSection('plugins')" @if ($section === 'plugins') aria-current="page" @endif style="flex-direction:row;align-items:center">
+			<span class="grow" style="display:flex;flex-direction:column"><b>{{ __('Plugins') }}</b><small>{{ __('alleen-lezen') }}</small></span>
+			<span class="side-note">{{ $pluginCount }}</span>
+		</a>
+
+		@if ($favorites !== [])
+			<div class="index-group">
+				<div class="eyebrow">{{ __('Favorieten') }}</div>
+				@foreach ($favorites as $favorite)
+					<a href="#" wire:click.prevent="open('{{ $favorite['project'] }}|{{ $favorite['path'] }}')" wire:key="sfav-{{ $favorite['project'] }}-{{ $favorite['path'] }}">
+						<x-icon name="star" small/>
+						<span class="grow ellipsis mono" style="font-size:12.5px">{{ $favorite['path'] }}</span>
+						<span class="side-note">{{ $favorite['project'] }}</span>
+					</a>
 				@endforeach
 			</div>
-			<span class="spacer"></span>
-			<button class="btn primary" type="button" wire:click="startCreating"><x-icon name="plus" small/>{{ __('Skill aanmaken') }}</button>
+		@endif
+
+		<div class="index-group">
+			<div class="eyebrow">
+				<span>{{ __('Projecten · :count', ['count' => $withSkills + $withoutSkills]) }}</span>
+				<button class="tchip" type="button" style="height:26px;border-radius:999px;letter-spacing:0;text-transform:none;font-size:12px" aria-pressed="{{ $onlyWithSkills ? 'true' : 'false' }}" wire:click="$toggle('onlyWithSkills')">{{ __('Met skills') }} <b>{{ $withSkills }}</b></button>
+			</div>
+			@foreach ($projectRows as $row)
+				<a href="#" wire:click.prevent="showProject('{{ $row['name'] }}')" wire:key="sp-{{ $row['name'] }}" @if ($project === $row['name']) aria-current="page" @endif>
+					<span class="grow ellipsis">{{ $row['name'] }}</span>
+					<span class="side-note">{{ $row['count'] ?: '' }}</span>
+				</a>
+			@endforeach
+			@if ($onlyWithSkills && $withoutSkills > 0)
+				<button class="item more" type="button" wire:click="$set('onlyWithSkills', false)">{{ trans_choice(':count project zonder skills|:count projecten zonder skills', $withoutSkills, ['count' => $withoutSkills]) }}</button>
+			@endif
 		</div>
-	</div>
+	</nav>
 
-	<div class="content">
-		@include('partials.active-filters')
-		@foreach ($groups as $group)
-			<section class="section">
-				<div class="section-head">
-					<h2>{{ $group['case']->label() }}</h2>
-					<span class="side-note">{{ $group['case']->note() ? $group['case']->note() . ' · ' : '' }}{{ trans_choice(':count skill|:count skills', $group['skills']->count(), ['count' => $group['skills']->count()]) }}</span>
-				</div>
-				<div class="box list">
-					@forelse ($group['skills'] as $item)
-						<div class="krow{{ $openSkill === $item->name ? ' open' : '' }}" wire:key="skill-{{ $item->skillId->id }}">
-							<button class="rowlink kname" type="button" wire:click="open('{{ $item->name }}')">
-								<b>{{ $item->name }}</b><small>{{ $item->location() }}</small>
-							</button>
-							<span class="kdesc">{{ $item->description }}</span>
-							<span class="acts above">
-								@if ($item->isEditable())
-									<span class="chip teal">{{ $item->scope->label() }}</span>
-								@else
-									<span class="chip gray"><x-icon name="lock" small/>{{ __('Alleen-lezen') }}</span>
-								@endif
-							</span>
-							<span class="chev"><x-icon name="chev" small/></span>
-						</div>
-					@empty
-						<div class="empty">
-							<span class="bubble"><x-icon name="skills"/></span>
-							<b>{{ __('Nog geen skills') }}</b>
-							<span>{{ $group['case']->emptyHint() }}</span>
-						</div>
-					@endforelse
-				</div>
-			</section>
-		@endforeach
-	</div>
-
-	@if ($skill || $creating)
-		<div class="scrim" wire:click="closeDrawer"></div>
-		@if ($skill && $copying)
-			@include('partials.copy-to-project', ['what' => $skill->name, 'projects' => $projectsToCopyTo, 'warning' => $copyWarning])
+	<div class="page">
+		@if ($libraryDone)
+			<div class="alert green" style="margin:16px 44px 0;max-width:1000px"><x-icon name="check" small/><span class="grow">{{ $libraryDone }}</span><button class="icon-btn" type="button" style="width:26px;height:26px" wire:click="$set('libraryDone', null)" aria-label="{{ __('Melding weg') }}"><x-icon name="x" small/></button></div>
 		@endif
 
-		@if ($creating)
-			@include('partials.skill-new', ['projects' => $projects, 'globalScope' => $globalScope])
-		@else
-			@include('partials.skill-drawer', ['skill' => $skill, 'body' => $body])
-		@endif
+		@switch ($page['kind'])
+			@case ('project')
+				@include('partials.skills.project', $page)
+				@break
+			@case ('global')
+			@case ('plugins')
+				@include('partials.skills.list', $page)
+				@break
+			@case ('library')
+				@include('partials.skills.library', $page)
+				@break
+			@case ('skill')
+				@include('partials.skills.skill', $page)
+				@break
+			@default
+				<main class="main" style="padding:34px 44px">
+					<div class="empty"><b>{{ __('Kies links een project') }}</b><span>{{ __('Je ziet dan welke skills een agent daar kan pakken.') }}</span></div>
+				</main>
+		@endswitch
+	</div>
+
+	@if ($skillDrawer)
+		@include('partials.skill-drawer', $skillDrawer)
+	@endif
+
+	@if ($itemDrawer)
+		@include('partials.library.item-drawer', $itemDrawer + ['kindLabel' => __('Bibliotheekskill')])
+	@endif
+
+	@if ($confirmingRollOut)
+		@include('partials.library.roll-out')
+	@endif
+
+	@if ($addingLibrary)
+		@include('partials.library.new', $newLibrary)
+	@endif
+
+	@if ($creating)
+		@include('partials.skill-new', ['places' => $newSkillPlaces])
 	@endif
 </div>

@@ -58,6 +58,15 @@ class PromptRunEntity extends ValueObject
 		return (int) $until->diffInSeconds($this->startedAt, absolute: true);
 	}
 
+	/**
+	 * Whether the prompt is long enough to fold away in the chat, as a prompt
+	 * built from the ticket usually is.
+	 */
+	public function hasLongPrompt(): bool
+	{
+		return mb_strlen($this->prompt) > 600 || substr_count($this->prompt, "\n") > 10;
+	}
+
 	public function costLabel(): ?string
 	{
 		return $this->cost === null ? null : '$' . number_format($this->cost, 2);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Fetch\Actions;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Str;
 use Src\Fetch\Contracts\FetchRunRepositoryContract;
@@ -19,13 +20,14 @@ use Src\Session\Actions\ScanSessionsAction;
 use Src\Skill\Actions\ScanSkillsAction;
 use Src\Ticket\Actions\FetchTicketsAction;
 use Src\Ticket\Contracts\TicketSourceRepositoryContract;
+use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Throwable;
 
 /**
  * Walks along the sources and writes down per source what it yielded. A
  * source that cannot be reached does not hold up the round.
  *
- * @method static FetchRunEntity execute(FetchRunId $fetchRunId, ?FetchSourceEnum $only)
+ * @method static FetchRunEntity execute(FetchRunId $fetchRunId, ?FetchSourceEnum $only, bool $dueOnly)
  */
 class RunFetchAction extends Command
 {
@@ -37,6 +39,8 @@ class RunFetchAction extends Command
 	public function __construct(
 		public readonly FetchRunId $fetchRunId,
 		public readonly ?FetchSourceEnum $only = null,
+		// een automatische ronde laat een bron die nog rust met rust
+		public readonly bool $dueOnly = false,
 	) {
 	}
 
@@ -47,6 +51,10 @@ class RunFetchAction extends Command
 
 		foreach (FetchSourceEnum::cases() as $source) {
 			if ($this->only !== null && $this->only !== $source) {
+				continue;
+			}
+
+			if ($this->dueOnly && $this->isResting($source, $fetchRunRepository)) {
 				continue;
 			}
 
@@ -69,11 +77,38 @@ class RunFetchAction extends Command
 			}
 		}
 
+		// de stand van de werkkopieën ligt dan klaar tot de volgende ronde; een
+		// pagina die hem leest hoeft niet meer op git te wachten
+		try {
+			resolve(WorktreeRepositoryContract::class)->refreshStatuses($this->statusKeepSeconds());
+		} catch (Throwable $failure) {
+			$failures[] = 'worktrees: ' . $this->shortened($failure);
+		}
+
 		return $fetchRunRepository->markFinished(
 			$this->fetchRunId,
 			$results,
 			$failures === [] ? null : implode(' · ', $failures),
 		);
+	}
+
+	/**
+	 * Long enough to bridge the gap to the next automatic round.
+	 */
+	private function statusKeepSeconds(): int
+	{
+		return max((int) config('devdock.worktree.status_seconds'), (int) config('devdock.refresh_seconds') * 3);
+	}
+
+	private function isResting(FetchSourceEnum $source, FetchRunRepositoryContract $fetchRunRepository): bool
+	{
+		if ($source->restSeconds() <= 0) {
+			return false;
+		}
+
+		$lastFetchedAt = $fetchRunRepository->getLastFetchedAt($source);
+
+		return $lastFetchedAt !== null && $lastFetchedAt->isAfter(CarbonImmutable::now()->subSeconds($source->restSeconds()));
 	}
 
 	private function countFrom(FetchSourceEnum $source): int

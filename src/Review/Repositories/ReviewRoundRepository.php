@@ -6,6 +6,7 @@ namespace Src\Review\Repositories;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\File;
 use Src\Review\Contracts\ReviewRoundRepositoryContract;
 use Src\Review\Enums\RoundStatusEnum;
 use Src\Review\Enums\VerdictEnum;
@@ -71,7 +72,7 @@ class ReviewRoundRepository implements ReviewRoundRepositoryContract
 		return ReviewRoundEntityCollection::fromArray($reviewRoundEntities);
 	}
 
-	public function open(string $card, ?string $commitSha, ?string $directory, array $lenses): ReviewRoundEntity
+	public function open(string $card, ?string $commitSha, ?string $directory, array $lenses, ?string $fingerprint = null): ReviewRoundEntity
 	{
 		$number = ((int) ReviewRoundEloquent::query()->where('card', $card)->max('number')) + 1;
 
@@ -79,6 +80,7 @@ class ReviewRoundRepository implements ReviewRoundRepositoryContract
 			'card' => $card,
 			'number' => $number,
 			'commit_sha' => $commitSha,
+			'fingerprint' => $fingerprint,
 			'directory' => $directory,
 			'status' => RoundStatusEnum::RUNNING->value,
 			'started_at' => CarbonImmutable::now(),
@@ -204,7 +206,41 @@ class ReviewRoundRepository implements ReviewRoundRepositoryContract
 
 	public function deleteForCard(string $card): void
 	{
+		$this->deleteLogsForCard($card);
+
 		ReviewRoundEloquent::query()->where('card', $card)->delete();
+	}
+
+	public function logFolder(ReviewRoundId $reviewRoundId): string
+	{
+		return storage_path('app/rounds/' . $reviewRoundId->id);
+	}
+
+	public function countLogsForCard(string $card): int
+	{
+		return $this->logFoldersFor($card)->count();
+	}
+
+	public function deleteLogsForCard(string $card): int
+	{
+		$folders = $this->logFoldersFor($card);
+
+		$folders->each(fn (string $folder) => File::deleteDirectory($folder));
+
+		return $folders->count();
+	}
+
+	/**
+	 * @return Collection<int, string>
+	 */
+	private function logFoldersFor(string $card): Collection
+	{
+		return ReviewRoundEloquent::query()
+			->where('card', $card)
+			->pluck('id')
+			->map(fn (mixed $id) => $this->logFolder(new ReviewRoundId(id: (int) $id)))
+			->filter(fn (string $folder) => is_dir($folder))
+			->values();
 	}
 
 	private function byId(ReviewRoundId $reviewRoundId): ReviewRoundEntity
@@ -221,6 +257,7 @@ class ReviewRoundRepository implements ReviewRoundRepositoryContract
 			card: (string) $reviewRoundEloquent->card,
 			number: (int) $reviewRoundEloquent->number,
 			commitSha: $reviewRoundEloquent->commit_sha,
+			fingerprint: $reviewRoundEloquent->fingerprint,
 			directory: $reviewRoundEloquent->directory,
 			status: RoundStatusEnum::from((string) $reviewRoundEloquent->status),
 			results: $this->resultsOf($reviewRoundEloquent->results),

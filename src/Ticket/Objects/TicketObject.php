@@ -19,6 +19,8 @@ class TicketObject extends ValueObject
 		public readonly ?string $status,
 		public readonly ?string $type,
 		public readonly ?string $priority,
+		public readonly ?string $sprint,
+		public readonly ?CarbonImmutable $sprintEndsAt,
 		public readonly ?string $url,
 		public readonly ?CarbonImmutable $changedAt,
 	) {
@@ -28,6 +30,7 @@ class TicketObject extends ValueObject
 	public static function from(array $data): self
 	{
 		$fields = $data['fields'] ?? [];
+		$sprint = $data['sprint'] ?? null;
 
 		return new self(
 			key: (string) $data['key'],
@@ -36,6 +39,8 @@ class TicketObject extends ValueObject
 			status: $fields['status']['name'] ?? null,
 			type: $fields['issuetype']['name'] ?? null,
 			priority: $fields['priority']['name'] ?? null,
+			sprint: $sprint['name'] ?? null,
+			sprintEndsAt: isset($sprint['endDate']) ? CarbonImmutable::parse($sprint['endDate']) : null,
 			url: $data['url'] ?? null,
 			changedAt: isset($fields['updated']) ? CarbonImmutable::parse($fields['updated']) : null,
 		);

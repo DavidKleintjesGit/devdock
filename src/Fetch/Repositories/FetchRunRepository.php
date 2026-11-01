@@ -14,6 +14,12 @@ use Src\Fetch\Objects\FetchRunId;
 
 class FetchRunRepository implements FetchRunRepositoryContract
 {
+	/**
+	 * A source that rests is left out of a round; this many rounds back is
+	 * always far enough to find its last visit.
+	 */
+	private const LOOK_BACK_RUNS = 50;
+
 	public function create(): FetchRunEntity
 	{
 		$fetchRunEloquent = FetchRunEloquent::query()->create([
@@ -47,6 +53,17 @@ class FetchRunRepository implements FetchRunRepositoryContract
 			->first();
 
 		return $fetchRunEloquent === null ? null : $this->mapToEntity($fetchRunEloquent);
+	}
+
+	public function getLastFetchedAt(FetchSourceEnum $source): ?CarbonImmutable
+	{
+		return FetchRunEloquent::query()
+			->where('status', FetchStatusEnum::DONE->value)
+			->latest('id')
+			->limit(self::LOOK_BACK_RUNS)
+			->get(['results', 'finished_at'])
+			->first(fn (FetchRunEloquent $fetchRunEloquent) => ($fetchRunEloquent->results[$source->value] ?? 'skipped') !== 'skipped')
+			?->finished_at;
 	}
 
 	public function markSource(FetchRunId $fetchRunId, FetchSourceEnum $source): void

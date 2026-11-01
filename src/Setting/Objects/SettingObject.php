@@ -26,11 +26,12 @@ class SettingObject extends ValueObject
 		public readonly int $refreshSeconds,
 		public readonly array $columns,
 		public readonly int $doneDays,
+		public readonly bool $backlogHidden,
+		public readonly int $staleDays,
 		public readonly int $abandonedUpToPrompts,
 		public readonly int $largeFromMegabytes,
 		public readonly int $oldAfterDays,
 		public readonly string $theme,
-		public readonly bool $showBranch,
 		public readonly string $language,
 	) {
 		parent::__construct();
@@ -52,11 +53,12 @@ class SettingObject extends ValueObject
 			refreshSeconds: (int) $data['refresh_seconds'],
 			columns: (array) $data['columns'],
 			doneDays: (int) $data['done_days'],
+			backlogHidden: (bool) $data['backlog_hidden'],
+			staleDays: max(1, (int) $data['stale_days']),
 			abandonedUpToPrompts: (int) $data['abandoned_up_to'],
 			largeFromMegabytes: (int) $data['large_from_mb'],
 			oldAfterDays: (int) $data['old_after_days'],
 			theme: (string) $data['theme'],
-			showBranch: (bool) $data['show_branch'],
 			language: (string) $data['language'],
 		);
 	}

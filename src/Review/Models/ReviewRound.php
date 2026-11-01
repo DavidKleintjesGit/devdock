@@ -13,6 +13,7 @@ class ReviewRound extends Model
 		'card',
 		'number',
 		'commit_sha',
+		'fingerprint',
 		'directory',
 		'status',
 		'started_at',

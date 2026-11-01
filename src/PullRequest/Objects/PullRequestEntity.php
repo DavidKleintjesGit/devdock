@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Src\Packages\ValueObject\ValueObject;
 use Src\PullRequest\Enums\PullRequestRoleEnum;
 use Src\PullRequest\Enums\PullRequestStateEnum;
+use Src\Ticket\Objects\TicketKey;
 
 /**
  * A pull request you wrote or were asked to judge.
@@ -40,9 +41,7 @@ class PullRequestEntity extends ValueObject
 	 */
 	public function ticketKey(): ?string
 	{
-		preg_match('/CSM-\d{3,5}/', $this->title . ' ' . $this->sourceBranch, $found);
-
-		return $found[0] ?? null;
+		return TicketKey::find($this->title . ' ' . $this->sourceBranch);
 	}
 
 	public function isOpen(): bool

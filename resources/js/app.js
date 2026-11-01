@@ -204,3 +204,90 @@ document.addEventListener('livewire:init', () => {
 		pinToBottom();
 	}, LOOK_EVERY);
 });
+
+// De kop blijft staan bij scrollen en krijgt dan een schaduw, zodat je ziet
+// dat er inhoud onder doorloopt.
+const markScrolled = () => {
+	document.querySelectorAll('.head').forEach((head) => {
+		head.classList.toggle('scrolled', window.scrollY > 4);
+	});
+};
+
+window.addEventListener('scroll', markScrolled, { passive: true });
+document.addEventListener('livewire:navigated', markScrolled);
+
+// Een greep aan de rand van een lade of lijst sleep je breder of smaller. De
+// breedte staat als variabele op de pagina zelf, zodat een verversing van
+// Livewire hem niet weghaalt, en blijft in deze browser bewaard.
+(() => {
+	const remembered = (name) => {
+		try {
+			return window.localStorage.getItem('devdock.width.' + name);
+		} catch {
+			return null;
+		}
+	};
+
+	const remember = (name, width) => {
+		try {
+			window.localStorage.setItem('devdock.width.' + name, String(width));
+		} catch {
+			// zonder opslag geldt de breedte alleen tot je de pagina sluit
+		}
+	};
+
+	['--diff-width', '--diff-files'].forEach((name) => {
+		const width = remembered(name);
+
+		if (width !== null) {
+			document.documentElement.style.setProperty(name, width + 'px');
+		}
+	});
+
+	document.addEventListener('pointerdown', (event) => {
+		const grip = event.target.closest('[data-resize]');
+
+		if (grip === null || event.button !== 0) {
+			return;
+		}
+
+		const panel = grip.dataset.edge === 'start' ? grip.parentElement : grip.previousElementSibling;
+		const name = grip.dataset.resize;
+		const minimum = Number(grip.dataset.min ?? 120);
+		const maximum = Number(grip.dataset.max ?? window.innerWidth - 80);
+
+		event.preventDefault();
+		document.documentElement.classList.add('resizing');
+
+		const follow = (moveEvent) => {
+			const box = panel.getBoundingClientRect();
+			const width = grip.dataset.edge === 'start' ? box.right - moveEvent.clientX : moveEvent.clientX - box.left;
+			const clamped = Math.round(Math.min(Math.max(width, minimum), maximum));
+
+			document.documentElement.style.setProperty(name, clamped + 'px');
+		};
+
+		const stop = () => {
+			document.documentElement.classList.remove('resizing');
+			document.removeEventListener('pointermove', follow);
+			remember(name, parseInt(getComputedStyle(document.documentElement).getPropertyValue(name), 10) || panel.getBoundingClientRect().width);
+		};
+
+		document.addEventListener('pointermove', follow);
+		document.addEventListener('pointerup', stop, { once: true });
+	});
+})();
+
+// A mockup of the agent runs in a frame without access to the page, so it
+// tells the page how tall it is and the frame follows.
+window.addEventListener('message', (event) => {
+	if (typeof event.data?.mockupHeight !== 'number') {
+		return;
+	}
+
+	for (const frame of document.querySelectorAll('.mockup-frame')) {
+		if (frame.contentWindow === event.source) {
+			frame.style.height = Math.min(Math.max(event.data.mockupHeight, 80), 2000) + 'px';
+		}
+	}
+});

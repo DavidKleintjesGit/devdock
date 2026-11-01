@@ -25,6 +25,7 @@ class WriteLensContextAction extends Command
 		public readonly LensEntity $lensEntity,
 		public readonly array $files,
 		public readonly ?string $previousReport = null,
+		public readonly array $rules = [],
 	) {}
 
 	public function handle(AgentContextRepositoryContract $agentContextRepository): string
@@ -32,7 +33,7 @@ class WriteLensContextAction extends Command
 		$agentContextRepository->writeLensContext(
 			$this->worktreePath,
 			$this->lensEntity->name,
-			ComposeLensContextAction::execute($this->lensEntity, $this->files, $this->previousReport),
+			ComposeLensContextAction::execute($this->lensEntity, $this->files, $this->previousReport, $this->rules),
 		);
 
 		return implode("\n", [

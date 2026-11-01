@@ -1,150 +1,179 @@
-@if (! $claudeAvailable)
-	<div class="empty">
-		<span class="bubble"><x-icon name="alert"/></span>
-		<b>{{ __('Claude Code niet gevonden') }}</b>
-		<span>{{ __('Zet het pad naar Claude Code in de instellingen.') }}</span>
-	</div>
-@else
-	@if ($card->agent)
-		<div class="agentbar">
-			<span class="dot green"></span>
-			<span class="grow">
-				<b>{{ $card->agent->name }}</b>
-				<small class="mono">{{ $card->agent->shortKey() }}{{ $card->agent->directory ? ' · ' . $card->agent->directory : '' }}</small>
-			</span>
-			<x-busy-button action="openInClaude" class="btn sm" :busy="__('Openen...')">{{ __('Open in Claude') }}</x-busy-button>
-			<x-busy-button action="replaceAgent" class="btn sm" :busy="__('Bezig...')">{{ __('Vervangen') }}</x-busy-button>
+<div class="dbody" @if ($run?->isRunning()) wire:poll.1500ms="followProgress" @endif>
+	@if (! $claudeAvailable)
+		<div class="dsec">
+			<div class="empty">
+				<b>{{ __('Claude Code niet gevonden') }}</b>
+				<span>{{ __('Zet het pad naar Claude Code in de instellingen.') }}</span>
+				<button class="btn sm" type="button" onclick="Livewire.dispatch('open-settings', { section: 'koppelingen' })">{{ __('Naar de instellingen') }}</button>
+			</div>
 		</div>
-	@endif
+	@elseif ($card->project === null || $card->branch === null)
+		<div class="dsec">
+			<div class="empty">
+				<b>{{ __('Nog niet klaar om te beginnen') }}</b>
+				<span>{{ __('Zonder project en branch weet de agent niet waar hij moet werken.') }}</span>
+				<button class="btn sm" type="button" wire:click="setDrawerTab('Koppelingen')">{{ __('Naar de koppelingen') }}</button>
+			</div>
+		</div>
+	@else
+		<div class="banner gray chat-banner">
+			<span>{{ __('Krijgt mee') }}</span>
+			<b>{{ $card->ticketKey ? __('het ticket en de werkwijze van :project', ['project' => $card->project]) : __('de werkwijze van :project', ['project' => $card->project]) }}</b>
+			@if ($card->agent)<span class="mono agent-name">{{ $card->agent->name }}</span>@endif
+		</div>
 
-	@if ($conversation)
-		<div class="talk">
-			@foreach ($conversation as $exchange)
-				<div class="say mine">
-					<span class="eyebrow">{{ __('Jij') }}</span>
-					<div class="said">{{ $exchange->run->prompt }}</div>
-				</div>
-
-				<div class="say theirs">
-					<div class="fieldhead">
-						<span class="eyebrow">{{ $card->agent?->name ?? __('Agent') }}</span>
-						@if ($exchange->run->isRunning())
-							<span class="chip amber"><span class="dot amber pulse"></span>{{ __('Bezig') }}</span>
-						@elseif ($exchange->run->hasFailed())
-							<span class="chip red">{{ __('Mislukt') }}</span>
-						@elseif ($exchange->report)
-							<span class="chip {{ $exchange->report->status->tone() }}">{{ $exchange->report->status->label() }}</span>
+		@if ($conversation)
+			<div class="chat">
+				@foreach ($conversation as $exchange)
+					<div class="chat-turn you" wire:key="turn-you-{{ $exchange->run->promptRunId->id }}" x-data="{ folded: @js($exchange->run->hasLongPrompt()) }">
+						<div class="bubble" :class="{ folded }" title="{{ $exchange->run->startedAt?->calendar() }}">{{ $exchange->run->prompt }}</div>
+						@if ($exchange->run->hasLongPrompt())
+							<button class="btn text xs unfold" type="button" @click="folded = ! folded" x-text="folded ? @js(__('Hele bericht tonen')) : @js(__('Inklappen'))">{{ __('Hele bericht tonen') }}</button>
 						@endif
-						<span class="right muted" style="font-size:12px">{{ $exchange->run->seconds() }}s{{ $exchange->run->costLabel() ? ' · ' . $exchange->run->costLabel() : '' }}</span>
 					</div>
 
-					@if ($exchange->run->hasFailed())
-						<span class="note red"><x-icon name="alert" small/><span>{{ $exchange->run->message }}</span></span>
-					@elseif ($exchange->body || $exchange->report)
-						<div class="said">
-							@if ($exchange->body)
-								<div class="md">{!! $exchange->body !!}</div>
+					<div class="chat-turn agent" wire:key="turn-agent-{{ $exchange->run->promptRunId->id }}">
+						<span class="who">
+							@if ($exchange->run->isRunning())
+								<span class="sdot busy"></span>
+								{{ $card->agent?->name ?? __('agent') }} · <span class="ink">{{ __('bezig sinds :time', ['time' => $exchange->run->startedAt?->format('H:i')]) }}</span>
+								<button class="btn xs stop" type="button" wire:click="stopPrompt">{{ __('Stoppen') }}</button>
+							@else
+								{{ $card->agent?->name ?? __('agent') }} · {{ __(':count s', ['count' => $exchange->run->seconds()]) }}{{ $exchange->run->costLabel() ? ' · ' . $exchange->run->costLabel() : '' }}
 							@endif
-
-							@if ($exchange->report)
-								<p class="lede">{{ $exchange->report->summary }}</p>
-							@endif
-
-							<div class="outcome">
-								@if ($exchange->report?->done)
-									<div>
-										<h4 class="eyebrow">{{ __('Gedaan') }}</h4>
-										@foreach ($exchange->report?->done ?? [] as $line)
-											<span class="bullet"><x-icon name="check" small/><span>{{ $line }}</span></span>
-										@endforeach
-									</div>
-								@endif
-								@if ($exchange->report?->open)
-									<div>
-										<h4 class="eyebrow">{{ __('Nog open') }}</h4>
-										@foreach ($exchange->report?->open ?? [] as $line)
-											<span class="bullet"><x-icon name="alert" small/><span>{{ $line }}</span></span>
-										@endforeach
-									</div>
-								@endif
-							</div>
-
-							@if ($exchange->report?->question)
-								<span class="note amber"><x-icon name="info" small/><span>{{ $exchange->report->question }}</span></span>
-							@endif
-
-						</div>
-					@endif
-
-				</div>
-			@endforeach
-		</div>
-	@endif
-
-	@if ($agents && $agents->count() > 1)
-		<div class="field">
-			<h3 class="eyebrow">{{ __('Eerdere agents') }}</h3>
-			<div class="linklist">
-				@foreach ($agents as $agent)
-					<div class="linkrow static">
-						<span class="dot {{ $agent->isActive ? 'green' : '' }}"></span>
-						<span class="grow">
-							<b>{{ $agent->name }}</b>
-							<small class="mono">{{ $agent->shortKey() }} · {{ $agent->directory ?? __('zonder map') }}</small>
 						</span>
-						@if ($agent->isActive)
-							<span class="chip green">{{ __('actief') }}</span>
-						@else
-							<button class="btn sm" type="button" wire:click="useAgent('{{ $agent->sessionUuid }}')">{{ __('Op actief zetten') }}</button>
+
+						@if ($exchange->transcript && $exchange->transcript->steps !== [])
+							<details class="agent-steps">
+								<summary>
+									<x-icon name="chev" small/>
+									<span class="grow">
+										{{ trans_choice(':count stap|:count stappen', count($exchange->transcript->steps), ['count' => count($exchange->transcript->steps)]) }}
+										@if ($exchange->run->isRunning())
+											· {{ __('nu') }}: {{ $exchange->transcript->latestStep()->tool }} <span class="mono">{{ $exchange->transcript->latestStep()->subject }}</span>
+										@elseif ($exchange->transcript->summary() !== '')
+											· {{ $exchange->transcript->summary() }}
+										@endif
+									</span>
+								</summary>
+								<ol class="step-list">
+									@foreach ($exchange->transcript->steps as $step)
+										<li><span class="tool">{{ $step->tool }}</span><span class="mono subject">{{ $step->subject }}</span></li>
+									@endforeach
+								</ol>
+							</details>
+						@endif
+
+						@if ($exchange->run->hasFailed())
+							<div class="alert red">{{ $exchange->run->message }}</div>
+						@endif
+
+						<div class="answer">
+							@foreach ($exchange->passages as $passage)
+								@if ($passage instanceof \Src\Prompt\Objects\MockupObject)
+									<x-mockup :mockup="$passage" :run="$exchange->run->promptRunId->id" wire:key="mockup-{{ $exchange->run->promptRunId->id }}-{{ $loop->index }}"/>
+								@else
+									{!! $passage !!}
+								@endif
+							@endforeach
+							@if ($exchange->run->isRunning())
+								@if ($exchange->passages === [])<p class="md-p muted">{{ __('Aan het werk…') }}</p>@endif
+								<span class="caret" aria-hidden="true"></span>
+							@endif
+						</div>
+
+						@if (! $exchange->run->isRunning() && ($exchange->report || ($loop->last && $exchange->choices !== [])))
+							<div class="reportbar {{ $exchange->report?->status->tone() ?? 'amber' }}">
+								<span class="state"><span class="sdot"></span>{{ $exchange->report?->status->label() ?? __('Vraag') }}</span>
+								@if ($exchange->report?->question)
+									<p class="question">{{ $exchange->report->question }}</p>
+								@elseif ($exchange->report && $exchange->report->open !== [])
+									<ul class="open">
+										@foreach ($exchange->report->open as $openPoint)<li>{{ $openPoint }}</li>@endforeach
+									</ul>
+								@endif
+								<div class="reportbar-actions">
+									@if ($loop->last && $exchange->choices !== [])
+										@foreach ($exchange->choices as $choice)
+											<button class="btn sm {{ $loop->first ? 'primary' : '' }}" type="button" wire:click="answer(@js($choice))" wire:key="choice-{{ $loop->index }}">{{ $choice }}</button>
+										@endforeach
+									@endif
+									<button class="btn sm push-end" type="button" wire:click="setDrawerTab('Werkkopie')">{{ __('Wijzigingen bekijken') }}</button>
+								</div>
+							</div>
 						@endif
 					</div>
 				@endforeach
 			</div>
-		</div>
-	@endif
-
-	@if ($card->project === null || $card->branch === null)
-		<div class="box">
-			<div class="empty">
-				<span class="bubble"><x-icon name="lock"/></span>
-				<b>{{ __('Nog niet klaar om te beginnen') }}</b>
-				<span>{{ __('Er ontbreekt nog iets voordat een agent aan deze taak mag werken.') }}</span>
-				<button class="btn primary" type="button" wire:click="setDrawerTab('Workflow')">{{ __('Naar de workflow') }}</button>
+		@else
+			<div class="dsec">
+				<p class="muted">{{ $card->agent ? __(':name wacht op een opdracht.', ['name' => $card->agent->name]) : __('Je eerste bericht geeft deze taak zijn agent.') }}</p>
 			</div>
-		</div>
+		@endif
 
-		<div class="dfoot">
-			<button class="btn primary" type="button" wire:click="setDrawerTab('Workflow')">{{ __('Naar de workflow') }}</button>
-			<span class="hint">{{ __('geblokkeerd') }}</span>
-		</div>
-	@else
-		<div class="dfoot stack" @if ($run?->isRunning()) wire:poll.3s @endif>
-			@if ($promptSources !== [])
-				<span class="sources">
-					@foreach ($promptSources as $source)
-						<button class="btn sm" type="button" wire:click="fillPromptFrom('{{ $source['case']->value }}')" wire:target="fillPromptFrom('{{ $source['case']->value }}')" wire:loading.attr="disabled">
-							<span class="dot {{ $source['case']->tone() }}"></span>{{ $source['case']->label() }}@if ($source['count'])<span class="n">{{ $source['count'] }}</span>@endif
-						</button>
+		@if ($agents && $agents->count() > 1)
+			<section class="dsec line">
+				<h3 class="eyebrow">{{ __('Eerdere agents') }}</h3>
+				<div class="list">
+					@foreach ($agents as $agent)
+						<div class="row">
+							<span class="sdot {{ $agent->isActive ? 'yours' : 'quiet' }}"></span>
+							<span class="grow title"><b>{{ $agent->name }}</b><small class="mono">{{ $agent->shortKey() }}</small></span>
+							@if ($agent->isActive)
+								<span class="label teal">{{ __('actief') }}</span>
+							@else
+								<button class="btn xs" type="button" wire:click="useAgent('{{ $agent->sessionUuid }}')">{{ __('Op actief zetten') }}</button>
+							@endif
+						</div>
 					@endforeach
-				</span>
-			@endif
-			<label class="sr" for="prompt-text">{{ $card->agent ? __('Volgende stap') : __('Eerste prompt') }}</label>
-			<div class="composer">
-				<textarea id="prompt-text" class="textarea" data-send-on-enter wire:model="prompt" placeholder="{{ $card->agent ? __('Wat is de volgende stap?') : __('Wat moet Claude doen?') }}" @disabled($run?->isRunning())></textarea>
-				<button class="send" type="button" wire:click="send" wire:target="send" wire:loading.attr="disabled"
-					aria-label="{{ $card->agent ? __('Versturen') : __('Gesprek beginnen') }}" @disabled($run?->isRunning())>
-						<span wire:loading.remove wire:target="send"><x-icon name="chev" small/></span>
-					<span wire:loading wire:target="send" class="dot amber pulse"></span>
-				</button>
-				@if ($run?->isRunning())
-					<button class="stop" type="button" wire:click="stopPrompt" aria-label="{{ __('Afbreken') }}"><x-icon name="x" small/></button>
-				@endif
-			</div>
-			@error('prompt')<span class="note red"><x-icon name="alert" small/><span>{{ $message }}</span></span>@enderror
-			<div class="sendrow">
-				<span class="hint">{{ $run?->isRunning() ? __('Bezig...') : ($card->agent ? __('Enter verstuurt, Shift+Enter is een nieuwe regel') : __('Hiermee krijgt deze taak zijn agent')) }}</span>
-				<span class="hint mono">{{ $card->branch ?? $card->project }}</span>
-			</div>
-		</div>
+				</div>
+			</section>
+		@endif
 	@endif
+</div>
+
+@if ($claudeAvailable && $card->project !== null && $card->branch !== null)
+	<div class="composer">
+		@if ($promptSources !== [])
+			@if ($composing)
+				<div class="sources">
+					<div style="display:flex;align-items:center;gap:10px">
+						<b class="grow" style="font-size:13px">{{ __('Prompt maken uit context') }}</b>
+						<button class="btn text xs" type="button" wire:click="toggleComposing">{{ __('Inklappen') }}</button>
+					</div>
+					<div class="source-chips" role="group" aria-label="{{ __('Context') }}">
+						@foreach ($promptSources as $source)
+							<button class="source-chip" type="button" role="checkbox" aria-checked="{{ in_array($source['case']->value, $pickedSources, true) ? 'true' : 'false' }}" wire:click="togglePromptSource('{{ $source['case']->value }}')" wire:key="source-{{ $source['case']->value }}">
+								<span class="mark"><x-icon name="check" small/></span>{{ $source['label'] }}
+							</button>
+						@endforeach
+					</div>
+					<div style="display:flex;align-items:center;gap:10px">
+						<span class="hint grow">{{ __('De prompt komt in het veld hieronder. Je leest hem eerst.') }}</span>
+						<button class="btn sm primary" type="button" wire:click="buildPrompt" @disabled($pickedSourceCount === 0)><x-icon name="skills" small/>{{ __('Prompt maken') }}@if ($pickedSourceCount > 0) · {{ $pickedSourceCount }}@endif</button>
+					</div>
+				</div>
+			@endif
+		@endif
+
+		<div class="composer-row">
+			@if ($promptSources !== [] && ! $composing)
+				<button class="btn text sm" type="button" wire:click="toggleComposing">
+					<x-icon name="plus" small/>{{ __('Prompt maken uit context') }}
+					<span class="muted" style="font-weight:400">· {{ $promptSourceSummary }}</span>
+				</button>
+			@endif
+			<span class="hint">{{ __('Enter stuurt · Shift+Enter is een nieuwe regel') }}</span>
+		</div>
+
+		<div class="boxwrap">
+			<label class="sr" for="prompt-text">{{ __('Bericht aan de agent') }}</label>
+			<textarea id="prompt-text" class="textarea" data-send-on-enter wire:model="prompt" placeholder="{{ __('Wat is de volgende stap?') }}" @disabled($run?->isRunning())></textarea>
+			<button class="btn primary send" type="button" wire:click="send" wire:target="send" wire:loading.attr="disabled" aria-label="{{ __('Versturen') }}" @disabled($run?->isRunning())>
+				<span wire:loading.remove wire:target="send"><x-icon name="send" small/></span>
+				<span wire:loading wire:target="send" class="dot amber pulse"></span>
+			</button>
+		</div>
+		@error('prompt')<span class="field"><span class="err">{{ $message }}</span></span>@enderror
+	</div>
 @endif

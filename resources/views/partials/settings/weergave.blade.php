@@ -1,23 +1,25 @@
-<div class="panelhead"><h3>{{ __('Weergave') }}</h3></div>
+<header>
+	<h3>{{ __('Weergave') }}</h3>
+	<p>{{ __('Hoe DevDock er op dit apparaat uitziet.') }}</p>
+</header>
 
-<div class="set">
-	<div class="txt"><span class="lbl">{{ __('Thema') }}</span></div>
-	<div class="seg" role="group" aria-label="{{ __('Thema') }}">
-		@foreach (['system' => __('Systeem'), 'light' => __('Licht'), 'dark' => __('Donker')] as $value => $label)
-			<button type="button" aria-pressed="{{ $theme === $value ? 'true' : 'false' }}" wire:click="$set('theme', '{{ $value }}')">{{ $label }}</button>
-		@endforeach
+<section>
+	<div class="setlist">
+		<div class="set">
+			<span class="txt"><b>{{ __('Thema') }}</b></span>
+			<span class="seg" role="group" aria-label="{{ __('Thema') }}">
+				@foreach (['system' => __('Systeem'), 'light' => __('Licht'), 'dark' => __('Donker')] as $value => $label)
+					<button type="button" aria-pressed="{{ $theme === $value ? 'true' : 'false' }}" wire:click="$set('theme', '{{ $value }}')">{{ $label }}</button>
+				@endforeach
+			</span>
+		</div>
+		<div class="set">
+			<span class="txt"><b>{{ __('Taal') }}</b></span>
+			<span class="seg" role="group" aria-label="{{ __('Taal') }}">
+				@foreach (['en' => 'English', 'nl' => 'Nederlands'] as $value => $label)
+					<button type="button" aria-pressed="{{ $language === $value ? 'true' : 'false' }}" wire:click="$set('language', '{{ $value }}')">{{ $label }}</button>
+				@endforeach
+			</span>
+		</div>
 	</div>
-</div>
-
-<div class="set">
-	<div class="txt"><label class="lbl" for="language">{{ __('Taal') }}</label></div>
-	<select id="language" class="select" wire:model="language">
-		<option value="en">English</option>
-		<option value="nl">Nederlands</option>
-	</select>
-</div>
-
-<div class="set">
-	<div class="txt"><span class="lbl">{{ __('Branchnaam op de kaart') }}</span></div>
-	<button class="toggle" type="button" aria-pressed="{{ $showBranch ? 'true' : 'false' }}" wire:click="$toggle('showBranch')" aria-label="{{ __('Branchnaam op de kaart') }}"></button>
-</div>
+</section>

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\AgentAssetController;
 use App\Http\Controllers\LocaleController;
 use App\Livewire\Board;
 use App\Livewire\Rules;
@@ -18,3 +19,7 @@ Route::get('/regels', Rules::class)->name('rules');
 Route::get('/skills', Skills::class)->name('skills');
 
 Route::get('/taal/{locale}', [LocaleController::class, 'update'])->name('locale');
+
+Route::get('/agent/{run}/public/{path}', [AgentAssetController::class, 'show'])
+	->where(['run' => '[0-9]+', 'path' => '.*'])
+	->name('agent.asset');

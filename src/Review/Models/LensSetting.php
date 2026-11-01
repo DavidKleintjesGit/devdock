@@ -12,9 +12,14 @@ class LensSetting extends Model
 		'lens_id',
 		'project',
 		'is_enabled',
+		'paths',
+		'rules',
+		'command',
 	];
 
 	protected $casts = [
 		'is_enabled' => 'boolean',
+		'paths' => 'array',
+		'rules' => 'array',
 	];
 }

@@ -26,11 +26,12 @@ class SettingEntity extends ValueObject
 		public readonly int $refreshSeconds,
 		public readonly array $columns,
 		public readonly int $doneDays,
+		public readonly bool $backlogHidden,
+		public readonly int $staleDays,
 		public readonly int $abandonedUpToPrompts,
 		public readonly int $largeFromMegabytes,
 		public readonly int $oldAfterDays,
 		public readonly string $theme,
-		public readonly bool $showBranch,
 		public readonly string $language,
 	) {
 		parent::__construct();
@@ -55,11 +56,12 @@ class SettingEntity extends ValueObject
 			'refresh_seconds' => $this->refreshSeconds,
 			'columns' => $this->columns,
 			'done_days' => $this->doneDays,
+			'backlog_hidden' => $this->backlogHidden,
+			'stale_days' => $this->staleDays,
 			'abandoned_up_to' => $this->abandonedUpToPrompts,
 			'large_from_mb' => $this->largeFromMegabytes,
 			'old_after_days' => $this->oldAfterDays,
 			'theme' => $this->theme,
-			'show_branch' => $this->showBranch,
 			'language' => $this->language,
 		];
 	}

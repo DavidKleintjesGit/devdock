@@ -24,12 +24,18 @@ class SessionRepository implements SessionRepositoryContract
 			['uuid' => $sessionObject->uuid],
 			[
 				'folder' => $sessionObject->folder,
+				'cwd' => $sessionObject->cwd,
 				'project' => $sessionObject->project,
 				'title' => $sessionObject->title,
 				'branch' => $sessionObject->branch,
 				'prompt_count' => $sessionObject->promptCount,
 				'bytes' => $sessionObject->bytes,
 				'last_active_at' => $sessionObject->lastActiveAt,
+				'first_active_at' => $sessionObject->firstActiveAt,
+				'active_days' => $sessionObject->activeDays,
+				'has_commit' => $sessionObject->hasCommit,
+				'is_interrupted' => $sessionObject->isInterrupted,
+				'is_unanswered' => $sessionObject->isUnanswered,
 				'fingerprint' => $sessionObject->fingerprint,
 			],
 		);
@@ -86,6 +92,11 @@ class SessionRepository implements SessionRepositoryContract
 			]);
 	}
 
+	public function pin(SessionId $sessionId, bool $isPinned): void
+	{
+		ClaudeSessionEloquent::query()->whereKey($sessionId->id)->update(['is_pinned' => $isPinned]);
+	}
+
 	public function delete(SessionId $sessionId): void
 	{
 		ClaudeSessionEloquent::query()->whereKey($sessionId->id)->delete();
@@ -103,12 +114,19 @@ class SessionRepository implements SessionRepositoryContract
 			sessionId: new SessionId(id: $claudeSessionEloquent->id, uuid: $claudeSessionEloquent->uuid),
 			uuid: (string) $claudeSessionEloquent->uuid,
 			folder: (string) $claudeSessionEloquent->folder,
+			cwd: $claudeSessionEloquent->cwd,
 			project: $claudeSessionEloquent->project,
 			title: $claudeSessionEloquent->title,
 			branch: $claudeSessionEloquent->branch,
 			promptCount: $promptCount,
 			bytes: $bytes,
 			lastActiveAt: $lastActiveAt,
+			firstActiveAt: $claudeSessionEloquent->first_active_at,
+			activeDays: (int) $claudeSessionEloquent->active_days,
+			hasCommit: (bool) $claudeSessionEloquent->has_commit,
+			isInterrupted: (bool) $claudeSessionEloquent->is_interrupted,
+			isUnanswered: (bool) $claudeSessionEloquent->is_unanswered,
+			isPinned: (bool) $claudeSessionEloquent->is_pinned,
 			fingerprint: (string) $claudeSessionEloquent->fingerprint,
 			status: $this->statusOf($promptCount, $lastActiveAt, $thresholds),
 			group: $this->groupOf($lastActiveAt),

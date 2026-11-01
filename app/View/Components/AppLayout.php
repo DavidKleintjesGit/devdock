@@ -4,19 +4,25 @@ declare(strict_types=1);
 
 namespace App\View\Components;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\Component;
 use Illuminate\View\View;
-use Src\Fetch\Actions\CountConnectedSourcesAction;
-use Src\Project\Actions\GetProjectsAction;
-use Src\Project\Objects\ProjectEntity;
+use Src\Board\Actions\BuildBoardAction;
+use Src\Board\Objects\CardObject;
+use Src\Library\Actions\GetLibrariesAction;
+use Src\Library\Actions\GetStandingsAction;
+use Src\Library\Objects\LibraryEntity;
+use Src\Library\Objects\StandingObject;
+use Src\Session\Actions\GetSessionTraitsAction;
+use Src\Session\Enums\SessionTraitEnum;
 
 class AppLayout extends Component
 {
 	/**
-	 * The number of sources DevDock knows: Jira, Bitbucket, the sites folder and
-	 * the sessions folder.
+	 * The signals in the side bar are worth a short wait, not a full board
+	 * on every page.
 	 */
-	private const SOURCES = 4;
+	private const SIGNAL_SECONDS = 30;
 
 	public function __construct(public ?string $title = null)
 	{
@@ -26,45 +32,51 @@ class AppLayout extends Component
 	{
 		return view('layouts.app', [
 			'navigation' => $this->navigation(),
-			'sources' => $this->sources(),
-			'otherLocale' => app()->getLocale() === 'en' ? 'nl' : 'en',
 		]);
 	}
 
 	/**
-	 * @return array<string, array{label: string, icon: string}>
+	 * Every page in the side bar, with what it has to say without opening it.
+	 *
+	 * @return array<string, array{label: string, icon: string, pill: ?int, count: ?int, flag: ?string}>
 	 */
 	private function navigation(): array
 	{
+		$signals = Cache::remember('navigation.signals', self::SIGNAL_SECONDS, fn () => [
+			'yours' => collect(BuildBoardAction::execute())->filter(fn (CardObject $cardObject) => $cardObject->isYourTurn())->count(),
+			'sessions' => $this->sessionsThatCanGo(),
+			'behind' => $this->projectsBehind(),
+		]);
+
 		return [
-			'board' => ['label' => 'Bord', 'icon' => 'bord'],
-			'sessions' => ['label' => 'Sessies', 'icon' => 'sessies'],
-			'workflows' => ['label' => 'Workflows', 'icon' => 'workflows'],
-			'rules' => ['label' => 'Regels', 'icon' => 'regels'],
-			'skills' => ['label' => 'Skills', 'icon' => 'skills'],
+			'board' => ['label' => 'Bord', 'icon' => 'bord', 'pill' => $signals['yours'] ?: null, 'count' => null, 'flag' => null],
+			'sessions' => ['label' => 'Sessies', 'icon' => 'sessies', 'pill' => null, 'count' => $signals['sessions'] ?: null, 'flag' => null],
+			'workflows' => ['label' => 'Workflows', 'icon' => 'workflows', 'pill' => null, 'count' => null, 'flag' => null],
+			'rules' => ['label' => 'Regels', 'icon' => 'regels', 'pill' => null, 'count' => null, 'flag' => $signals['behind'] > 0
+				? trans_choice(':count project loopt achter op een bibliotheek|:count projecten lopen achter op een bibliotheek', $signals['behind'], ['count' => $signals['behind']])
+				: null],
+			'skills' => ['label' => 'Skills', 'icon' => 'skills', 'pill' => null, 'count' => null, 'flag' => null],
 		];
 	}
 
 	/**
-	 * How many of the sources can be reached, and when something was last
-	 * fetched.
-	 *
-	 * @return array{connected: int, total: int, tone: string, updated: string}
+	 * Sessions nothing pleads for and at least three things point away from.
 	 */
-	private function sources(): array
+	private function sessionsThatCanGo(): int
 	{
-		$connected = CountConnectedSourcesAction::execute();
+		return collect(GetSessionTraitsAction::execute())
+			->filter(fn (array $traits) => ! collect($traits)->contains(fn (SessionTraitEnum $trait) => $trait->protects())
+				&& count($traits) >= 3)
+			->count();
+	}
 
-		$scannedAt = collect(GetProjectsAction::execute())
-			->map(fn (ProjectEntity $projectEntity) => $projectEntity->scannedAt)
-			->filter()
-			->max();
-
-		return [
-			'connected' => $connected,
-			'total' => self::SOURCES,
-			'tone' => $connected === self::SOURCES ? 'green' : 'amber',
-			'updated' => $scannedAt?->format('H:i') ?? __('nooit'),
-		];
+	private function projectsBehind(): int
+	{
+		return collect(GetLibrariesAction::execute())
+			->flatMap(fn (LibraryEntity $libraryEntity) => GetStandingsAction::execute($libraryEntity))
+			->filter(fn (StandingObject $standingObject) => $standingObject->standing->deviates())
+			->pluck('project')
+			->unique()
+			->count();
 	}
 }

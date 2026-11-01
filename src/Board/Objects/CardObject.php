@@ -6,6 +6,7 @@ namespace Src\Board\Objects;
 
 use Carbon\CarbonImmutable;
 use Src\Board\Enums\BoardColumnEnum;
+use Src\Board\Enums\CardStatusEnum;
 use Src\Packages\ValueObject\ValueObject;
 use Src\PullRequest\Objects\PullRequestEntity;
 use Src\PullRequest\Objects\PullRequestEntityCollection;
@@ -34,11 +35,13 @@ class CardObject extends ValueObject
 		public readonly ?int $changedFiles,
 		public readonly ?CarbonImmutable $changedAt,
 		public readonly ?string $description,
-		public readonly ?string $note,
-		public readonly ?string $tone,
+		public readonly CardStatusEnum $status,
+		public readonly string $statusText,
+		public readonly array $lensStates,
 		public readonly bool $hasNameMismatch,
-		public readonly ?string $myRole,
 		public readonly bool $isStale,
+		public readonly int $behind,
+		public readonly ?string $mainBranch,
 		public readonly bool $hasWaitingWork,
 		public readonly ?string $activePullRequest,
 		public readonly ?TaskAgentEntity $agent,
@@ -92,6 +95,52 @@ class CardObject extends ValueObject
 	public function dateLabel(): ?string
 	{
 		return $this->changedAt?->translatedFormat('j M');
+	}
+
+	/**
+	 * How long ago the task last moved, as short as the card allows.
+	 */
+	public function ageLabel(): ?string
+	{
+		if ($this->changedAt === null) {
+			return null;
+		}
+
+		$minutes = (int) $this->changedAt->diffInMinutes(CarbonImmutable::now(), absolute: true);
+
+		return match (true) {
+			$minutes < 60 => __(':count min', ['count' => max(1, $minutes)]),
+			$minutes < 60 * 24 => __(':count u', ['count' => intdiv($minutes, 60)]),
+			$this->changedAt->isYesterday() => __('gisteren'),
+			$minutes < 60 * 24 * 14 => __(':count d', ['count' => intdiv($minutes, 60 * 24)]),
+			default => __(':count w', ['count' => intdiv($minutes, 60 * 24 * 7)]),
+		};
+	}
+
+	/**
+	 * Whether the next move on this task is yours.
+	 */
+	public function isYourTurn(): bool
+	{
+		return $this->status === CardStatusEnum::YOURS && $this->column !== BoardColumnEnum::DONE;
+	}
+
+	public function isInBacklog(): bool
+	{
+		return $this->column === BoardColumnEnum::LATER;
+	}
+
+	public function isDone(): bool
+	{
+		return $this->column === BoardColumnEnum::DONE;
+	}
+
+	/**
+	 * Whether this is a to-do of your own rather than a ticket or a branch.
+	 */
+	public function isTodo(): bool
+	{
+		return str_starts_with($this->id, 'todo:');
 	}
 
 	public function promptCount(): int

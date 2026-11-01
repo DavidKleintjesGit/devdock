@@ -12,7 +12,7 @@ interface FetchProcessRepositoryContract
 	 * Puts the fetching away as a separate process, so the page does not hang
 	 * while the repositories are walked.
 	 */
-	public function startDetached(FetchRunId $fetchRunId): void;
+	public function startDetached(FetchRunId $fetchRunId, bool $dueOnly): void;
 
 	/**
 	 * Which php executable the separate process uses; that is readable in the

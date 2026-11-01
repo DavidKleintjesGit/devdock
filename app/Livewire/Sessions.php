@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Livewire\Concerns\WithDrawerStack;
-use App\Livewire\Concerns\WithFilterChips;
 use App\Livewire\Concerns\WithProjectFilter;
 use App\Livewire\Concerns\WithSessionActions;
 use Illuminate\Contracts\View\View;
@@ -13,32 +12,38 @@ use Illuminate\Support\Collection;
 use Livewire\Attributes\Session;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use Src\Project\Actions\GetProjectsAction;
-use Src\Project\Objects\ProjectEntity;
 use Src\Session\Actions\DeleteSessionAction;
 use Src\Session\Actions\GetSessionsAction;
-use Src\Session\Actions\GetTranscriptAction;
-use Src\Session\Enums\SessionCleanupEnum;
-use Src\Session\Enums\SessionGroupEnum;
-use Src\Session\Enums\SessionStatusEnum;
+use Src\Session\Actions\GetSessionTraitsAction;
+use Src\Session\Enums\SessionTraitEnum;
 use Src\Session\Objects\SessionEntity;
 use Src\Session\Objects\SessionId;
 
 class Sessions extends Component
 {
 	use WithDrawerStack;
-	use WithFilterChips;
 	use WithProjectFilter;
 	use WithSessionActions;
+
+	/**
+	 * How many traits a row shows before it says how many more there are.
+	 */
+	private const TRAITS_ON_ROW = 3;
+
+	/**
+	 * A finished round of fetching brings the page up to date.
+	 */
+	protected $listeners = ['fetched' => '$refresh'];
 
 	#[Session(key: 'devdock.sessions.query')]
 	public string $query = '';
 
-	#[Session(key: 'devdock.sessions.when')]
-	public string $when = '';
+	/** @var array<int, string> */
+	#[Session(key: 'devdock.sessions.traits')]
+	public array $traits = [];
 
-	#[Session(key: 'devdock.sessions.cleanup')]
-	public string $cleanup = '';
+	#[Session(key: 'devdock.sessions.traits-open')]
+	public bool $traitsOpen = true;
 
 	/** @var array<int, string> */
 	public array $selected = [];
@@ -48,6 +53,11 @@ class Sessions extends Component
 
 	public function mount(): void
 	{
+		$this->traits = array_values(array_filter(
+			$this->traits,
+			fn (string $trait) => SessionTraitEnum::tryFrom($trait) !== null,
+		));
+
 		if ($this->openSession !== null) {
 			$this->replaceDrawer('session', $this->openSession);
 		}
@@ -58,21 +68,20 @@ class Sessions extends Component
 		$this->selected = [];
 	}
 
-	public function toggleWhen(string $when): void
+	public function toggleTrait(string $trait): void
 	{
-		$this->when = $this->when === $when ? '' : $when;
-	}
-
-	public function toggleCleanup(string $cleanup): void
-	{
-		$this->cleanup = $this->cleanup === $cleanup ? '' : $cleanup;
+		$this->traits = in_array($trait, $this->traits, true)
+			? array_values(array_diff($this->traits, [$trait]))
+			: [...$this->traits, $trait];
+		$this->selected = [];
 	}
 
 	public function resetFilters(): void
 	{
 		$this->query = '';
-		$this->when = '';
-		$this->cleanup = '';
+		$this->traits = [];
+		$this->selected = [];
+		$this->clearProjects();
 	}
 
 	public function toggleSelected(string $uuid): void
@@ -82,13 +91,18 @@ class Sessions extends Component
 			: [...$this->selected, $uuid];
 	}
 
+	/**
+	 * Picks every session in view that nothing protects, or lets them all go.
+	 */
 	public function toggleAllShown(): void
 	{
-		$shown = $this->shown(collect(GetSessionsAction::execute()))->pluck('uuid')->all();
+		$traitsByUuid = GetSessionTraitsAction::execute();
+		$selectable = $this->shown(collect(GetSessionsAction::execute()), $traitsByUuid)
+			->reject(fn (SessionEntity $sessionEntity) => $this->isProtected($traitsByUuid[$sessionEntity->uuid] ?? []))
+			->pluck('uuid')
+			->all();
 
-		$this->selected = array_diff($shown, $this->selected) === []
-			? array_values(array_diff($this->selected, $shown))
-			: array_values(array_unique([...$this->selected, ...$shown]));
+		$this->selected = array_diff($selectable, $this->selected) === [] ? [] : $selectable;
 	}
 
 	public function clearSelection(): void
@@ -101,6 +115,7 @@ class Sessions extends Component
 	{
 		$this->openSession = $uuid;
 		$this->renaming = false;
+		$this->wholeTranscript = false;
 		$this->replaceDrawer('session', $uuid);
 	}
 
@@ -133,160 +148,143 @@ class Sessions extends Component
 		$this->openSession = null;
 	}
 
-	public function render(): View
-	{
-		$all = collect(GetSessionsAction::execute());
-		$shown = $this->shown($all);
-		$cleanupOptions = $this->cleanupOptions($all);
-		$sessionEntity = $this->openSessionEntity($all);
-
-		return view('livewire.sessions', [
-			'groups' => collect(SessionGroupEnum::cases())
-				->map(fn (SessionGroupEnum $group) => [
-					'case' => $group,
-					'sessions' => $shown->filter(fn (SessionEntity $item) => $item->group === $group)->values(),
-					'total' => $all->filter(fn (SessionEntity $item) => $item->group === $group)->count(),
-				])
-				->filter(fn (array $group) => $group['sessions']->isNotEmpty()),
-			'shown' => $shown,
-			'all' => $all,
-			'projectOptions' => $this->projectOptions($this->countsByProject($all)),
-			'projectTotal' => $all->count(),
-			'whenOptions' => $this->whenOptions($all),
-			'cleanupOptions' => $cleanupOptions,
-			'cleanupLabel' => $this->cleanupLabel(),
-			'chips' => $this->chips(),
-			'diskTotal' => round($all->sum('bytes') / 1048576),
-			'filtered' => filled($this->query)
-				|| filled($this->when)
-				|| filled($this->cleanup)
-				|| $this->hasProjectFilter(),
-			'session' => $sessionEntity,
-			'projectPath' => $this->projectPathOf($sessionEntity),
-			'drawerTab' => $this->drawerTab(),
-			'transcript' => $sessionEntity === null || $this->drawerTab() !== 'Transcript'
-				? collect()
-				: collect(GetTranscriptAction::execute($sessionEntity->sessionId)),
-		]);
-	}
-
 	/**
 	 * @param  Collection<int, SessionEntity>  $all
-	 */
-	private function openSessionEntity(Collection $all): ?SessionEntity
-	{
-		$drawer = $this->currentDrawer();
-
-		if ($drawer === null) {
-			return null;
-		}
-
-		return $all->first(fn (SessionEntity $sessionEntity) => $sessionEntity->uuid === $drawer['id']);
-	}
-
-	/**
-	 * Where the project of this session stands on disk; that is what you type in
-	 * the terminal to carry on there.
-	 */
-	private function projectPathOf(?SessionEntity $sessionEntity): ?string
-	{
-		if ($sessionEntity?->project === null) {
-			return null;
-		}
-
-		return GetProjectsAction::execute()
-			->first(fn (ProjectEntity $projectEntity) => $projectEntity->name === $sessionEntity->project)?->path;
-	}
-
-	/**
-	 * @param  Collection<int, SessionEntity>  $all
+	 * @param  array<string, array<int, SessionTraitEnum>>  $traitsByUuid
 	 * @return Collection<int, SessionEntity>
 	 */
-	private function shown(Collection $all): Collection
+	private function shown(Collection $all, array $traitsByUuid): Collection
 	{
 		return $all
 			->when($this->hasProjectFilter(), fn (Collection $items) => $items->filter(
 				fn (SessionEntity $sessionEntity) => in_array($sessionEntity->project, $this->projects, true),
 			))
-			->when(filled($this->cleanup), fn (Collection $items) => $items->filter(
-				fn (SessionEntity $sessionEntity) => $this->needsCleanup($sessionEntity),
-			))
 			->when(filled($this->query), fn (Collection $items) => $items->filter(
 				fn (SessionEntity $sessionEntity) => $sessionEntity->matches($this->query),
 			))
-			->when(filled($this->when), fn (Collection $items) => $items->filter(
-				fn (SessionEntity $sessionEntity) => $sessionEntity->status->value === $this->when,
-			))
+			// traits stack: a session has to carry every one you switched on
+			->filter(fn (SessionEntity $sessionEntity) => array_diff(
+				$this->traits,
+				array_map(fn (SessionTraitEnum $trait) => $trait->value, $traitsByUuid[$sessionEntity->uuid] ?? []),
+			) === [])
 			->values();
 	}
 
-	private function needsCleanup(SessionEntity $sessionEntity): bool
+	/**
+	 * One line of the list, ready to show.
+	 *
+	 * @param  array<int, SessionTraitEnum>  $traits
+	 * @return array<string, mixed>
+	 */
+	private function row(SessionEntity $sessionEntity, array $traits): array
 	{
-		return match (SessionCleanupEnum::from($this->cleanup)) {
-			SessionCleanupEnum::ABANDONED => $sessionEntity->status === SessionStatusEnum::ABANDONED,
-			SessionCleanupEnum::LARGE => $sessionEntity->isLarge,
-			SessionCleanupEnum::UNNAMED => $sessionEntity->title === null,
-			SessionCleanupEnum::TICKET_MISMATCH => $sessionEntity->mismatchedTicket() !== null,
-		};
+		$shownTraits = collect($traits)->reject(fn (SessionTraitEnum $trait) => $trait->protects())->values();
+
+		return [
+			'session' => $sessionEntity,
+			'traits' => $shownTraits->take(self::TRAITS_ON_ROW)->all(),
+			'moreTraits' => max(0, $shownTraits->count() - self::TRAITS_ON_ROW),
+			'canGo' => $this->canGo($traits),
+			'isProtected' => $this->isProtected($traits),
+			'isSelected' => in_array($sessionEntity->uuid, $this->selected, true),
+			'age' => $sessionEntity->lastActiveAt === null
+				? '–'
+				: __(':count d', ['count' => (int) $sessionEntity->lastActiveAt->diffInDays(now(), absolute: true)]),
+		];
+	}
+
+	/**
+	 * The four groups of traits, each trait with how many sessions carry it.
+	 *
+	 * @param  Collection<int, SessionEntity>  $all
+	 * @param  array<string, array<int, SessionTraitEnum>>  $traitsByUuid
+	 * @return Collection<string, array<int, array{case: SessionTraitEnum, count: int, isOn: bool}>>
+	 */
+	private function traitGroups(Collection $all, array $traitsByUuid): Collection
+	{
+		return collect(SessionTraitEnum::cases())
+			->map(fn (SessionTraitEnum $trait) => [
+				'case' => $trait,
+				'count' => $all->filter(fn (SessionEntity $sessionEntity) => in_array($trait, $traitsByUuid[$sessionEntity->uuid] ?? [], true))->count(),
+				'isOn' => in_array($trait->value, $this->traits, true),
+			])
+			->groupBy(fn (array $trait) => $trait['case']->group())
+			->map(fn (Collection $group) => $group->values()->all());
 	}
 
 	/**
 	 * @param  Collection<int, SessionEntity>  $all
-	 * @return Collection<string, int>
+	 * @param  Collection<int, SessionEntity>  $canGo
 	 */
-	private function countsByProject(Collection $all): Collection
+	private function summary(Collection $all, Collection $canGo): string
 	{
-		return $all->map(fn (SessionEntity $sessionEntity) => $sessionEntity->project)->countBy();
-	}
-
-	/**
-	 * @param  Collection<int, SessionEntity>  $all
-	 * @return Collection<int, array{case: SessionStatusEnum, count: int}>
-	 */
-	private function whenOptions(Collection $all): Collection
-	{
-		return collect(SessionStatusEnum::cases())->map(fn (SessionStatusEnum $status) => [
-			'case' => $status,
-			'count' => $all->filter(fn (SessionEntity $item) => $item->status === $status)->count(),
+		return implode(' · ', [
+			trans_choice(':count gesprek|:count gesprekken', $all->count(), ['count' => $all->count()]),
+			__(':size op schijf', ['size' => $this->megabytes((int) $all->sum('bytes'))]),
+			trans_choice(':count kan weg, samen :size|:count kunnen weg, samen :size', $canGo->count(), [
+				'count' => $canGo->count(),
+				'size' => $this->megabytes((int) $canGo->sum('bytes')),
+			]),
 		]);
 	}
 
 	/**
-	 * The sessions that ask to be cleaned up, each with how many stand that way.
-	 *
-	 * @param  Collection<int, SessionEntity>  $all
-	 * @return Collection<int, array{case: SessionCleanupEnum, count: int}>
+	 * @param  array<int, SessionTraitEnum>  $traits
 	 */
-	private function cleanupOptions(Collection $all): Collection
+	private function isProtected(array $traits): bool
 	{
-		return collect(SessionCleanupEnum::cases())->map(fn (SessionCleanupEnum $case) => [
-			'case' => $case,
-			'count' => $all->filter(fn (SessionEntity $item) => match ($case) {
-				SessionCleanupEnum::ABANDONED => $item->status === SessionStatusEnum::ABANDONED,
-				SessionCleanupEnum::LARGE => $item->isLarge,
-				SessionCleanupEnum::UNNAMED => $item->title === null,
-				SessionCleanupEnum::TICKET_MISMATCH => $item->mismatchedTicket() !== null,
-			})->count(),
-		]);
-	}
-
-	private function cleanupLabel(): string
-	{
-		return blank($this->cleanup) ? __('Alles') : SessionCleanupEnum::from($this->cleanup)->label();
+		return collect($traits)->contains(fn (SessionTraitEnum $trait) => $trait->protects());
 	}
 
 	/**
-	 * What is switched on now, so you can let it go again.
-	 *
-	 * @return array<int, array{label: string, filter: string}>
+	 * @param  array<int, SessionTraitEnum>  $traits
 	 */
-	private function chips(): array
+	private function canGo(array $traits): bool
 	{
-		return array_values(array_filter([
-			filled($this->query) ? ['label' => __('Zoeken: :term', ['term' => $this->query]), 'filter' => 'query'] : null,
-			filled($this->when) ? ['label' => SessionStatusEnum::from($this->when)->label(), 'filter' => 'when'] : null,
-			filled($this->cleanup) ? ['label' => $this->cleanupLabel(), 'filter' => 'cleanup'] : null,
-			...$this->projectChips(),
-		]));
+		return ! $this->isProtected($traits) && count($traits) >= self::TRAITS_TO_GO;
+	}
+
+	/**
+	 * @param  Collection<int, SessionEntity>  $all
+	 * @param  array<string, array<int, SessionTraitEnum>>  $traitsByUuid
+	 * @return array<string, mixed>|null
+	 */
+	private function openSessionDrawer(Collection $all, array $traitsByUuid): ?array
+	{
+		$drawer = $this->currentDrawer();
+		$sessionEntity = $drawer === null
+			? null
+			: $all->first(fn (SessionEntity $item) => $item->uuid === $drawer['id']);
+
+		return $sessionEntity === null ? null : $this->sessionDrawer($sessionEntity, $traitsByUuid[$sessionEntity->uuid] ?? []);
+	}
+
+	public function render(): View
+	{
+		$all = collect(GetSessionsAction::execute());
+		$traitsByUuid = GetSessionTraitsAction::execute();
+		$shown = $this->shown($all, $traitsByUuid);
+		$canGo = $all->filter(fn (SessionEntity $sessionEntity) => $this->canGo($traitsByUuid[$sessionEntity->uuid] ?? []));
+		$selectable = $shown->reject(fn (SessionEntity $sessionEntity) => $this->isProtected($traitsByUuid[$sessionEntity->uuid] ?? []));
+		$picked = $all->filter(fn (SessionEntity $sessionEntity) => in_array($sessionEntity->uuid, $this->selected, true));
+
+		return view('livewire.sessions', [
+			'rows' => $shown->map(fn (SessionEntity $sessionEntity) => $this->row($sessionEntity, $traitsByUuid[$sessionEntity->uuid] ?? [])),
+			'summary' => $this->summary($all, $canGo),
+			'result' => __(':shown van :total in beeld · :size', [
+				'shown' => $shown->count(),
+				'total' => $all->count(),
+				'size' => $this->megabytes((int) $shown->sum('bytes')),
+			]),
+			'traitGroups' => $this->traitGroups($all, $traitsByUuid),
+			'activeTraits' => array_map(fn (string $trait) => SessionTraitEnum::from($trait), $this->traits),
+			'selectableCount' => $selectable->count(),
+			'protectedCount' => $shown->count() - $selectable->count(),
+			'pickedLine' => __(':count gekozen · :size komt vrij', ['count' => $picked->count(), 'size' => $this->megabytes((int) $picked->sum('bytes'))]),
+			'projectOptions' => $this->projectOptions($all->map(fn (SessionEntity $sessionEntity) => $sessionEntity->project)->countBy()),
+			'projectTotal' => $all->count(),
+			'filtered' => filled($this->query) || $this->traits !== [] || $this->hasProjectFilter(),
+			'drawer' => $this->openSessionDrawer($all, $traitsByUuid),
+		]);
 	}
 }

@@ -16,17 +16,18 @@ use Src\Ticket\Actions\GetTicketsAction;
 use Src\Ticket\Objects\TicketEntity;
 
 /**
- * A first prompt for a task, built from whatever it already carries: the
- * ticket it came from, the note you left on it, or the review remarks waiting
- * on its pull requests.
+ * A prompt for a task, built from the parts of its context you picked: the
+ * ticket it came from, the note you left on it, the review remarks waiting on
+ * its pull requests, or the findings of the last round.
  *
- * @method static ?string execute(string $card, PromptSourceEnum $source)
+ * @method static ?string execute(string $card, array $sources)
  */
 class BuildTaskPromptAction extends Command
 {
 	public function __construct(
 		public readonly string $card,
-		public readonly PromptSourceEnum $source,
+		/** @var array<int, PromptSourceEnum> */
+		public readonly array $sources,
 	) {}
 
 	public function handle(): ?string
@@ -38,12 +39,18 @@ class BuildTaskPromptAction extends Command
 			return null;
 		}
 
-		return match ($this->source) {
+		$parts = array_filter(array_map(fn (PromptSourceEnum $source) => match ($source) {
 			PromptSourceEnum::TICKET => $this->fromTicket($cardObject),
 			PromptSourceEnum::NOTE => $this->fromNote($cardObject),
 			PromptSourceEnum::REVIEW => $this->fromReview($cardObject),
 			PromptSourceEnum::ROUND => $this->fromRound($cardObject),
-		};
+		}, $this->sources));
+
+		if ($parts === []) {
+			return null;
+		}
+
+		return implode("\n\n", [...$parts, $this->howToGoAbout($cardObject)]);
 	}
 
 	/**
@@ -70,7 +77,6 @@ class BuildTaskPromptAction extends Command
 		return implode("\n\n", array_filter([
 			$opening,
 			$ticketEntity->description,
-			$this->howToGoAbout($cardObject),
 		]));
 	}
 
@@ -83,7 +89,6 @@ class BuildTaskPromptAction extends Command
 		return implode("\n\n", [
 			$cardObject->title,
 			$cardObject->description,
-			$this->howToGoAbout($cardObject),
 		]);
 	}
 

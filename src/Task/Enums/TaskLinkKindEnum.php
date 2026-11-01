@@ -21,6 +21,18 @@ enum TaskLinkKindEnum: string
 	 */
 	case READABLE_PROJECT = 'readable_project';
 
+	/**
+	 * Whether a value of this kind belongs to one task only, so tying it here
+	 * takes it off any other. Many tasks share a project.
+	 */
+	public function isExclusive(): bool
+	{
+		return match ($this) {
+			self::TICKET, self::BRANCH, self::PULL_REQUEST => true,
+			self::PROJECT, self::READABLE_PROJECT => false,
+		};
+	}
+
 	public function label(): string
 	{
 		return __(match ($this) {

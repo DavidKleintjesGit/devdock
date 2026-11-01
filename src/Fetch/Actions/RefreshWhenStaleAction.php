@@ -34,6 +34,6 @@ class RefreshWhenStaleAction extends Command
 		$due = $latest?->finishedAt === null
 			|| $latest->finishedAt->isBefore(CarbonImmutable::now()->subSeconds($seconds));
 
-		return $due ? StartFetchAction::execute() : null;
+		return $due ? StartFetchAction::execute(true) : null;
 	}
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Src\Worktree\Contracts;
 
+use Carbon\CarbonImmutable;
+use Src\Worktree\Enums\WorktreeOriginEnum;
 use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Src\Worktree\Objects\ChangeObjectCollection;
 use Src\Worktree\Objects\WorktreeEntity;
@@ -22,6 +24,12 @@ interface WorktreeRepositoryContract
 	 */
 	public function create(WorktreeObject $worktreeObject): WorktreeEntity;
 
+	/**
+	 * Writes down the database DevDock made for this copy, so it can go along
+	 * when the copy is cleaned up.
+	 */
+	public function markDatabase(WorktreeId $worktreeId, ?string $database): WorktreeEntity;
+
 	public function getAll(): WorktreeEntityCollection;
 
 	public function getFor(string $project, string $branch): ?WorktreeEntity;
@@ -38,6 +46,34 @@ interface WorktreeRepositoryContract
 	 * to work.
 	 */
 	public function checkedOutAt(string $repositoryPath, string $branch): ?string;
+
+	/**
+	 * Every branch that stands checked out somewhere, with the folder it
+	 * stands in: the project itself or one of its working copies.
+	 *
+	 * @return array<string, string>
+	 */
+	public function getPlaces(string $repositoryPath): array;
+
+	/**
+	 * Writes down a folder DevDock did not make as the working copy of a
+	 * branch: one that already stood there, or the project itself. Cleaning
+	 * up leaves such a folder where it is.
+	 */
+	public function adopt(string $project, string $branch, string $path, WorktreeOriginEnum $origin, ?string $card): WorktreeEntity;
+
+	/**
+	 * Whether the main line on origin already holds every commit of this
+	 * branch, so taking the branch away loses nothing.
+	 */
+	public function isMerged(string $repositoryPath, string $branch): bool;
+
+	/**
+	 * Puts the project itself back on the main line, so the branch it stood on
+	 * can get a working copy of its own. Refuses when there is uncommitted
+	 * work; gives back why, or null.
+	 */
+	public function switchToMain(string $repositoryPath): ?string;
 
 	/**
 	 * Puts the branch and its working copy under another name. Everything on
@@ -71,6 +107,12 @@ interface WorktreeRepositoryContract
 	public function getHead(string $path): ?string;
 
 	/**
+	 * A hash of everything this branch changed against the main line,
+	 * committed or not. It moves with every change, and not with a commit.
+	 */
+	public function getFingerprint(string $path): ?string;
+
+	/**
 	 * Every file this branch changed against the main line, committed and
 	 * uncommitted together. That is what a reviewer has to judge.
 	 *
@@ -79,12 +121,51 @@ interface WorktreeRepositoryContract
 	public function getChangedFiles(string $path): array;
 
 	/**
-	 * Writes the standing changes down as one commit. Nothing leaves the
-	 * machine; pushing is a step of its own.
+	 * The same files as getChangedFiles, each with what kind of change it is
+	 * and how many lines came in and went out, measured from where the branch
+	 * left the main line.
 	 */
-	public function commit(string $path, string $title, string $body): bool;
+	public function getBranchChanges(string $path): ChangeObjectCollection;
 
+	/**
+	 * Writes the standing changes down as one commit, or only the files that
+	 * were picked. Nothing leaves the machine; pushing is a step of its own.
+	 *
+	 * @param  array<int, string>|null  $files
+	 */
+	public function commit(string $path, string $title, string $body, ?array $files = null): bool;
+
+	/**
+	 * Sends the commits to the upstream, or creates the branch of the same
+	 * name on origin when nothing is followed yet. Never to the main line.
+	 */
 	public function push(string $path): bool;
+
+	/**
+	 * Merges the main line of origin into the branch. Returns why it did not
+	 * work, or null when it did; a conflict leaves everything as it was.
+	 */
+	public function update(string $path): ?string;
+
+	/**
+	 * The commits that are on no remote yet, newest first.
+	 *
+	 * @return array<int, array{sha: string, at: CarbonImmutable, title: string}>
+	 */
+	public function getUnpushedCommits(string $path): array;
+
+	/**
+	 * The branches on origin a task branch may follow; the main line is left
+	 * out on purpose.
+	 *
+	 * @return array<int, string>
+	 */
+	public function getRemoteBranches(string $path): array;
+
+	/**
+	 * Lets the branch follow another branch on origin, or nothing at all.
+	 */
+	public function setUpstream(string $path, ?string $upstream): bool;
 
 	/**
 	 * Throws the standing state of a working copy away, for when something
@@ -92,4 +173,10 @@ interface WorktreeRepositoryContract
 	 * from git again.
 	 */
 	public function forgetStatus(string $path): void;
+
+	/**
+	 * Reads the state of every working copy again and keeps it for the given
+	 * time, so a page finds it ready instead of waiting on git.
+	 */
+	public function refreshStatuses(int $keepSeconds): void;
 }

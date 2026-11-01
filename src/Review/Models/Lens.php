@@ -15,12 +15,15 @@ class Lens extends Model
 		'name',
 		'description',
 		'paths',
+		'rules',
 		'command',
 		'position',
+		'project',
 	];
 
 	protected $casts = [
 		'paths' => 'array',
+		'rules' => 'array',
 	];
 
 	public function settings(): HasMany

@@ -18,10 +18,10 @@ enum PromptSourceEnum: string
 	public function label(): string
 	{
 		return __(match ($this) {
-			self::TICKET => 'Uit het ticket',
-			self::NOTE => 'Uit de notitie',
-			self::REVIEW => 'Uit de review',
-			self::ROUND => 'Uit de ronde',
+			self::TICKET => 'Het ticket',
+			self::NOTE => 'De notitie',
+			self::REVIEW => 'Opmerkingen uit de review',
+			self::ROUND => 'Bevindingen van de laatste ronde',
 		});
 	}
 

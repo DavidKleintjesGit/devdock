@@ -6,6 +6,7 @@ namespace Src\Project\Objects;
 
 use Carbon\CarbonImmutable;
 use Src\Packages\ValueObject\ValueObject;
+use Src\Ticket\Objects\TicketKey;
 
 /**
  * A git checkout in the sites folder, with the standing of its working tree.
@@ -31,9 +32,7 @@ class ProjectEntity extends ValueObject
 	 */
 	public function ticketKey(): ?string
 	{
-		preg_match('/CSM-\d{3,5}/', (string) $this->branch, $found);
-
-		return $found[0] ?? null;
+		return TicketKey::find($this->branch);
 	}
 
 	/**

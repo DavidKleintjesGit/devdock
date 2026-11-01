@@ -1,13 +1,18 @@
-<div class="panelhead">
-	<h3>{{ __('Over DevDock') }}</h3>
-	<p>{{ __('Een werkbord dat vier bronnen op één plek legt. Alles draait en blijft op deze machine.') }}</p>
-</div>
+<header style="flex-direction:row;align-items:center;gap:14px">
+	<x-mark :size="44"/>
+	<span style="display:flex;flex-direction:column;gap:4px">
+		<span class="wordmark" style="font-size:22px">Dev<span>Dock</span></span>
+		<p>{{ __('Een werkbord dat vier bronnen op één plek legt. Alles draait en blijft op deze machine.') }}</p>
+	</span>
+</header>
 
-<dl class="facts">
-	<div><dt>{{ __('Versie') }}</dt><dd>devdock v{{ config('devdock.version') }}</dd></div>
-	<div><dt>{{ __('Database') }}</dt><dd class="mono">database/database.sqlite</dd></div>
-	<div><dt>{{ __('Instellingen') }}</dt><dd class="mono">.env</dd></div>
-	<div><dt>{{ __('Regelbestanden') }}</dt><dd>{{ $counts['rules'] }}</dd></div>
-	<div><dt>{{ __('Skills') }}</dt><dd>{{ $counts['skills'] }}</dd></div>
-	<div><dt>{{ __('Sessies') }}</dt><dd>{{ $counts['sessions'] }}</dd></div>
-</dl>
+<section>
+	<div class="setlist">
+		<div class="set"><span class="txt"><b>{{ __('Versie') }}</b></span><span class="mono">devdock v{{ config('devdock.version') }}</span></div>
+		<div class="set"><span class="txt"><b>{{ __('Database') }}</b></span><span class="mono">{{ $database }}</span></div>
+		<div class="set"><span class="txt"><b>{{ __('Instellingen') }}</b></span><span class="mono">.env</span></div>
+		<div class="set"><span class="txt"><b>{{ __('Regelbestanden') }}</b></span><span>{{ $counts['rules'] }}</span></div>
+		<div class="set"><span class="txt"><b>{{ __('Skills') }}</b></span><span>{{ $counts['skills'] }}</span></div>
+		<div class="set"><span class="txt"><b>{{ __('Sessies') }}</b></span><span>{{ $counts['sessions'] }}</span></div>
+	</div>
+</section>

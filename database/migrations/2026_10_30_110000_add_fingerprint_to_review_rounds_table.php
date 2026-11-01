@@ -1,0 +1,25 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+	public function up(): void
+	{
+		Schema::table('review_rounds', function (Blueprint $table): void {
+			// what the lenses judged, so a later change shows the verdict expired
+			$table->string('fingerprint', 64)->nullable()->after('commit_sha');
+		});
+	}
+
+	public function down(): void
+	{
+		Schema::table('review_rounds', function (Blueprint $table): void {
+			$table->dropColumn('fingerprint');
+		});
+	}
+};

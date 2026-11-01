@@ -54,7 +54,7 @@ class StartRoundAction extends Command
 			return $standing;
 		}
 
-		if ($rounds->count() >= (int) config('devdock.review.max_rounds')) {
+		if ($rounds->count() >= GetWorkflowSettingAction::execute($cardObject->project)->maxRounds) {
 			return null;
 		}
 
@@ -90,6 +90,7 @@ class StartRoundAction extends Command
 			$worktreeRepository->getHead($this->directory),
 			$this->directory,
 			$lenses,
+			$worktreeRepository->getFingerprint($this->directory),
 		);
 
 		$jobs = [];

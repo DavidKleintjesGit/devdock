@@ -15,12 +15,17 @@ class Ticket extends Model
 		'status',
 		'type',
 		'priority',
+		'sprint',
+		'sprint_ends_at',
 		'url',
 		'changed_at',
 	];
 
 	protected function casts(): array
 	{
-		return ['changed_at' => 'immutable_datetime'];
+		return [
+			'changed_at' => 'immutable_datetime',
+			'sprint_ends_at' => 'immutable_datetime',
+		];
 	}
 }

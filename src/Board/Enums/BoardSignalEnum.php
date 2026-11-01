@@ -11,32 +11,41 @@ use Src\Board\Objects\CardObject;
  */
 enum BoardSignalEnum: string
 {
-	case NEEDS_YOU = 'needs-you';
+	case YOUR_TURN = 'your-turn';
 	case HIGH_PRIORITY = 'high-priority';
 	case STALLED = 'stalled';
 
 	public function label(): string
 	{
 		return __(match ($this) {
-			self::NEEDS_YOU => 'Needs you',
-			self::HIGH_PRIORITY => 'High priority',
-			self::STALLED => 'Stalled',
+			self::YOUR_TURN => 'Jouw beurt',
+			self::HIGH_PRIORITY => 'Hoge prioriteit',
+			self::STALLED => 'Stilgevallen',
 		});
 	}
 
 	public function tone(): string
 	{
 		return match ($this) {
-			self::NEEDS_YOU => 'teal',
+			self::YOUR_TURN => 'teal',
 			self::HIGH_PRIORITY => 'red',
-			self::STALLED => 'amber',
+			self::STALLED => 'gray',
 		};
+	}
+
+	/**
+	 * Whether the filter carries the red triangle of a high priority instead
+	 * of a dot.
+	 */
+	public function hasPriorityMark(): bool
+	{
+		return $this === self::HIGH_PRIORITY;
 	}
 
 	public function matches(CardObject $cardObject): bool
 	{
 		return match ($this) {
-			self::NEEDS_YOU => $cardObject->column->waitsOnYou(),
+			self::YOUR_TURN => $cardObject->isYourTurn(),
 			self::HIGH_PRIORITY => $cardObject->isHighPriority(),
 			self::STALLED => $cardObject->isStale,
 		};

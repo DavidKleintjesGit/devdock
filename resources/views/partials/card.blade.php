@@ -1,25 +1,23 @@
-<article class="kcard{{ $openCard === $card->id ? ' open' : '' }}" wire:key="card-{{ $card->id }}" wire:click="open('{{ $card->id }}')" role="button" tabindex="0">
-	<span class="row">
-		<span class="rowlink ticket">{{ $card->ticketKey ?? __('Zonder ticket') }}</span>
-		@if ($card->ticketStatus)<span class="chip amber">{{ $card->ticketStatus }}</span>@endif
-		<span class="date">{{ $card->dateLabel() }}</span>
+<button type="button" @class(['kcard', 'open' => $openCard === $card->id, 'done' => $card->isDone(), 'todo' => $card->isTodo()]) wire:key="card-{{ $card->id }}" wire:click="open('{{ $card->id }}')">
+	<span class="kline">
+		@if ($card->isHighPriority())<svg class="ic s prio" width="11" height="11" role="img" aria-label="{{ __('Hoge prioriteit') }}"><use href="#i-prio"/></svg>@endif
+		<span class="kkey">{{ $card->ticketKey ?? ($card->isTodo() ? __('to-do') : __('zonder ticket')) }}</span>
+		@if ($card->project)<span>·</span><span class="kproject">{{ $card->project }}</span>@else<span class="kproject"></span>@endif
+		<span>{{ $card->ageLabel() }}</span>
 	</span>
-	<h3>{{ $card->title }}</h3>
-	<span class="meta">
-		@foreach ($card->pullRequests as $pullRequest)
-			<span><x-icon name="pr" small/>#{{ $pullRequest->number }}{{ $pullRequest->isMerged() ? ' ' . __('gemerged') : '' }}</span>
-		@endforeach
-		@if ($card->commentCount())<span><x-icon name="chat" small/>{{ __(':count opmerkingen', ['count' => $card->commentCount()]) }}</span>@endif
-		@if ($card->changedFiles)<span><x-icon name="file" small/>{{ __(':count gewijzigd', ['count' => $card->changedFiles]) }}</span>@endif
-		@if ($card->sessions->count() > 1)<span><x-icon name="chat" small/>{{ __(':count sessies', ['count' => $card->sessions->count()]) }}</span>@endif
-		@if ($card->promptCount())<span>{{ __(':count prompts', ['count' => $card->promptCount()]) }}</span>@endif
-		<span><x-icon name="folder" small/>{{ $card->project ?? __('Zonder project') }}</span>
-		@if ($card->branch && config('devdock.board.show_branch'))<span class="mono"><x-icon name="branch" small/>{{ $card->branch }}</span>@endif
+	<span class="ktitle">{{ $card->title }}</span>
+	<span class="kstatus">
+		@if ($card->lensStates !== [])
+			<span class="ldots" aria-hidden="true">@foreach ($card->lensStates as $state)<span class="ldot {{ $state }}"></span>@endforeach</span>
+		@else
+			<span class="sdot {{ $card->status->value }}"></span>
+		@endif
+		<span @class(['txt', 'yours' => $card->isYourTurn()])>{{ $card->statusText }}</span>
+		@if ($card->behind > 0)
+			<span class="wicon" title="{{ trans_choice(':count commit achter op :main|:count commits achter op :main', $card->behind, ['count' => $card->behind, 'main' => $card->mainBranch]) }}"><svg class="ic s" width="13" height="13" role="img" aria-label="{{ __('Achter op :main', ['main' => $card->mainBranch]) }}"><use href="#i-alert"/></svg></span>
+		@endif
+		@if ($card->isStale)
+			<span class="wicon pause" title="{{ __('Stilgevallen') }}"><svg class="ic s" width="12" height="12" role="img" aria-label="{{ __('Stilgevallen') }}"><use href="#i-pause"/></svg></span>
+		@endif
 	</span>
-	@if ($card->hasWaitingWork)
-		<span class="note green"><x-icon name="check" small/><span>{{ __('Werk klaar in de werkkopie') }}</span></span>
-	@endif
-	@if ($card->note)
-		<span class="note {{ $card->tone }}"><x-icon :name="$card->tone === 'green' ? 'check' : 'alert'" small/><span>{{ $card->note }}</span></span>
-	@endif
-</article>
+</button>

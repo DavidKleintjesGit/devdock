@@ -13,7 +13,7 @@ use Src\Packages\Cqrs\Command;
  * Sets a round along the sources ready and has it run outside the request.
  * When a round is already running, that is the round.
  *
- * @method static FetchRunEntity execute()
+ * @method static FetchRunEntity execute(bool $dueOnly)
  */
 class StartFetchAction extends Command
 {
@@ -21,6 +21,12 @@ class StartFetchAction extends Command
 	 * A round still running after this has hung.
 	 */
 	private const HANGS_AFTER_MINUTES = 10;
+
+	public function __construct(
+		// automatisch ophalen slaat een bron over die nog rust; op de knop gaat alles mee
+		public readonly bool $dueOnly = false,
+	) {
+	}
 
 	public function handle(
 		FetchRunRepositoryContract $fetchRunRepository,
@@ -34,7 +40,7 @@ class StartFetchAction extends Command
 
 		$fetchRunEntity = $fetchRunRepository->create();
 
-		$fetchProcessRepository->startDetached($fetchRunEntity->fetchRunId);
+		$fetchProcessRepository->startDetached($fetchRunEntity->fetchRunId, $this->dueOnly);
 
 		return $fetchRunEntity;
 	}

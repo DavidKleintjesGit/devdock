@@ -1,66 +1,60 @@
-<div class="field">
-	<div class="fieldhead">
-		<h3 class="eyebrow">{{ __('Beschrijving') }}</h3>
-		<span class="muted" style="font-size:12.5px">{{ __('gaat mee als context naar de agent') }}</span>
-	</div>
-	@if ($description)
-		<div class="prose">{{ $description }}</div>
-	@else
-		<div class="prose empty-prose">{{ __('Nog geen beschrijving. Een ticket of een notitie op deze taak vult dit.') }}</div>
-	@endif
-</div>
-
-<dl class="facts">
-	<div><dt>{{ __('Wacht op') }}</dt><dd>{{ $card->column->waitsOn() }}</dd></div>
-	<div><dt>{{ __('Agent') }}</dt><dd>{!! $card->agent ? e($card->agent->name) . '<small class="mono">' . e($card->agent->shortKey()) . '</small>' : e(__('Nog geen agent')) !!}</dd></div>
-	<div><dt>{{ __('Lokaal') }}</dt><dd>{{ $card->changedFiles ? __(':count gewijzigd', ['count' => $card->changedFiles]) : __('Niets gewijzigd') }}</dd></div>
-	<div><dt>{{ __('Werkkopie') }}</dt><dd>{{ $worktree ? ($worktree->waitingLabel() ?? __('Schoon')) : __('Nog geen eigen map') }}@if ($worktree)<small class="mono">{{ $worktree->path }}</small>@endif</dd></div>
-</dl>
-
-@if ($card->note)
-	<span class="note {{ $card->tone }}"><x-icon :name="$card->tone === 'green' ? 'check' : 'alert'" small/><span>{{ $card->note }}</span></span>
-@endif
-
-<div class="field">
-	<div class="fieldhead">
-		<h3 class="eyebrow">{{ __('Actieve koppelingen') }}</h3>
-		<span class="muted" style="font-size:12.5px">{{ __('wisselen doe je per tab') }}</span>
-	</div>
-	@if ($links)
-		<div class="linklist">
-			@foreach ($links as $link)
-				<div class="linkrow static">
-					<x-icon :name="$link['kind']->icon()" small/>
-					<span class="grow">
-						<b class="mono">{{ $link['value'] }}</b>
-						<small>{{ $link['kind']->label() }}</small>
-					</span>
-				</div>
-			@endforeach
+<div class="dbody">
+	<div class="banner {{ $nextStep['tone'] }}">
+		<div class="grow" style="display:flex;flex-direction:column;gap:3px;min-width:200px">
+			<b>{{ $nextStep['title'] }}</b>
+			<span>{{ $nextStep['text'] }}</span>
 		</div>
-	@else
-		<div class="prose empty-prose">{{ __('Nog niets gekoppeld. Zet een ticket, project, branch of pull request vast op de tab die erbij hoort.') }}</div>
-	@endif
-</div>
-
-<div class="field">
-	<div class="fieldhead">
-		<h3 class="eyebrow">{{ __('Laatste antwoord') }}</h3>
-		@if ($lastReport)<span class="chip {{ $lastReport->status->tone() }}">{{ $lastReport->status->label() }}</span>@endif
 	</div>
-	@if ($lastReport)
-		<p class="lede">{{ $lastReport->summary }}</p>
-	@else
-		<div class="prose empty-prose">{{ __('De agent heeft nog niets teruggestuurd. Wat hij antwoordt komt hier als samenvatting te staan.') }}</div>
+
+	<section class="dsec">
+		<h3 class="eyebrow">{{ $card->ticketKey ? __('Het ticket') : __('De notitie') }}</h3>
+		@if ($description)
+			<p style="white-space:pre-line">{{ $description }}</p>
+		@else
+			<p class="muted">{{ __('Nog geen beschrijving. Een ticket of een notitie op deze taak vult dit.') }}</p>
+		@endif
+		@if ($card->ticketUrl)<a href="{{ $card->ticketUrl }}" target="_blank" rel="noopener" style="font-size:13px;text-decoration:none">{{ __('Openen in Jira') }}</a>@endif
+	</section>
+
+	@if ($reviewComments->isNotEmpty() || $changesRequestedBy)
+		<section class="dsec">
+			<div class="headrow">
+				<h3 class="eyebrow">{{ __('Uit de review op Bitbucket') }}</h3>
+				<span class="label amber">{{ trans_choice(':count open|:count open', $reviewComments->count(), ['count' => $reviewComments->count()]) }}</span>
+			</div>
+			<div class="list">
+				@if ($changesRequestedBy)
+					<a class="row tall" href="{{ $activePullRequest?->url }}" target="_blank" rel="noopener" style="background:var(--amber-wash);flex-direction:column;align-items:flex-start;gap:3px">
+						<span style="display:flex;gap:8px;align-items:center;font-size:12.5px"><b>{{ $changesRequestedBy }}</b><span class="label amber">{{ __('Requested changes') }}</span></span>
+						<span class="muted">{{ __('Vraagt om wijzigingen op :pr.', ['pr' => $card->activePullRequest]) }}</span>
+					</a>
+				@endif
+				@foreach ($reviewComments as $comment)
+					<a class="row tall" href="{{ $comment->url }}" target="_blank" rel="noopener" style="flex-direction:column;align-items:flex-start;gap:3px">
+						<span style="display:flex;gap:8px;font-size:12.5px;color:var(--muted)"><b style="color:var(--fg)">{{ $comment->author }}</b><span class="mono" style="font-size:12px">{{ $comment->path ? $comment->path . ($comment->line ? ':' . $comment->line : '') : __('op de pull request zelf') }}</span></span>
+						<span style="color:var(--fg-2)">{{ $comment->title() }}</span>
+					</a>
+				@endforeach
+			</div>
+		</section>
 	@endif
+
+	<section class="dsec">
+		<h3 class="eyebrow">{{ __('Deze taak') }}</h3>
+		<div class="list">
+			<div class="row"><span class="key">{{ __('Project') }}</span><span class="val mono">{{ $card->project ?? __('nog geen') }}</span><button class="btn xs" type="button" wire:click="setDrawerTab('Koppelingen')">{{ __('Wijzigen') }}</button></div>
+			<div class="row"><span class="key">{{ __('Branch') }}</span><span class="val mono">{{ $card->branch ?? __('nog geen') }}</span><button class="btn xs" type="button" wire:click="setDrawerTab('Koppelingen')">{{ __('Wijzigen') }}</button></div>
+			<div class="row"><span class="key">{{ __('Werkkopie') }}</span><span class="val">{{ $worktree ? ($worktree->waitingLabel() ?? __('schoon')) : __('nog geen eigen map') }}</span><button class="btn xs" type="button" wire:click="setDrawerTab('Werkkopie')">{{ __('Wijzigen') }}</button></div>
+			<div class="row"><span class="key">{{ __('Agent') }}</span><span class="val mono">{{ $card->agent?->name ?? __('nog geen') }}</span><button class="btn xs" type="button" wire:click="setDrawerTab('Agent')">{{ __('Wijzigen') }}</button></div>
+		</div>
+	</section>
 </div>
 
 <div class="dfoot">
-	<button class="btn primary" type="button" wire:click="setDrawerTab('Agent')">
-		<x-icon name="chat" small/>{{ $lastReport ? $lastReport->status->waitsOn() : __('Naar de agent') }}
-	</button>
-	<button class="btn {{ $confirmingDeleteTask ? 'danger solid' : 'danger' }}" type="button" wire:click="deleteTask">
-		{{ $confirmingDeleteTask ? __('Zeker weten? Verwijderen') : __('Taak verwijderen') }}
-	</button>
-	<span class="hint">{{ $card->agent?->name ?? __('Nog geen agent') }}</span>
+	<span class="hint">{{ $nextStep['hint'] }}</span>
+	@if ($nextStep['tab'])
+		<button class="btn primary" type="button" wire:click="setDrawerTab('{{ $nextStep['tab'] }}')">{{ $nextStep['button'] }}<x-icon name="arrow" small/></button>
+	@elseif ($nextStep['url'])
+		<a class="btn primary" href="{{ $nextStep['url'] }}" target="_blank" rel="noopener">{{ __('Openen in Bitbucket') }}<x-icon name="external" small/></a>
+	@endif
 </div>

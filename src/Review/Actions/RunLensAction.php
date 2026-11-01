@@ -18,7 +18,9 @@ use Src\Review\Objects\LensId;
 use Src\Review\Objects\ReviewRoundEntity;
 use Src\Review\Objects\ReviewRoundId;
 use Src\Task\Actions\GetReadableDirectoriesAction;
+use Src\Worktree\Actions\GetWorktreesAction;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
+use Src\Worktree\Objects\WorktreeEntity;
 use Throwable;
 
 /**
@@ -59,7 +61,13 @@ class RunLensAction extends Command implements ShouldQueue
 		WorktreeRepositoryContract $worktreeRepository,
 	): ?ReviewRoundEntity {
 		$reviewRoundEntity = $reviewRoundRepository->getById($this->reviewRoundId);
-		$lensEntity = $lensRepository->getAll()->first(
+
+		// the lens as this project set it: its own paths, rules and command
+		$project = GetWorktreesAction::execute()
+			->first(fn (WorktreeEntity $worktreeEntity) => $worktreeEntity->path === $reviewRoundEntity?->directory)
+			?->project;
+
+		$lensEntity = $lensRepository->getAll($project)->first(
 			fn (LensEntity $lensEntity) => $lensEntity->lensId->id === $this->lensId->id,
 		);
 
@@ -78,6 +86,7 @@ class RunLensAction extends Command implements ShouldQueue
 				$lensEntity,
 				$lensEntity->touches($worktreeRepository->getChangedFiles($directory)),
 				$this->previousReport($reviewRoundRepository, $reviewRoundEntity),
+				$project === null ? [] : $this->rulesFor($project, $lensEntity),
 			),
 			$this->logPath($lensEntity),
 			fn (array $event) => $this->note($reviewRoundRepository, $event),
@@ -182,11 +191,21 @@ class RunLensAction extends Command implements ShouldQueue
 	 */
 	private function logPath(LensEntity $lensEntity): string
 	{
-		return storage_path(sprintf(
-			'app/rounds/%d/%s.jsonl',
-			(int) $this->reviewRoundId->id,
-			$lensEntity->name,
-		));
+		return resolve(ReviewRoundRepositoryContract::class)->logFolder($this->reviewRoundId) . '/' . $lensEntity->name . '.jsonl';
+	}
+
+	/**
+	 * The rule files this lens reads in the project, found the way the
+	 * workflow page shows them.
+	 *
+	 * @return array<int, string>
+	 */
+	private function rulesFor(string $project, LensEntity $lensEntity): array
+	{
+		$checked = collect(CheckWorkflowAction::execute($project)['lenses'])
+			->first(fn (array $lens) => $lens['lens']->lensId->id === $lensEntity->lensId->id);
+
+		return $checked['reads'] ?? [];
 	}
 
 	/**

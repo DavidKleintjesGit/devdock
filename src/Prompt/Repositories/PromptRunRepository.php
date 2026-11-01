@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Src\Prompt\Repositories;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\File;
 use Src\Prompt\Contracts\PromptRunRepositoryContract;
 use Src\Prompt\Enums\PromptStatusEnum;
 use Src\Prompt\Models\PromptRun as PromptRunEloquent;
@@ -63,6 +65,22 @@ class PromptRunRepository implements PromptRunRepositoryContract
 		return $promptRunEloquent === null ? null : $this->mapToEntity($promptRunEloquent);
 	}
 
+	public function getLatestPerCard(): array
+	{
+		$latest = [];
+
+		// the board asks this for every card; one query instead of a hundred
+		$promptRunEloquents = PromptRunEloquent::query()
+			->orderBy('id')
+			->get();
+
+		foreach ($promptRunEloquents as $promptRunEloquent) {
+			$latest[(string) $promptRunEloquent->card] = $this->mapToEntity($promptRunEloquent);
+		}
+
+		return $latest;
+	}
+
 	public function getByReviewRounds(string $card): array
 	{
 		$byRound = [];
@@ -109,6 +127,38 @@ class PromptRunRepository implements PromptRunRepositoryContract
 		]);
 
 		return $this->mapToEntity($promptRunEloquent);
+	}
+
+	public function logPath(PromptRunId $promptRunId): string
+	{
+		return storage_path('app/prompts/' . $promptRunId->id . '.jsonl');
+	}
+
+	public function countLogsForCard(string $card): int
+	{
+		return $this->logPathsFor($card)->count();
+	}
+
+	public function deleteLogsForCard(string $card): int
+	{
+		$logPaths = $this->logPathsFor($card);
+
+		File::delete($logPaths->all());
+
+		return $logPaths->count();
+	}
+
+	/**
+	 * @return Collection<int, string>
+	 */
+	private function logPathsFor(string $card): Collection
+	{
+		return PromptRunEloquent::query()
+			->where('card', $card)
+			->pluck('id')
+			->map(fn (mixed $id) => $this->logPath(new PromptRunId(id: (int) $id)))
+			->filter(fn (string $logPath) => is_file($logPath))
+			->values();
 	}
 
 	private function mapToEntity(PromptRunEloquent $promptRunEloquent): PromptRunEntity

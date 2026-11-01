@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Providers\AppServiceProvider;
 use Src\Board\Providers\BoardServiceProvider;
 use Src\Fetch\Providers\FetchServiceProvider;
+use Src\Library\Providers\LibraryServiceProvider;
 use Src\Project\Providers\ProjectServiceProvider;
 use Src\Prompt\Providers\PromptServiceProvider;
 use Src\PullRequest\Providers\PullRequestServiceProvider;
@@ -21,6 +22,7 @@ return [
 	AppServiceProvider::class,
 	BoardServiceProvider::class,
 	FetchServiceProvider::class,
+	LibraryServiceProvider::class,
 	ProjectServiceProvider::class,
 	PromptServiceProvider::class,
 	PullRequestServiceProvider::class,

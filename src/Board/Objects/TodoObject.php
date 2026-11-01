@@ -16,6 +16,7 @@ class TodoObject extends ValueObject
 		public readonly string $title,
 		public readonly ?string $note,
 		public readonly ?string $project,
+		public readonly bool $isLater,
 	) {
 		parent::__construct();
 	}
@@ -26,6 +27,7 @@ class TodoObject extends ValueObject
 			title: (string) $data['title'],
 			note: $data['note'] ?? null,
 			project: $data['project'] ?? null,
+			isLater: (bool) ($data['is_later'] ?? false),
 		);
 	}
 }

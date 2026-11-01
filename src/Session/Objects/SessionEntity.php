@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Src\Packages\ValueObject\ValueObject;
 use Src\Session\Enums\SessionGroupEnum;
 use Src\Session\Enums\SessionStatusEnum;
+use Src\Ticket\Objects\TicketKey;
 
 /**
  * A conversation with Claude Code, as it stands in the sessions folder.
@@ -18,12 +19,19 @@ class SessionEntity extends ValueObject
 		public readonly SessionId $sessionId,
 		public readonly string $uuid,
 		public readonly string $folder,
+		public readonly ?string $cwd,
 		public readonly ?string $project,
 		public readonly ?string $title,
 		public readonly ?string $branch,
 		public readonly int $promptCount,
 		public readonly int $bytes,
 		public readonly ?CarbonImmutable $lastActiveAt,
+		public readonly ?CarbonImmutable $firstActiveAt,
+		public readonly int $activeDays,
+		public readonly bool $hasCommit,
+		public readonly bool $isInterrupted,
+		public readonly bool $isUnanswered,
+		public readonly bool $isPinned,
 		public readonly string $fingerprint,
 		public readonly SessionStatusEnum $status,
 		public readonly SessionGroupEnum $group,
@@ -45,9 +53,7 @@ class SessionEntity extends ValueObject
 	 */
 	public function ticketKey(): ?string
 	{
-		preg_match('/CSM-\d{3,5}/', (string) $this->branch, $found);
-
-		return $found[0] ?? null;
+		return TicketKey::find($this->branch);
 	}
 
 	/**

@@ -27,11 +27,12 @@ class EnvironmentSettingRepository implements SettingRepositoryContract
 			refreshSeconds: (int) config('devdock.refresh_seconds'),
 			columns: (array) config('devdock.board.columns'),
 			doneDays: (int) config('devdock.board.done_days'),
+			backlogHidden: (bool) config('devdock.board.backlog_hidden'),
+			staleDays: (int) config('devdock.board.stale_days'),
 			abandonedUpToPrompts: (int) config('devdock.sessions.abandoned_up_to'),
 			largeFromMegabytes: (int) config('devdock.sessions.large_from_mb'),
 			oldAfterDays: (int) config('devdock.sessions.old_after_days'),
 			theme: (string) config('devdock.theme'),
-			showBranch: (bool) config('devdock.board.show_branch'),
 			language: app()->getLocale(),
 		);
 	}
@@ -49,11 +50,12 @@ class EnvironmentSettingRepository implements SettingRepositoryContract
 			'DEVDOCK_REFRESH_SECONDS' => (string) $settingObject->refreshSeconds,
 			'DEVDOCK_COLUMNS' => implode(',', $settingObject->columns),
 			'DEVDOCK_DONE_DAYS' => (string) $settingObject->doneDays,
+			'DEVDOCK_BACKLOG_HIDDEN' => $settingObject->backlogHidden ? 'true' : 'false',
+			'DEVDOCK_STALE_DAYS' => (string) $settingObject->staleDays,
 			'DEVDOCK_ABANDONED_UP_TO' => (string) $settingObject->abandonedUpToPrompts,
 			'DEVDOCK_LARGE_FROM_MB' => (string) $settingObject->largeFromMegabytes,
 			'DEVDOCK_OLD_AFTER_DAYS' => (string) $settingObject->oldAfterDays,
 			'DEVDOCK_THEME' => $settingObject->theme,
-			'DEVDOCK_SHOW_BRANCH' => $settingObject->showBranch ? 'true' : 'false',
 			'APP_LOCALE' => $settingObject->language,
 		];
 
@@ -72,6 +74,14 @@ class EnvironmentSettingRepository implements SettingRepositoryContract
 		$this->write($values);
 
 		return $this->get();
+	}
+
+	public function saveThreshold(int $maxRounds, string $afterRounds): void
+	{
+		$this->write([
+			'DEVDOCK_MAX_ROUNDS' => (string) $maxRounds,
+			'DEVDOCK_AFTER_ROUNDS' => $afterRounds,
+		]);
 	}
 
 	/**

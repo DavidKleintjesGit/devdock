@@ -24,4 +24,25 @@ interface WorkingCopyRepositoryContract
 	 * link to the checkout would otherwise take the real one with it.
 	 */
 	public function release(string $path, ?string $site): void;
+
+	/**
+	 * The ignored files and folders the copy got from the checkout.
+	 *
+	 * @return array<int, string>
+	 */
+	public function getCarried(string $path): array;
+
+	/**
+	 * Copies those files over again, for when they changed in the checkout.
+	 * The .env stays, since it holds what this copy was given.
+	 */
+	public function carryOverAgain(string $repositoryPath, string $path): void;
+
+	/**
+	 * Per package folder whether the copy borrows it from the checkout, and
+	 * whether the lock file still matches.
+	 *
+	 * @return array<int, array{folder: string, lock: string, isBorrowed: bool, isSameLock: bool}>
+	 */
+	public function getPackages(string $repositoryPath, string $path): array;
 }

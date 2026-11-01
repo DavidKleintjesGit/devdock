@@ -14,7 +14,10 @@ use Src\Packages\ValueObject\ValueObject;
 class LensEntity extends ValueObject
 {
 	/**
-	 * @param  array<int, string>  $paths  glob patterns, relative to the project
+	 * @param  array<int, string>  $paths  glob patterns, relative to the project, as they hold here
+	 * @param  array<int, string>  $rules  patterns of the rule files it reads, or the files picked in this project
+	 * @param  array<int, string>  $standardPaths
+	 * @param  array<int, string>  $standardRules
 	 */
 	public function __construct(
 		public readonly LensId $lensId,
@@ -23,8 +26,31 @@ class LensEntity extends ValueObject
 		public readonly array $paths,
 		public readonly ?string $command,
 		public readonly bool $isEnabled,
+		public readonly array $rules = [],
+		public readonly ?string $project = null,
+		public readonly array $standardPaths = [],
+		public readonly array $standardRules = [],
+		public readonly ?string $standardCommand = null,
+		public readonly bool $hasPickedRules = false,
 	) {
 		parent::__construct();
+	}
+
+	/**
+	 * Whether this lens belongs to one project only.
+	 */
+	public function isOwn(): bool
+	{
+		return $this->project !== null;
+	}
+
+	/**
+	 * Whether this project changed anything about a lens of the standard.
+	 */
+	public function isCustomized(): bool
+	{
+		return ! $this->isOwn()
+			&& ($this->paths !== $this->standardPaths || $this->hasPickedRules || $this->command !== $this->standardCommand);
 	}
 
 	/**

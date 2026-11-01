@@ -1,110 +1,113 @@
-<div class="page{{ $file ? ' drawer-open' : '' }}">
-	<header class="pagebar">
-		<div class="logo m-logo" aria-hidden="true">D</div>
-		<h1>{{ __('Regels') }}</h1>
-		<span class="count">{{ __(':files bestanden · :lines regels · :words woorden', ['files' => $total, 'lines' => number_format($lines, 0, ',', '.'), 'words' => number_format($words, 0, ',', '.')]) }}</span>
-		<x-page-actions/>
-	</header>
+<div class="split{{ $page['kind'] === 'none' ? '' : ' has-page' }}">
+	<nav class="index" aria-label="{{ __('Regels') }}">
+		<label class="search" style="flex:none;max-width:none">
+			<x-icon name="search" small/>
+			<span class="sr">{{ __('Zoek een regel of project') }}</span>
+			<input type="search" wire:model.live.debounce.250ms="search" placeholder="{{ __('Zoek een regel of project') }}" autocomplete="off">
+		</label>
 
-	<div class="toolbar">
-		<div class="tb-search">
-			<label class="search">
-				<x-icon name="search"/><span class="sr">{{ __('Zoeken') }}</span>
-				<input type="search" wire:model.live.debounce.300ms="query" placeholder="{{ __('Zoek op bestand of project') }}" autocomplete="off">
-			</label>
+		<a class="block" href="#" wire:click.prevent="showGlobal" @if ($global) aria-current="page" @endif>
+			<b>{{ __('Globaal') }}</b>
+			<small>{{ __('alleen jij, in elk project') }}</small>
+		</a>
+
+		<div class="index-group">
+			<div class="eyebrow">{{ __('Bibliotheken') }}</div>
+			@foreach ($libraries as $libraryEntity)
+				<a class="block" href="#" wire:click.prevent="showLibrary({{ $libraryEntity->id }})" wire:key="lib-{{ $libraryEntity->id }}" @if ($library === $libraryEntity->id && $rule === '') aria-current="page" @endif>
+					<b>{{ $libraryEntity->name }}</b>
+					<small>{{ trans_choice(':count regel|:count regels', count($libraryEntity->rules()), ['count' => count($libraryEntity->rules())]) }} · {{ trans_choice(':count project|:count projecten', count($libraryEntity->followers), ['count' => count($libraryEntity->followers)]) }}</small>
+				</a>
+			@endforeach
+			<button class="item" type="button" style="color:var(--accent)" wire:click="startLibrary"><x-icon name="plus" small/>{{ __('Bibliotheek toevoegen') }}</button>
 		</div>
-		<div class="tb-filters">
-			<x-project-picker
-				:options="$projectOptions"
-				:selected="$projects"
-				:total="$projectTotal"
-				:query="$projectQuery"
-				query-property="projectQuery"
-				toggle="toggleProject"
-				clear="clearProjects"
-			/>
 
-			<div class="seg" role="group" aria-label="{{ __('Herkomst') }}">
-				<button type="button" aria-pressed="{{ $origin === '' ? 'true' : 'false' }}" wire:click="$set('origin', '')">{{ __('Alles') }} <span class="n">{{ $total }}</span></button>
-				@foreach ($origins as $option)
-					<button type="button" aria-pressed="{{ $origin === $option['case']->value ? 'true' : 'false' }}" wire:click="toggleOrigin('{{ $option['case']->value }}')">{{ $option['case']->label() }} <span class="n">{{ $option['count'] }}</span></button>
+		@if ($favorites !== [])
+			<div class="index-group">
+				<div class="eyebrow">{{ __('Favorieten') }}</div>
+				@foreach ($favorites as $favorite)
+					<a href="#" wire:click.prevent="openFavorite('{{ $favorite['project'] }}', '{{ $favorite['path'] }}')" wire:key="fav-{{ $favorite['project'] }}-{{ $favorite['path'] }}">
+						<x-icon name="star" small/>
+						<span class="grow ellipsis mono" style="font-size:12.5px">{{ str_replace('.claude/rules/', '', $favorite['path']) }}</span>
+						<span class="side-note">{{ $favorite['project'] }}</span>
+					</a>
 				@endforeach
 			</div>
-		</div>
-	</div>
-
-	<div class="content">
-		@include('partials.active-filters')
-		@if ($behind->isNotEmpty())
-			<div class="alert" role="status">
-				<x-icon name="alert"/>
-				<span class="txt">
-					<b style="color:var(--red)">{{ __(':count van de :total bestanden lopen achter op mtvtd-core', ['count' => $behind->count(), 'total' => $total]) }}</b>
-					<span>{{ __(':names, in :projects projecten.', ['names' => $behindNames->implode(', '), 'projects' => $behindProjects]) }}</span>
-				</span>
-				<button class="btn sm" type="button" wire:click="askUpdateAll"><x-icon name="refresh" small/>{{ __('Alles bijwerken') }}</button>
-			</div>
 		@endif
-		@include('partials.permissions', [
-			'permissionGroups' => $permissionGroups,
-			'permissionTotal' => $permissionTotal,
-			'ignoredProjects' => $ignoredProjects,
-		])
 
-		@forelse ($groups as $group)
-			<section class="section">
-				<div class="section-head">
-					<h2>{{ $group['case']->label() }}</h2>
-					<span class="side-note">{{ trans_choice(':count bestand|:count bestanden', $group['files']->count(), ['count' => $group['files']->count()]) }}</span>
-				</div>
-				<div class="box list">
-					<div class="listhead fcols">
-						<span>{{ __('Bestand') }}</span>
-						<span>{{ __('Herkomst') }}</span>
-						<span class="r">{{ __('Aantal regels') }}</span>
-						<span class="r">{{ __('Woorden') }}</span>
-						<span></span>
-					</div>
-					@foreach ($group['files'] as $item)
-						<div class="frow fcols{{ $openFileId === $item->ruleFileId->id ? ' open' : '' }}" wire:key="rule-{{ $item->ruleFileId->id }}">
-							<button class="rowlink fname" type="button" wire:click="open({{ $item->ruleFileId->id }})">
-								<x-icon name="file" small/>
-								<span class="ftext">
-									<span class="mono">{{ $item->path }}</span>
-									@if ($item->summary)<small>{{ $item->summary }}</small>@endif
-								</span>
-								@if ($projects === [] || count($projects) > 1)<span class="muted mono">{{ $item->project }}</span>@endif
-							</button>
-							<span><span class="chip {{ $item->origin->tone() }}">{{ $item->origin->label() }}</span></span>
-							<span class="lines mono">{{ $item->lines }}</span>
-							<span class="read r mono">{{ number_format($item->words, 0, ',', '.') }}</span>
-							<span class="chev"><x-icon name="chev" small/></span>
-						</div>
-					@endforeach
-				</div>
-			</section>
-		@empty
-			<div class="box">
-				<div class="empty">
-					<span class="bubble"><x-icon name="regels"/></span>
-					<b>{{ __('Nog geen regels ingeladen') }}</b>
-					<span>{{ __('Er zijn nog geen regelbestanden ingelezen.') }}</span>
-					<button class="btn sm" type="button" wire:click="$refresh">{{ __('Nu ophalen') }}</button>
-				</div>
+		<div class="index-group">
+			<div class="eyebrow">
+				<span>{{ __('Projecten · :count', ['count' => $projectTotal]) }}</span>
+				@if ($deviatingCount > 0 || $onlyDeviating)
+					<button class="tchip" type="button" style="height:26px;border-radius:999px;letter-spacing:0;text-transform:none;font-size:12px" aria-pressed="{{ $onlyDeviating ? 'true' : 'false' }}" wire:click="$toggle('onlyDeviating')">{{ __('Wijkt af') }} <b style="color:var(--amber)">{{ $deviatingCount }}</b></button>
+				@endif
 			</div>
-		@endforelse
+			@foreach ($projectRows as $row)
+				<a href="#" wire:click.prevent="showProject('{{ $row['name'] }}')" wire:key="rp-{{ $row['name'] }}" @if ($project === $row['name']) aria-current="page" @endif>
+					<span class="dot {{ $row['tone'] }}"></span>
+					<span class="grow ellipsis">{{ $row['name'] }}</span>
+					<span class="side-note {{ $row['noteTone'] }}">{{ $row['note'] }}</span>
+				</a>
+			@endforeach
+			@if ($hiddenProjects > 0)
+				<button class="item more" type="button" wire:click="$set('allProjects', true)">{{ __('Nog :count projecten', ['count' => $hiddenProjects]) }}</button>
+			@endif
+		</div>
+	</nav>
+
+	<div class="page">
+		@if ($libraryDone)
+			<div class="alert green" style="margin:16px 44px 0;max-width:1000px"><x-icon name="check" small/><span class="grow">{{ $libraryDone }}</span><button class="icon-btn" type="button" style="width:26px;height:26px" wire:click="$set('libraryDone', null)" aria-label="{{ __('Melding weg') }}"><x-icon name="x" small/></button></div>
+		@endif
+
+		@switch ($page['kind'])
+			@case ('project')
+				@include('partials.rules.project', $page)
+				@break
+			@case ('library')
+				@include('partials.rules.library', $page)
+				@break
+			@case ('rule')
+				@include('partials.rules.rule', $page)
+				@break
+			@case ('global')
+				@include('partials.rules.global', $page)
+				@break
+			@default
+				<main class="main" style="padding:34px 44px">
+					<div class="empty">
+						<b>{{ __('Kies links een project of bibliotheek') }}</b>
+						<span>{{ __('Een project laat zien wat een agent daar leest; een bibliotheek wat je projecten zouden moeten hebben.') }}</span>
+					</div>
+				</main>
+		@endswitch
 	</div>
 
-	@if ($confirming !== '')
-		@include('partials.confirm-update')
+	@if ($fileDrawer)
+		@include('partials.rules.file-drawer', $fileDrawer)
 	@endif
 
-	@if ($file && $copying)
-		@include('partials.copy-to-project', ['what' => $file->path, 'projects' => $projectsToCopyTo, 'warning' => $copyWarning])
+	@if ($itemDrawer)
+		@include('partials.library.item-drawer', $itemDrawer + ['kindLabel' => __('Bibliotheekregel')])
 	@endif
 
-	@if ($file)
-		<div class="scrim" wire:click="closeDrawer"></div>
-		@include('partials.rule-drawer', ['file' => $file, 'tab' => $drawerTab, 'body' => $body, 'elsewhere' => $elsewhere])
+	@if ($confirmingRollOut)
+		@include('partials.library.roll-out')
+	@endif
+
+	@if ($addingLibrary)
+		@include('partials.library.new', $newLibrary)
+	@endif
+
+	@if ($adding)
+		@include('partials.rules.add', $adding)
+	@endif
+
+	@if ($landings)
+		@include('partials.rules.landing', $landings)
+	@endif
+
+	@if ($newRule)
+		@include('partials.rules.new', $newRule)
 	@endif
 </div>

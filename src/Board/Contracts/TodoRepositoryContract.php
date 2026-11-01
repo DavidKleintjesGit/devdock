@@ -22,5 +22,10 @@ interface TodoRepositoryContract
 	 */
 	public function markDone(TodoId $todoId, bool $isDone): TodoEntity;
 
+	/**
+	 * Moves a to-do between the sprint and the backlog.
+	 */
+	public function planLater(TodoId $todoId, bool $isLater): TodoEntity;
+
 	public function delete(TodoId $todoId): void;
 }
