@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\WithContext;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Src\Project\Actions\GetProjectsAction;
+use Src\Project\Objects\ProjectEntity;
 use Src\Review\Actions\CheckWorkflowAction;
 use Src\Review\Actions\CreateLensAction;
 use Src\Review\Actions\CustomizeLensAction;
@@ -28,6 +30,8 @@ use Src\Setting\Contracts\SettingRepositoryContract;
 
 class Workflows extends Component
 {
+	use WithContext;
+
 	/**
 	 * The thresholds you can pick from.
 	 */
@@ -40,6 +44,12 @@ class Workflows extends Component
 
 	#[Url(except: '')]
 	public string $project = '';
+
+	/**
+	 * What the page shows of the project: its workflow, or the context its agents and lenses get.
+	 */
+	#[Url(except: 'workflow')]
+	public string $view = 'workflow';
 
 	public string $search = '';
 
@@ -88,6 +98,7 @@ class Workflows extends Component
 		$this->creatingLens = false;
 		$this->editingThreshold = false;
 		$this->saved = null;
+		$this->contextFile = null;
 	}
 
 	/**
@@ -477,6 +488,8 @@ class Workflows extends Component
 			'steps' => WorkflowStepEnum::cases(),
 			'lensDrawer' => $this->openLens === null ? null : $this->lensDrawer($lenses, $check),
 			'ruleFiles' => $check['ruleFiles'] ?? [],
+			'view' => $this->view,
+			...($this->view === 'context' ? $this->projectContextData($this->project ?: null, $this->project === '' ? null : GetProjectsAction::execute()->first(fn (ProjectEntity $projectEntity) => $projectEntity->name === $this->project)?->path) : []),
 			'newPathCount' => $this->project !== '' && trim($this->newPath) !== '' ? CountProjectFilesAction::execute($this->project, trim($this->newPath)) : null,
 		]);
 	}

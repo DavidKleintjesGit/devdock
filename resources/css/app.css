@@ -736,6 +736,11 @@ body.is-working .working{opacity:1}
 .context-reader-head .grow{display:flex;flex-direction:column;min-width:0}
 .context-reader-head .mono{font-size:12px;overflow-wrap:anywhere}
 .context-reader>.md{padding:14px 16px 18px;font-size:13px;overflow-wrap:anywhere}
+.context-page{gap:16px}
+.context-split{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+.context-split>.context-files{flex:0 1 300px;min-width:240px;padding:8px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.context-split>.context-reader{flex:1 1 520px;min-width:0}
+.page-tabs{flex-basis:100%;padding:0;margin:2px 0 -22px;border-bottom:0}
 
 /* ---------- smaller scherm ---------- */
 @media (max-width:1180px){

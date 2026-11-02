@@ -27,4 +27,17 @@ enum ContextChoiceEnum: string
 			self::SKILLS => 'Gelden voor de agent én elke lens. Claude krijgt alleen de omschrijving mee, en leest de rest pas als de skill gebruikt wordt.',
 		});
 	}
+
+	/**
+	 * The same line in Workflows, before any task has added its own.
+	 */
+	public function explanationOutsideTask(): string
+	{
+		return __(match ($this) {
+			self::AGENT => 'Wat alleen de agent krijgt. Per taak komen daar waar hij staat, het gesprek en de opdracht van de beurt bij.',
+			self::LENS => 'Wat deze lens krijgt. Per taak vult DevDock de bestanden en het vorige rapport in.',
+			self::RULES => 'Gelden voor de agent én elke lens. Een werkkopie leest ze uit zijn eigen map.',
+			self::SKILLS => 'Gelden voor de agent én elke lens. Claude krijgt alleen de omschrijving mee, en leest de rest pas als de skill gebruikt wordt.',
+		});
+	}
 }

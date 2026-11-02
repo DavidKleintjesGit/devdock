@@ -58,9 +58,18 @@
 						</div>
 					@endif
 				</div>
+				<nav class="tabs page-tabs" aria-label="{{ __('Weergave') }}">
+					<button type="button" @if ($view !== 'context') aria-current="page" @endif wire:click="$set('view', 'workflow')">{{ __('Workflow') }}</button>
+					<button type="button" @if ($view === 'context') aria-current="page" @endif wire:click="$set('view', 'context')">{{ __('Context') }}</button>
+				</nav>
 			</div>
 		</header>
 
+		@if ($view === 'context')
+			<main class="pbody">
+				@include('partials.workflow-context')
+			</main>
+		@else
 		<main class="pbody">
 			<div class="stack">
 				@if ($saved)
@@ -238,6 +247,7 @@
 				</section>
 			</div>
 		</main>
+		@endif
 	</div>
 
 	@if ($lensDrawer)
