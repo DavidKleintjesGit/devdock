@@ -6,6 +6,7 @@ namespace Src\Worktree\Actions;
 
 use Src\Packages\Cqrs\Command;
 use Src\Prompt\Contracts\PromptRunRepositoryContract;
+use Src\Review\Contracts\AgentContextRepositoryContract;
 use Src\Review\Contracts\ReviewRoundRepositoryContract;
 use Src\Session\Contracts\SessionFileRepositoryContract;
 use Src\Worktree\Enums\WorktreeOriginEnum;
@@ -30,6 +31,7 @@ class DescribeCleanUpAction extends Command
 		SessionFileRepositoryContract $sessionFileRepository,
 		ReviewRoundRepositoryContract $reviewRoundRepository,
 		PromptRunRepositoryContract $promptRunRepository,
+		AgentContextRepositoryContract $agentContextRepository,
 	): array {
 		$worktreeEntity = $this->worktreeEntity;
 		$sessions = $worktreeEntity->origin->isOurs() ? $sessionFileRepository->countFor($worktreeEntity->path) : 0;
@@ -50,6 +52,9 @@ class DescribeCleanUpAction extends Command
 			$sessions === 0 ? null : trans_choice(':count Claude-sessie van deze werkkopie|:count Claude-sessies van deze werkkopie', $sessions, ['count' => $sessions]),
 			$rounds === 0 ? null : trans_choice('De logboeken van :count lensronde|De logboeken van :count lensrondes', $rounds, ['count' => $rounds]),
 			$agentRounds === 0 ? null : trans_choice('De logboeken van :count agentronde|De logboeken van :count agentrondes', $agentRounds, ['count' => $agentRounds]),
+			$worktreeEntity->card !== null && $agentContextRepository->hasReports($worktreeEntity->path, $worktreeEntity->card)
+				? __('De rondverslagen in :folder', ['folder' => dirname($agentContextRepository->reportFolder($worktreeEntity->card, 1))])
+				: null,
 		]));
 	}
 }

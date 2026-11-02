@@ -1,3 +1,17 @@
+import './highlight.js';
+
+// De lade is een component van zichzelf; welke kaart erin open staat meldt
+// hij hier, zodat het bord die kaart kan markeren zonder zelf te hertekenen.
+document.addEventListener('alpine:init', () => {
+	// pending is the card that was clicked and is still on its way: its skeleton shows until the panel arrives
+	Alpine.store('board', { openCard: null, pending: null });
+
+	window.addEventListener('drawer-card', (event) => {
+		Alpine.store('board').openCard = event.detail.card ?? null;
+		Alpine.store('board').pending = null;
+	});
+});
+
 // Elk verzoek naar de server zet een balk bovenaan, zodat een klik nooit in
 // het niets verdwijnt. Livewire meldt begin en eind van elke ronde.
 document.addEventListener('livewire:init', () => {
@@ -286,8 +300,18 @@ window.addEventListener('message', (event) => {
 	}
 
 	for (const frame of document.querySelectorAll('.mockup-frame')) {
-		if (frame.contentWindow === event.source) {
-			frame.style.height = Math.min(Math.max(event.data.mockupHeight, 80), 2000) + 'px';
+		if (frame.contentWindow !== event.source) {
+			continue;
+		}
+
+		// a chat that stood at the bottom stays there while a frame grows above it
+		const scroller = frame.closest('.dbody');
+		const atBottom = scroller !== null && scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 120;
+
+		frame.style.height = Math.min(Math.max(event.data.mockupHeight, 80), 2000) + 'px';
+
+		if (atBottom) {
+			scroller.scrollTop = scroller.scrollHeight;
 		}
 	}
 });

@@ -72,13 +72,15 @@ class ReviewRoundRepository implements ReviewRoundRepositoryContract
 		return ReviewRoundEntityCollection::fromArray($reviewRoundEntities);
 	}
 
-	public function open(string $card, ?string $commitSha, ?string $directory, array $lenses, ?string $fingerprint = null): ReviewRoundEntity
+	public function open(string $card, ?string $commitSha, ?string $directory, array $lenses, ?string $fingerprint = null, bool $startsSeries = false): ReviewRoundEntity
 	{
-		$number = ((int) ReviewRoundEloquent::query()->where('card', $card)->max('number')) + 1;
+		$latest = ReviewRoundEloquent::query()->where('card', $card)->orderByDesc('number')->first();
+		$number = (int) $latest?->number + 1;
 
 		$reviewRoundEloquent = ReviewRoundEloquent::query()->create([
 			'card' => $card,
 			'number' => $number,
+			'series_start' => $startsSeries ? $number : (int) ($latest?->series_start ?? 1),
 			'commit_sha' => $commitSha,
 			'fingerprint' => $fingerprint,
 			'directory' => $directory,
@@ -256,6 +258,7 @@ class ReviewRoundRepository implements ReviewRoundRepositoryContract
 			reviewRoundId: new ReviewRoundId(id: $reviewRoundEloquent->id),
 			card: (string) $reviewRoundEloquent->card,
 			number: (int) $reviewRoundEloquent->number,
+			seriesStart: (int) ($reviewRoundEloquent->series_start ?? 1),
 			commitSha: $reviewRoundEloquent->commit_sha,
 			fingerprint: $reviewRoundEloquent->fingerprint,
 			directory: $reviewRoundEloquent->directory,

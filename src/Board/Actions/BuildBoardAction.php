@@ -290,8 +290,9 @@ class BuildBoardAction extends Command
 
 		$column = match (true) {
 			$todoEntity->isDone() => BoardColumnEnum::DONE,
-			$todoEntity->isLater => BoardColumnEnum::LATER,
+			// work tied to it outweighs "for later", as with a ticket in the backlog
 			$agent !== null || $taskEntity?->branch() !== null => BoardColumnEnum::BUILDING,
+			$todoEntity->isLater => BoardColumnEnum::LATER,
 			default => BoardColumnEnum::TO_DO,
 		};
 
@@ -430,13 +431,13 @@ class BuildBoardAction extends Command
 
 		if ($latestRound?->isRunning()) {
 			return [CardStatusEnum::BUSY, __('Ronde :number van :max · lenzen bezig', [
-				'number' => $latestRound->number,
+				'number' => $latestRound->positionInSeries(),
 				'max' => $maxRounds,
 			])];
 		}
 
 		if ($promptRunEntity?->isRunning()) {
-			return [CardStatusEnum::BUSY, __('De agent werkt de punten bij')];
+			return [CardStatusEnum::BUSY, __('De agent werkt de bevindingen bij')];
 		}
 
 		if ($staleDays !== null) {
@@ -449,20 +450,29 @@ class BuildBoardAction extends Command
 
 		$open = $latestRound->openFindings();
 
+		// a lens that fell over never looked, so its round is not clean
+		if ($open === 0 && $latestRound->fallenLenses() > 0) {
+			return [CardStatusEnum::YOURS, trans_choice(
+				':count lens viel om · jouw beurt|:count lenzen vielen om · jouw beurt',
+				$latestRound->fallenLenses(),
+				['count' => $latestRound->fallenLenses()],
+			)];
+		}
+
 		if ($latestRound->status === RoundStatusEnum::PASSED || $open === 0) {
 			return [CardStatusEnum::YOURS, __('Schoon · jouw beurt: committen en pushen')];
 		}
 
-		if ($latestRound->number >= $maxRounds) {
+		if ($latestRound->positionInSeries() >= $maxRounds) {
 			return [CardStatusEnum::YOURS, trans_choice(
-				':max rondes op, :count punt open|:max rondes op, :count punten open',
+				':max rondes op, :count bevinding open|:max rondes op, :count bevindingen open',
 				$open,
 				['max' => $maxRounds, 'count' => $open],
 			)];
 		}
 
 		return [CardStatusEnum::YOURS, trans_choice(
-			':count punt open · jouw beurt|:count punten open · jouw beurt',
+			':count bevinding open · jouw beurt|:count bevindingen open · jouw beurt',
 			$open,
 			['count' => $open],
 		)];

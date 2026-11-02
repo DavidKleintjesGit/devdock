@@ -404,11 +404,14 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return null;
 		}
 
-		$lines = preg_split('/\R/', (string) file_get_contents($whole)) ?: [];
+		$contents = (string) file_get_contents($whole);
+		$lines = $contents === '' ? [] : (preg_split('/\R/', rtrim($contents, "\r\n")) ?: []);
 
+		// the hunk header is what the diff reader goes by; without it the file looks empty
 		return implode("\n", [
 			'--- /dev/null',
 			'+++ b/' . $file,
+			'@@ -0,0 +1,' . count($lines) . ' @@',
 			...array_map(fn (string $line) => '+' . $line, $lines),
 		]);
 	}
@@ -552,9 +555,13 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return false;
 		}
 
-		$command = $status['upstream'] === null
-			? ['git', 'push', '-u', 'origin', 'HEAD:refs/heads/' . $target]
-			: ['git', 'push', 'origin', 'HEAD:refs/heads/' . $target];
+		$command = match (true) {
+			$status['upstream'] === null => ['git', 'push', '-u', 'origin', 'HEAD:refs/heads/' . $target],
+			// origin holds commits that are not here, such as the version from before a
+			// rebase: overwrite exactly the version seen here, and refuse when origin moved since
+			$status['only_on_upstream'] > 0 => ['git', 'push', '--force-with-lease=refs/heads/' . $target . ':' . $this->shaOf($path, $status['upstream']), 'origin', 'HEAD:refs/heads/' . $target],
+			default => ['git', 'push', 'origin', 'HEAD:refs/heads/' . $target],
+		};
 
 		$pushed = Process::path($path)
 			->timeout(self::TIMEOUT)
@@ -612,15 +619,16 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return [];
 		}
 
-		$result = Process::path($path)->run(['git', 'log', '--format=%h%x09%cI%x09%s', 'HEAD', '--not', '--remotes']);
+		// kept as long as the status, and thrown away with it after a commit or push
+		$output = Cache::remember($this->unpushedKey($path), (int) config('devdock.worktree.status_seconds'), function () use ($path): string {
+			$result = Process::path($path)->run(['git', 'log', '--format=%h%x09%cI%x09%s', 'HEAD', '--not', '--remotes']);
 
-		if (! $result->successful()) {
-			return [];
-		}
+			return $result->successful() ? trim($result->output()) : '';
+		});
 
 		$commits = [];
 
-		foreach (preg_split('/\R/', trim($result->output())) ?: [] as $line) {
+		foreach (preg_split('/\R/', $output) ?: [] as $line) {
 			$parts = explode("\t", $line, 3);
 
 			if (count($parts) === 3) {
@@ -667,6 +675,16 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		$result = Process::path($path)->run(['git', 'symbolic-ref', '--short', 'HEAD']);
 
 		return $result->successful() && trim($result->output()) !== '' ? trim($result->output()) : null;
+	}
+
+	/**
+	 * The full sha a ref points at here; empty when git does not know the ref.
+	 */
+	private function shaOf(string $path, string $ref): string
+	{
+		$result = Process::path($path)->run(['git', 'rev-parse', '--verify', $ref]);
+
+		return $result->successful() ? trim($result->output()) : '';
 	}
 
 	/**
@@ -907,6 +925,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			card: $worktreeEloquent->card,
 			changedFiles: $status['changed_files'],
 			ahead: $status['ahead'],
+			onlyOnUpstream: $status['only_on_upstream'],
 			behind: $status['behind'],
 			upstream: $status['upstream'],
 			mainBranch: $status['main_branch'],
@@ -918,7 +937,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	}
 
 	/**
-	 * @return array{changed_files: int, ahead: int, behind: int, has_commits: bool, upstream: ?string, main_branch: string, last_commit_at: ?string}
+	 * @return array{changed_files: int, ahead: int, only_on_upstream: int, behind: int, has_commits: bool, upstream: ?string, main_branch: string, last_commit_at: ?string}
 	 */
 	private function statusOf(string $path): array
 	{
@@ -952,7 +971,13 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		Cache::forget($this->changedFilesKey($path));
 		Cache::forget($this->changesKey($path));
 		Cache::forget($this->branchChangesKey($path));
+		Cache::forget($this->unpushedKey($path));
 		Cache::forget('worktree.fingerprint.' . md5($path));
+	}
+
+	private function unpushedKey(string $path): string
+	{
+		return 'worktree.unpushed.' . md5($path);
 	}
 
 	private function statusKey(string $path): string
@@ -976,13 +1001,14 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	}
 
 	/**
-	 * @return array{changed_files: int, ahead: int, behind: int, has_commits: bool, upstream: ?string, main_branch: string, last_commit_at: ?string}
+	 * @return array{changed_files: int, ahead: int, only_on_upstream: int, behind: int, has_commits: bool, upstream: ?string, main_branch: string, last_commit_at: ?string}
 	 */
 	private function emptyStatus(): array
 	{
 		return [
 			'changed_files' => 0,
 			'ahead' => 0,
+			'only_on_upstream' => 0,
 			'behind' => 0,
 			'has_commits' => false,
 			'upstream' => null,
@@ -992,7 +1018,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	}
 
 	/**
-	 * @return array{changed_files: int, ahead: int, behind: int, has_commits: bool, upstream: ?string, main_branch: string, last_commit_at: ?string}
+	 * @return array{changed_files: int, ahead: int, only_on_upstream: int, behind: int, has_commits: bool, upstream: ?string, main_branch: string, last_commit_at: ?string}
 	 */
 	private function readStatus(string $path): array
 	{
@@ -1031,15 +1057,20 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			foreach ($cold as $index => $path) {
 				$pool->as('status-' . $index)->path($path)->command($this->statusCommand());
 				$pool->as('sides-' . $index)->path($path)->command($this->sidesCommand($mains[$index]));
+				$pool->as('unpushed-' . $index)->path($path)->command(['git', 'log', '--format=%h%x09%cI%x09%s', 'HEAD', '--not', '--remotes']);
 			}
 		})->start()->wait();
 
 		foreach ($cold as $index => $path) {
+			$seconds = $keepSeconds ?? (int) config('devdock.worktree.status_seconds');
+			$unpushed = $results['unpushed-' . $index];
+
 			Cache::put(
 				$this->statusKey($path),
 				$this->parseStatus($path, $mains[$index], $results['status-' . $index], $results['sides-' . $index]),
-				$keepSeconds ?? (int) config('devdock.worktree.status_seconds'),
+				$seconds,
 			);
+			Cache::put($this->unpushedKey($path), $unpushed->successful() ? trim($unpushed->output()) : '', $seconds);
 		}
 	}
 
@@ -1063,7 +1094,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	}
 
 	/**
-	 * @return array{changed_files: int, ahead: int, behind: int, has_commits: bool, upstream: ?string, main_branch: string, last_commit_at: ?string}
+	 * @return array{changed_files: int, ahead: int, only_on_upstream: int, behind: int, has_commits: bool, upstream: ?string, main_branch: string, last_commit_at: ?string}
 	 */
 	private function parseStatus(string $path, string $main, ProcessResult $result, ProcessResult $sides): array
 	{
@@ -1074,6 +1105,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		$changedFiles = 0;
 		$upstream = null;
 		$aheadOfUpstream = 0;
+		$onlyOnUpstream = 0;
 
 		foreach (explode("\n", $result->output()) as $line) {
 			$line = trim($line);
@@ -1083,8 +1115,9 @@ class WorktreeRepository implements WorktreeRepositoryContract
 					$upstream = substr($line, 18);
 				}
 
-				if (str_starts_with($line, '# branch.ab ') && preg_match('/\+(\d+)/', $line, $counts) === 1) {
+				if (str_starts_with($line, '# branch.ab ') && preg_match('/\+(\d+) -(\d+)/', $line, $counts) === 1) {
 					$aheadOfUpstream = (int) $counts[1];
+					$onlyOnUpstream = (int) $counts[2];
 				}
 
 				continue;
@@ -1105,8 +1138,15 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			'changed_files' => $changedFiles,
 
 			// a branch cut without tracking has no upstream to count against; all
-			// it has beyond the main line is then not pushed
-			'ahead' => $upstream === null ? $aheadOfMain : $aheadOfUpstream,
+			// it has beyond the main line is then not pushed. After a rebase the
+			// upstream still stands on the old main line, and everything that came
+			// in there since counts as ahead of it, so only the own commits count
+			'ahead' => match (true) {
+				$upstream === null => $aheadOfMain,
+				$onlyOnUpstream > 0 && $sides->successful() => min($aheadOfUpstream, $aheadOfMain),
+				default => $aheadOfUpstream,
+			},
+			'only_on_upstream' => $upstream === null ? 0 : $onlyOnUpstream,
 			'behind' => $sides->successful() ? $behind : 0,
 			'has_commits' => $sides->successful() && $aheadOfMain > 0,
 			'upstream' => $upstream,

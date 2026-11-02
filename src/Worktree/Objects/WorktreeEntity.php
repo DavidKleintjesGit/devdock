@@ -26,6 +26,8 @@ class WorktreeEntity extends ValueObject
 		public readonly ?string $card,
 		public readonly int $changedFiles,
 		public readonly int $ahead,
+		// commits on the upstream that are not here, such as the version from before a rebase
+		public readonly int $onlyOnUpstream,
 		public readonly int $behind,
 		public readonly ?string $upstream,
 		public readonly string $mainBranch,

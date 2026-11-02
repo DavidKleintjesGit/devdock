@@ -34,11 +34,12 @@ interface ReviewRoundRepositoryContract
 
 	/**
 	 * Opens the next round of a task and puts every lens on it: the ones that
-	 * were called wait their turn, the rest are skipped straight away.
+	 * were called wait their turn, the rest are skipped straight away. The
+	 * round stays in the series of the one before, unless it starts a new one.
 	 *
 	 * @param  array<int, array{lens_id: LensId, verdict: VerdictEnum, touched_files: int}>  $lenses
 	 */
-	public function open(string $card, ?string $commitSha, ?string $directory, array $lenses, ?string $fingerprint = null): ReviewRoundEntity;
+	public function open(string $card, ?string $commitSha, ?string $directory, array $lenses, ?string $fingerprint = null, bool $startsSeries = false): ReviewRoundEntity;
 
 	public function markResultRunning(ReviewRoundId $reviewRoundId, LensId $lensId, ?string $sessionUuid): void;
 

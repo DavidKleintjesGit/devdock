@@ -13,14 +13,12 @@
 	</div>
 
 	<div class="diffsplit" style="border-top:1px solid var(--line)">
-		<nav class="difffiles" aria-label="{{ __('Bestanden') }}">
-			@foreach ($diffFiles as $file)
-				<button type="button" aria-current="{{ $openDiffFile === $file ? 'true' : 'false' }}" wire:click="openDiff('{{ $file }}')" wire:key="dfile-{{ $loop->index }}" title="{{ $file }}"><span class="ellipsis">{{ basename($file) }}</span></button>
-			@endforeach
+		<nav class="difffiles tree" aria-label="{{ __('Bestanden') }}">
+			@include('partials.diff-tree', ['nodes' => $diffTree, 'depth' => 0])
 		</nav>
 		<div class="resize-bar" data-resize="--diff-files" data-edge="end" data-min="140" data-max="520" aria-hidden="true" title="{{ __('Sleep om breder of smaller te maken') }}"></div>
 		<div class="diffpatch">
-			<x-diff :hunks="$diffHunks" :empty="__('Git heeft over dit bestand niets te melden tegenover de hoofdlijn.')"/>
+			<x-diff :hunks="$diffHunks" :file="$openDiffFile" :empty="__('Git heeft over dit bestand niets te melden tegenover de hoofdlijn.')"/>
 		</div>
 	</div>
 

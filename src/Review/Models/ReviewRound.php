@@ -12,6 +12,7 @@ class ReviewRound extends Model
 	protected $fillable = [
 		'card',
 		'number',
+		'series_start',
 		'commit_sha',
 		'fingerprint',
 		'directory',

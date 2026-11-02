@@ -72,9 +72,13 @@ class ReadTranscriptAction extends Command
 				}
 
 				if (($block['type'] ?? null) === 'tool_use' && filled($block['name'] ?? null)) {
+					[$added, $removed] = $this->linesOf((array) ($block['input'] ?? []));
+
 					$steps[] = new StepObject(
 						tool: (string) $block['name'],
 						subject: $this->subjectOf((array) ($block['input'] ?? [])),
+						added: $added,
+						removed: $removed,
 					);
 				}
 			}
@@ -104,6 +108,31 @@ class ReadTranscriptAction extends Command
 		$firstLine = strtok(is_string($subject) ? $subject : '', "\n");
 
 		return mb_strimwidth($firstLine === false ? '' : $firstLine, 0, self::SUBJECT_LENGTH, '…');
+	}
+
+	/**
+	 * How many lines a change put in and took out, read from what the tool was
+	 * given: the old and new text of an edit, or the whole of a written file.
+	 *
+	 * @return array{0: int, 1: int}
+	 */
+	private function linesOf(array $input): array
+	{
+		$edits = isset($input['edits']) && is_array($input['edits']) ? $input['edits'] : [$input];
+		$added = 0;
+		$removed = 0;
+
+		foreach ($edits as $edit) {
+			$added += $this->countLines($edit['new_string'] ?? $edit['content'] ?? null);
+			$removed += $this->countLines($edit['old_string'] ?? null);
+		}
+
+		return [$added, $removed];
+	}
+
+	private function countLines(mixed $text): int
+	{
+		return is_string($text) && $text !== '' ? substr_count(rtrim($text, "\n"), "\n") + 1 : 0;
 	}
 
 	private function relative(string $file): string

@@ -1,4 +1,4 @@
-<aside class="drawer" role="dialog" aria-labelledby="drawer-title" x-data="{ tall: $persist(false).as('devdock.chat-tall') }" :class="{ 'chat-tall': tall }">
+<aside class="drawer" role="dialog" aria-labelledby="drawer-title" x-data="{ tall: $persist(false).as('devdock.chat-tall'), pendingTab: null }" :class="{ 'chat-tall': tall, switching: pendingTab }" @drawer-card.window="pendingTab = null">
 	<div class="dbar">
 		@if ($previous)
 			<button class="back kind" type="button" wire:click="back"><x-icon name="back" small/>{{ $previous }}</button>
@@ -62,7 +62,7 @@
 
 		<nav class="tabs" role="tablist" aria-label="{{ __('Panelen') }}">
 			@foreach (['Overzicht', 'Agent', 'Werkkopie', 'Review', 'Koppelingen'] as $name)
-				<button type="button" role="tab" aria-selected="{{ $tab === $name ? 'true' : 'false' }}" wire:click="setDrawerTab('{{ $name }}')">{{ __($name) }}</button>
+				<button type="button" role="tab" aria-selected="{{ $tab === $name ? 'true' : 'false' }}" :aria-selected="(pendingTab ?? @js($tab)) === @js($name)" @click="if (@js($tab) !== @js($name)) pendingTab = @js($name)" wire:click="setDrawerTab('{{ $name }}')">{{ __($name) }}</button>
 			@endforeach
 			@if ($tab === 'Agent')
 				<button class="icon-btn chat-grow" type="button" @click="tall = true" aria-label="{{ __('Chat vergroten') }}" title="{{ __('Chat vergroten') }}"><x-icon name="tall"/></button>
@@ -75,6 +75,8 @@
 				<button class="icon-btn" type="button" wire:click="clearFailure" aria-label="{{ __('Melding weg') }}" style="width:26px;height:26px"><x-icon name="x" small/></button>
 			</div>
 		@endif
+
+		@include('partials.skeletons.tab')
 
 		@switch ($tab)
 			@case ('Agent')

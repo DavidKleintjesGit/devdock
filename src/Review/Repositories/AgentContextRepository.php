@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Review\Repositories;
 
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Src\Review\Contracts\AgentContextRepositoryContract;
 use Src\Review\Enums\WorkflowStepEnum;
@@ -11,10 +12,16 @@ use Src\Review\Enums\WorkflowStepEnum;
 class AgentContextRepository implements AgentContextRepositoryContract
 {
 	/**
-	 * Claude Code reads every markdown file under .claude/rules by itself, so
-	 * the context arrives without anything being pasted into a prompt.
+	 * The task context of the agent, handed to each of its turns. It stands
+	 * outside .claude/rules: Claude Code loads everything in there for every
+	 * session in the folder, and a lens is not meant to read the agent's task.
 	 */
-	private const RELATIVE_PATH = '.claude/rules/devdock-agent.md';
+	private const RELATIVE_PATH = '.devdock/agent.md';
+
+	/**
+	 * Where the task context would reach the lenses too; a copy there is taken away.
+	 */
+	private const RULES_COPY = '.claude/rules/devdock-agent.md';
 
 	/**
 	 * What one lens is asked to judge. These stand outside .claude/rules on
@@ -24,10 +31,11 @@ class AgentContextRepository implements AgentContextRepositoryContract
 	private const LENS_PATH = '.devdock/lens/%s.md';
 
 	/**
-	 * What one lens made of it, written whether it approved or not. Together
-	 * they are the record of a round: who looked, at what, and what came of it.
+	 * What one lens made of it, written whether it approved or not, in a folder
+	 * of the task and the round. Together they are the record of a round: who
+	 * looked, at what, and what came of it.
 	 */
-	private const REPORT_PATH = '.devdock/rapport/%s.md';
+	private const REPORT_PATH = '.devdock/rapport/%s/ronde-%d/%s.md';
 
 	private const ROUND_FOLDER = '.devdock';
 
@@ -70,11 +78,22 @@ class AgentContextRepository implements AgentContextRepositoryContract
 		$file = $worktreePath . '/' . self::RELATIVE_PATH;
 		$directory = dirname($file);
 
-		if (! is_dir($directory) && ! mkdir($directory, 0775, true) && ! is_dir($directory)) {
+		if (! is_dir($directory) && ! @mkdir($directory, 0775, true) && ! is_dir($directory)) {
 			return false;
 		}
 
+		if (is_file($worktreePath . '/' . self::RULES_COPY)) {
+			@unlink($worktreePath . '/' . self::RULES_COPY);
+		}
+
 		return file_put_contents($file, $contents) !== false;
+	}
+
+	public function getAgentContext(string $worktreePath): ?string
+	{
+		$file = $worktreePath . '/' . self::RELATIVE_PATH;
+
+		return is_file($file) ? (string) file_get_contents($file) : null;
 	}
 
 	public function writeLensContext(string $worktreePath, string $lens, string $contents): bool
@@ -82,18 +101,28 @@ class AgentContextRepository implements AgentContextRepositoryContract
 		return $this->lay($worktreePath, $this->lensPath($lens), $contents);
 	}
 
-	public function writeReport(string $worktreePath, string $lens, string $contents): bool
+	public function writeReport(string $worktreePath, string $card, int $round, string $lens, string $contents): bool
 	{
-		return $this->lay($worktreePath, $this->reportPath($lens), $contents);
+		return $this->lay($worktreePath, $this->reportPath($card, $round, $lens), $contents);
 	}
 
 	public function clearRound(string $worktreePath): void
 	{
-		foreach ([self::LENS_PATH, self::REPORT_PATH] as $pattern) {
-			foreach (glob($worktreePath . '/' . sprintf($pattern, '*')) ?: [] as $file) {
-				@unlink($file);
-			}
+		foreach (glob($worktreePath . '/' . sprintf(self::LENS_PATH, '*')) ?: [] as $file) {
+			@unlink($file);
 		}
+	}
+
+	public function removeReports(string $worktreePath, string $card): bool
+	{
+		$folder = $worktreePath . '/' . dirname($this->reportFolder($card, 1));
+
+		return ! is_dir($folder) || File::deleteDirectory($folder);
+	}
+
+	public function hasReports(string $worktreePath, string $card): bool
+	{
+		return is_dir($worktreePath . '/' . dirname($this->reportFolder($card, 1)));
 	}
 
 	public function lensPath(string $lens): string
@@ -101,14 +130,17 @@ class AgentContextRepository implements AgentContextRepositoryContract
 		return sprintf(self::LENS_PATH, $this->readable($lens));
 	}
 
-	public function reportPath(string $lens): string
+	public function reportPath(string $card, int $round, string $lens): string
 	{
-		return sprintf(self::REPORT_PATH, $this->readable($lens));
+		// the ticket number as it is written, so the folder reads ABC-123 and a to-do todo-4
+		$folder = trim((string) preg_replace('/[^A-Za-z0-9-]+/', '-', $card), '-');
+
+		return sprintf(self::REPORT_PATH, $folder, $round, $this->readable($lens));
 	}
 
-	public function reportFolder(): string
+	public function reportFolder(string $card, int $round): string
 	{
-		return dirname(sprintf(self::REPORT_PATH, 'x'));
+		return dirname($this->reportPath($card, $round, 'x'));
 	}
 
 	/**
@@ -123,7 +155,7 @@ class AgentContextRepository implements AgentContextRepositoryContract
 		$file = $worktreePath . '/' . $relativePath;
 		$directory = dirname($file);
 
-		if (! is_dir($directory) && ! mkdir($directory, 0775, true) && ! is_dir($directory)) {
+		if (! is_dir($directory) && ! @mkdir($directory, 0775, true) && ! is_dir($directory)) {
 			return false;
 		}
 
@@ -168,7 +200,7 @@ class AgentContextRepository implements AgentContextRepositoryContract
 		}
 
 		if (! is_dir(dirname($exclude))) {
-			mkdir(dirname($exclude), 0775, true);
+			@mkdir(dirname($exclude), 0775, true);
 		}
 
 		file_put_contents(
@@ -196,7 +228,7 @@ class AgentContextRepository implements AgentContextRepositoryContract
 		$directory = storage_path('app/context');
 
 		if (! is_dir($directory)) {
-			mkdir($directory, 0775, true);
+			@mkdir($directory, 0775, true);
 		}
 
 		return $directory . '/' . $key . '.md';

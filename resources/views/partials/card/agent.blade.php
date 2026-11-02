@@ -1,4 +1,4 @@
-<div class="dbody" @if ($run?->isRunning()) wire:poll.1500ms="followProgress" @endif>
+<div class="dbody" x-data x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight); setTimeout(() => $el.scrollTop = $el.scrollHeight, 400)" @if ($run?->isRunning()) wire:poll.1500ms="followProgress" @endif>
 	@if (! $claudeAvailable)
 		<div class="dsec">
 			<div class="empty">

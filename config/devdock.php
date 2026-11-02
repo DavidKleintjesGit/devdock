@@ -182,6 +182,32 @@ return [
 	'claude_binary' => env('DEVDOCK_CLAUDE_BINARY'),
 	'claude_token' => env('DEVDOCK_CLAUDE_TOKEN'),
 
+	// agents and lenses may look things up in Jira, Confluence and Bitbucket, but
+	// write nothing there: every one of these tools is denied on every server listed
+	'read_only' => [
+		'servers' => [
+			'claude_ai_Atlassian_MCP',
+			'claude_ai_Atlassian_Rovo',
+			'atlassian-rovo-apitoken',
+			'claude_ai_Claude_Docs',
+		],
+		'writing_tools' => [
+			'addGraphContext',
+			'addOrEditJiraIssueComment',
+			'createConfluenceContent',
+			'createJiraIssue',
+			'editJiraIssue',
+			'transitionJiraIssue',
+			'updateConfluenceContent',
+			'executeWrite',
+			'executeDestructive',
+			'batch',
+			'create',
+			'update',
+			'delete',
+		],
+	],
+
 	// hoe lang één prompt mag duren voordat het bord hem afbreekt
 	'prompt_timeout' => (int) env('DEVDOCK_PROMPT_TIMEOUT', 900),
 

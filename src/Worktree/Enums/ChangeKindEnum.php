@@ -37,6 +37,18 @@ enum ChangeKindEnum: string
 		});
 	}
 
+	/**
+	 * The icon in front of a file in a tree of changes, as Bitbucket shows it.
+	 */
+	public function icon(): string
+	{
+		return match ($this) {
+			self::ADDED, self::UNTRACKED => 'plus',
+			self::DELETED => 'minus',
+			default => 'pencil',
+		};
+	}
+
 	public function tone(): string
 	{
 		return match ($this) {

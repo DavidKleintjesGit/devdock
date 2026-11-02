@@ -51,6 +51,17 @@ interface PromptRunRepositoryContract
 	 */
 	public function logPath(PromptRunId $promptRunId): string;
 
+	/**
+	 * Lays down what a round is given beside its prompt, next to its log, and
+	 * returns where. It stays there as the record of what that round was told.
+	 */
+	public function writeInstructions(PromptRunId $promptRunId, string $instructions): string;
+
+	/**
+	 * What a round was given beside its prompt; null when it was not kept.
+	 */
+	public function getInstructions(PromptRunId $promptRunId): ?string;
+
 	public function countLogsForCard(string $card): int;
 
 	/**

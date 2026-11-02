@@ -18,6 +18,7 @@ use Src\Worktree\Actions\CommitChangesAction;
 use Src\Worktree\Actions\CreateWorktreeDatabaseAction;
 use Src\Worktree\Actions\DescribeCleanUpAction;
 use Src\Worktree\Actions\PushBranchAction;
+use Src\Worktree\Actions\RemoveWorktreeAction;
 use Src\Worktree\Actions\SetUpstreamAction;
 use Src\Worktree\Actions\UpdateWorktreeAction;
 use Src\Worktree\Actions\UseWorktreeDatabaseAction;
@@ -25,6 +26,7 @@ use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
 use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Enums\DatabaseFillEnum;
+use Src\Worktree\Enums\WorktreeOriginEnum;
 use Src\Worktree\Objects\ChangeObject;
 use Src\Worktree\Objects\DatabaseObject;
 use Src\Worktree\Objects\WorktreeEntity;
@@ -140,7 +142,11 @@ trait WithWorkingCopy
 		$pushed = PushBranchAction::execute($worktreeEntity->path);
 
 		$this->committed = $pushed ? __('Gepusht naar origin.') : null;
-		$this->failure = $pushed ? null : __('Pushen lukte niet. Een taakbranch pusht nooit naar de hoofdlijn.');
+		$this->failure = match (true) {
+			$pushed => null,
+			$worktreeEntity->onlyOnUpstream > 0 => __('Overschrijven lukte niet: origin veranderde sinds DevDock er voor het laatst keek. Haal eerst op en kijk wat er bij kwam.'),
+			default => __('Pushen lukte niet. Een taakbranch pusht nooit naar de hoofdlijn.'),
+		};
 	}
 
 	public function startDatabase(): void
@@ -228,6 +234,63 @@ trait WithWorkingCopy
 	}
 
 	/**
+	 * Takes a folder where the branch of this task already stands checked out
+	 * as its working copy: the project itself, or a copy made outside DevDock.
+	 * Cleaning up leaves such a folder where it is.
+	 */
+	public function adoptExternal(): void
+	{
+		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
+		$place = $cardObject === null ? null : $this->externalPlace($cardObject);
+
+		if ($place === null) {
+			$this->failure = __('De branch staat niet meer uitgecheckt; ververs even.');
+
+			return;
+		}
+
+		resolve(WorktreeRepositoryContract::class)->adopt(
+			(string) $cardObject->project,
+			(string) $cardObject->branch,
+			$place['path'],
+			$place['isProject'] ? WorktreeOriginEnum::PROJECT : WorktreeOriginEnum::ADOPTED,
+			$cardObject->id,
+		);
+
+		$this->committed = __('Gekoppeld aan DevDock.');
+	}
+
+	/**
+	 * Puts the project back on the main line and gives the branch a working
+	 * copy of its own, so the agent no longer works next to you in the project.
+	 * Refused while the project has uncommitted work.
+	 */
+	public function moveToOwnWorkingCopy(): void
+	{
+		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
+		$projectPath = $cardObject === null ? null : $this->projectPathFor($cardObject);
+
+		if ($projectPath === null) {
+			return;
+		}
+
+		$this->failure = resolve(WorktreeRepositoryContract::class)->switchToMain($projectPath);
+
+		if ($this->failure !== null) {
+			return;
+		}
+
+		$linked = $this->worktreeFor($cardObject);
+
+		// the link to the project itself goes; the folder stays as it is
+		if ($linked !== null && $linked->origin === WorktreeOriginEnum::PROJECT) {
+			RemoveWorktreeAction::execute($linked->worktreeId);
+		}
+
+		$this->createWorktree();
+	}
+
+	/**
 	 * Everything the Werkkopie tab shows about the copy of this card.
 	 *
 	 * @param  Collection<int, ChangeObject>  $changes
@@ -236,7 +299,7 @@ trait WithWorkingCopy
 	protected function workingCopyData(CardObject $cardObject, ?WorktreeEntity $worktreeEntity, Collection $changes): array
 	{
 		if ($worktreeEntity === null) {
-			return ['worktree' => null];
+			return ['worktree' => null, 'externalPlace' => $this->externalPlace($cardObject)];
 		}
 
 		$worktreeRepository = resolve(WorktreeRepositoryContract::class);
@@ -288,6 +351,35 @@ trait WithWorkingCopy
 			->filter(fn (StandingObject $standingObject) => $standingObject->standing === StandingEnum::BEHIND)
 			->values()
 			->all();
+	}
+
+	/**
+	 * The folder where the branch of this card stands checked out without
+	 * DevDock knowing it, with whether that folder is the project itself.
+	 *
+	 * @return array{path: string, isProject: bool}|null
+	 */
+	private function externalPlace(CardObject $cardObject): ?array
+	{
+		$projectPath = $this->projectPathFor($cardObject);
+
+		if ($projectPath === null || $cardObject->branch === null) {
+			return null;
+		}
+
+		$path = resolve(WorktreeRepositoryContract::class)->getPlaces($projectPath)[$cardObject->branch] ?? null;
+
+		return $path === null ? null : [
+			'path' => $path,
+			'isProject' => strcasecmp(rtrim(str_replace('\\', '/', $path), '/'), rtrim(str_replace('\\', '/', $projectPath), '/')) === 0,
+		];
+	}
+
+	private function projectPathFor(CardObject $cardObject): ?string
+	{
+		return GetProjectsAction::execute()
+			->first(fn (ProjectEntity $projectEntity) => $projectEntity->name === $cardObject->project)
+			?->path;
 	}
 
 	private function describeDatabase(WorktreeEntity $worktreeEntity): ?DatabaseObject

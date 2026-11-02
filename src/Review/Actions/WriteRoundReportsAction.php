@@ -35,7 +35,7 @@ class WriteRoundReportsAction extends Command
 		$written = 0;
 
 		foreach ($this->reviewRoundEntity->results as $resultEntity) {
-			if ($agentContextRepository->writeReport($directory, $resultEntity->lensName, $this->report($resultEntity))) {
+			if ($agentContextRepository->writeReport($directory, $this->reviewRoundEntity->card, $this->reviewRoundEntity->number, $resultEntity->lensName, $this->report($resultEntity))) {
 				$written++;
 			}
 		}

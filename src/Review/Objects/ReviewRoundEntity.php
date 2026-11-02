@@ -22,6 +22,7 @@ class ReviewRoundEntity extends ValueObject
 		public readonly ReviewRoundId $reviewRoundId,
 		public readonly string $card,
 		public readonly int $number,
+		public readonly int $seriesStart,
 		public readonly ?string $commitSha,
 		public readonly ?string $fingerprint,
 		public readonly ?string $directory,
@@ -31,6 +32,39 @@ class ReviewRoundEntity extends ValueObject
 		public readonly ?CarbonImmutable $finishedAt,
 	) {
 		parent::__construct();
+	}
+
+	/**
+	 * How many lenses fell over instead of judging. What they would have found
+	 * is not in the count of findings.
+	 */
+	public function fallenLenses(): int
+	{
+		return count(array_filter(
+			$this->results,
+			fn (ReviewResultEntity $resultEntity) => $resultEntity->verdict === VerdictEnum::ERROR,
+		));
+	}
+
+	/**
+	 * The findings in a few words, with the lenses that fell over named apart.
+	 * Empty when there is nothing to say.
+	 */
+	public function findingsSummary(): string
+	{
+		return collect([
+			$this->openFindings() === 0 ? null : trans_choice(':count bevinding|:count bevindingen', $this->openFindings(), ['count' => $this->openFindings()]),
+			$this->fallenLenses() === 0 ? null : trans_choice(':count lens viel om|:count lenzen vielen om', $this->fallenLenses(), ['count' => $this->fallenLenses()]),
+		])->filter()->implode(' · ');
+	}
+
+	/**
+	 * Which round of its loop this is. Restarting the loop begins a new series,
+	 * so the maximum counts from there and not from the first round ever.
+	 */
+	public function positionInSeries(): int
+	{
+		return $this->number - $this->seriesStart + 1;
 	}
 
 	/**

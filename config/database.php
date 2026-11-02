@@ -45,7 +45,10 @@ return [
 			'busy_timeout' => 10000,
 			'journal_mode' => 'WAL',
 			'synchronous' => 'NORMAL',
-			'transaction_mode' => 'DEFERRED',
+			// a transaction that starts reading and then writes cannot wait in SQLite:
+			// it fails at once with "database is locked". Claiming the write at the
+			// start lets the busy timeout do its work, which is what the queue needs
+			'transaction_mode' => 'IMMEDIATE',
 		],
 
 		'mysql' => [

@@ -20,7 +20,7 @@ class StartFetchAction extends Command
 	/**
 	 * A round still running after this has hung.
 	 */
-	private const HANGS_AFTER_MINUTES = 10;
+	public const HANGS_AFTER_MINUTES = 10;
 
 	public function __construct(
 		// automatisch ophalen slaat een bron over die nog rust; op de knop gaat alles mee
@@ -36,6 +36,11 @@ class StartFetchAction extends Command
 
 		if ($running !== null && $running->startedWithin(self::HANGS_AFTER_MINUTES)) {
 			return $running;
+		}
+
+		// a process that died halfway never closes its round; it is closed here so it stops counting as running
+		if ($running !== null) {
+			$fetchRunRepository->markFinished($running->fetchRunId, [], __('Deze ronde liep vast en is opgevolgd door een nieuwe.'));
 		}
 
 		$fetchRunEntity = $fetchRunRepository->create();

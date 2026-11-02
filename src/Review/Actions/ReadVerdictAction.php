@@ -47,22 +47,22 @@ class ReadVerdictAction extends Command
 			return new VerdictObject(VerdictEnum::FAIL, 1, __('Onleesbaar oordeel:') . "\n\n" . $block);
 		}
 
-		return new VerdictObject($verdict, $this->findings($lines), $block);
+		$findings = $this->findings($lines);
+
+		// an earlier finding that is still open keeps the lens from passing
+		return new VerdictObject($findings > 0 ? VerdictEnum::FAIL : $verdict, $findings, $block);
 	}
 
 	/**
+	 * The findings still standing: every new, numbered one and every earlier one
+	 * marked OPEN. An earlier one marked RESOLVED does not count.
+	 *
 	 * @param  array<int, string>  $lines
 	 */
 	private function findings(array $lines): int
 	{
-		$findings = 0;
-
-		foreach ($lines as $line) {
-			if (preg_match('/^\s*\d+\./', $line) === 1) {
-				$findings++;
-			}
-		}
-
-		return $findings;
+		return collect($lines)
+			->filter(fn (string $line) => preg_match('/^\s*(\d+\.|-\s*OPEN\b)/', $line) === 1)
+			->count();
 	}
 }

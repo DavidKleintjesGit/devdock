@@ -1,4 +1,4 @@
-<div class="dbody" @if ($latestRound?->isRunning()) wire:poll.3s="followProgress" @endif>
+<div class="dbody" @if ($latestRound?->isRunning() || $loopStatus === \Src\Review\Enums\LoopStatusEnum::AGENT) wire:poll.3s="followProgress" @endif>
 	@if ($isExpired)
 		<div class="banner amber" style="padding:16px 24px">
 			<div class="grow" style="display:flex;flex-direction:column;gap:2px;min-width:200px">
@@ -8,53 +8,117 @@
 		</div>
 	@endif
 
-	@forelse ($rounds as $round)
-		<section class="dsec" style="padding-left:0;padding-right:0;gap:0" wire:key="round-{{ $round->reviewRoundId->id }}">
-			<div class="headrow" style="padding:0 24px 10px">
-				<h3 class="eyebrow" style="flex:none">{{ __('Ronde :number', ['number' => $round->number]) }}</h3>
-				<span class="hint grow">{{ $round->startedAt?->calendar() }}@if ($round->finishedAt) · {{ $round->startedAt?->diffForHumans($round->finishedAt, true) }}@endif{{ $round->openFindings() ? ' · ' . trans_choice(':count bevinding|:count bevindingen', $round->openFindings(), ['count' => $round->openFindings()]) : '' }}</span>
-				<span class="label {{ $round->status->tone() }}">{{ $round->status->label() }}</span>
+	<div class="review-loop">
+		<div class="loop-status">
+			<span class="sdot {{ $loopStatus->tone() }}"></span>
+			<b>{{ $loopStatus->label($latestRound?->positionInSeries() ?? 0, $maxRounds, $latestRound?->findingsSummary() ?? '') }}</b>
+			<span class="hint">{{ __('automatisch · hoogstens :max rondes', ['max' => $maxRounds]) }}</span>
+		</div>
+
+		@if ($loopStatus->needsYou())
+			<div class="reportbar amber">
+				<p class="question">{{ $loopStatus === \Src\Review\Enums\LoopStatusEnum::AGENT_ASKS ? __('De agent stelde een vraag of liet bevindingen open. Geef antwoord bij de agent en start de loop daarna opnieuw.') : __('Kijk de rondes na, geef de agent aanwijzingen en start de loop opnieuw.') }}</p>
+				<div class="reportbar-actions">
+					<button class="btn sm" type="button" wire:click="setDrawerTab('Agent')">{{ __('Naar de agent') }}</button>
+					<x-busy-button action="restartLoop" class="btn sm primary" :busy="__('Lenzen oproepen...')">{{ trans_choice('Loop opnieuw starten · :count ronde|Loop opnieuw starten · :count rondes', $maxRounds, ['count' => $maxRounds]) }}</x-busy-button>
+				</div>
 			</div>
-			@foreach ($round->results as $result)
-				@if ($result->report && $result->verdict->hasFinding())
-					<button class="row" type="button" style="min-height:44px;padding:0 24px;border-top:1px solid var(--line)" wire:click="openFinding({{ $round->reviewRoundId->id }}, {{ $result->lensId->id }})" wire:key="result-{{ $round->reviewRoundId->id }}-{{ $result->lensId->id }}">
-						<span class="ldot {{ $result->verdict->dotTone() }}"></span>
-						<b style="width:100px">{{ $result->lensName }}</b>
-						<span class="grow hint" style="font-size:13px">{{ $result->summary() }}</span>
-						@if ($result->verdict->canBeRetried())<span class="btn xs" wire:click.stop="retryLens({{ $result->lensId->id }})">{{ __('Opnieuw') }}</span>@endif
-						<x-icon name="chev" small/>
-					</button>
-				@else
-					<div class="row" style="min-height:44px;padding:0 24px;border-top:1px solid var(--line)" wire:key="result-{{ $round->reviewRoundId->id }}-{{ $result->lensId->id }}">
-						<span class="ldot {{ $result->verdict->dotTone() }}"></span>
-						<b style="width:100px">{{ $result->lensName }}</b>
-						<span class="grow hint" style="font-size:13px">{{ $result->progressLabel() ?? $result->summary() }}</span>
-						@if ($result->startedAt && $result->finishedAt)<span class="hint" style="font-size:12px">{{ $result->startedAt->diffForHumans($result->finishedAt, true, true) }}</span>@endif
-					</div>
+		@endif
+
+		@forelse ($roundRows as $roundRow)
+			<details class="round" wire:ignore.self wire:key="round-{{ $roundRow['round']->reviewRoundId->id }}" @if ($loop->first) open @endif>
+				<summary class="round-head">
+					<x-icon name="chev" small/>
+					<b>{{ __('Ronde :number', ['number' => $roundRow['round']->number]) }}</b>
+					@if ($roundRow['round']->number === $roundRow['round']->seriesStart && $roundRow['round']->seriesStart > 1)<span class="label blue">{{ __('nieuwe loop') }}</span>@endif
+					<span class="label {{ $roundRow['round']->status->tone() }}">{{ $roundRow['round']->findingsSummary() ?: $roundRow['round']->status->label() }}</span>
+					@if ($roundRow['round']->commitSha)<span class="mono hint">{{ substr($roundRow['round']->commitSha, 0, 7) }}</span>@endif
+					<span class="hint push-end">{{ $roundRow['round']->startedAt?->calendar() }}</span>
+				</summary>
+
+				<section class="round-part">
+					<h4 class="eyebrow">{{ __('Wat de lenzen vonden') }}</h4>
+					@foreach ($roundRow['round']->results as $result)
+						@if ($result->report && $result->verdict->hasFinding())
+							<button class="row" type="button" wire:click="openFinding({{ $roundRow['round']->reviewRoundId->id }}, {{ $result->lensId->id }})" wire:key="result-{{ $roundRow['round']->reviewRoundId->id }}-{{ $result->lensId->id }}">
+								<span class="ldot {{ $result->verdict->dotTone() }}"></span>
+								<b class="lens-name">{{ $result->lensName }}</b>
+								<span class="grow hint">{{ $result->summary() }}</span>
+								@if ($result->verdict->canBeRetried())<span class="btn xs" wire:click.stop="retryLens({{ $result->lensId->id }})">{{ __('Opnieuw') }}</span>@endif
+								<x-icon name="chev" small/>
+							</button>
+						@else
+							<div class="row" wire:key="result-{{ $roundRow['round']->reviewRoundId->id }}-{{ $result->lensId->id }}">
+								<span class="ldot {{ $result->verdict->dotTone() }}"></span>
+								<b class="lens-name">{{ $result->lensName }}</b>
+								<span class="grow hint">{{ $result->progressLabel() ?? $result->summary() }}</span>
+								@if ($result->startedAt && $result->finishedAt)<span class="hint">{{ $result->startedAt->diffForHumans($result->finishedAt, true, true) }}</span>@endif
+							</div>
+						@endif
+					@endforeach
+				</section>
+
+				@if ($roundRow['turn'])
+					<section class="round-part">
+						<h4 class="eyebrow">{{ __('Wat de agent ermee deed') }}</h4>
+						<span class="hint">
+							{{ $card->agent?->name ?? __('agent') }} ·
+							@if ($roundRow['turn']->run->isRunning())
+								{{ __('bezig sinds :time', ['time' => $roundRow['turn']->run->startedAt?->format('H:i')]) }}
+							@else
+								{{ __(':count s', ['count' => $roundRow['turn']->run->seconds()]) }}{{ $roundRow['turn']->run->costLabel() ? ' · ' . $roundRow['turn']->run->costLabel() : '' }}
+							@endif
+						</span>
+						@if ($roundRow['turn']->report)
+							<p class="turn-summary">{{ $roundRow['turn']->report->summary }}</p>
+							<ul class="turn-points">
+								@foreach ($roundRow['turn']->report->done as $donePoint)
+									<li><x-icon name="check" small/>{{ $donePoint }}</li>
+								@endforeach
+								@foreach ($roundRow['turn']->report->open as $openPoint)
+									<li class="open"><x-icon name="alert" small/>{{ __('Open') }}: {{ $openPoint }}</li>
+								@endforeach
+							</ul>
+						@elseif ($roundRow['turn']->run->hasFailed())
+							<p class="turn-summary" style="color:var(--red)">{{ $roundRow['turn']->run->message }}</p>
+						@endif
+						<button class="btn xs" type="button" style="align-self:flex-start" wire:click="setDrawerTab('Agent')">{{ __('Hele gesprek') }}</button>
+					</section>
+
+					@if ($roundRow['turn']->changes !== [])
+						<section class="round-part">
+							<h4 class="eyebrow">
+								{{ trans_choice('Wat er veranderde · :count bestand|Wat er veranderde · :count bestanden', count($roundRow['turn']->changes), ['count' => count($roundRow['turn']->changes)]) }}
+								· +{{ $roundRow['turn']->addedLines() }} −{{ $roundRow['turn']->removedLines() }}
+							</h4>
+							@foreach ($roundRow['turn']->changes as $change)
+								<button class="filerow" type="button" wire:click="openDiff('{{ $change->path }}')" wire:key="round-change-{{ $roundRow['round']->reviewRoundId->id }}-{{ $loop->index }}">
+									<span class="name"><b>{{ $change->name() }}</b><small>{{ $change->folder() }}@if ($change->isNew()) · {{ __('nieuw') }}@endif</small></span>
+									<span class="delta">@if ($change->added)<span class="plus">+{{ $change->added }}</span>@endif @if ($change->removed)<span class="minus">−{{ $change->removed }}</span>@endif</span>
+									<x-icon name="chev" small/>
+								</button>
+							@endforeach
+						</section>
+					@endif
 				@endif
-			@endforeach
-			@if (isset($agentTurns[$round->reviewRoundId->id]))
-				<div class="hint" style="padding:10px 24px 0;border-top:1px solid var(--line)">{{ __('Aan de agent gegeven; hij werkte de punten bij voor de volgende ronde.') }}</div>
-			@endif
-		</section>
-	@empty
-		<section class="dsec">
+			</details>
+		@empty
 			<div class="empty">
 				<b>{{ __('Nog geen ronde gedraaid') }}</b>
 				<span>{{ $canDeliver ? __('Er staat werk klaar. De lenzen kijken alleen naar wat deze branch veranderde.') : __('Zodra er werk in de werkkopie staat, kunnen de lenzen erover.') }}</span>
 			</div>
-		</section>
-	@endforelse
+		@endforelse
+	</div>
 </div>
 
 <div class="dfoot">
 	<span class="hint" style="display:flex;flex-direction:column">
-		<span>{{ $latestRound ? __('Ronde :number van hoogstens :max, daarna :after', ['number' => $latestRound->number, 'max' => $maxRounds, 'after' => mb_strtolower($afterRounds->label())]) : __('Hoogstens :max rondes, daarna :after', ['max' => $maxRounds, 'after' => mb_strtolower($afterRounds->label())]) }}</span>
+		<span>{{ $latestRound ? __('Ronde :number van hoogstens :max, daarna :after', ['number' => $latestRound->positionInSeries(), 'max' => $maxRounds, 'after' => mb_strtolower($afterRounds->label())]) : __('Hoogstens :max rondes, daarna :after', ['max' => $maxRounds, 'after' => mb_strtolower($afterRounds->label())]) }}</span>
 		<a href="{{ route('workflows', ['project' => $card->project]) }}" style="text-decoration:none">{{ __('Lenzen en drempel staan in de workflow') }}</a>
 	</span>
 	@if ($latestRound?->isRunning())
 		<x-busy-button action="stopRound" class="btn" :busy="__('Afbreken...')">{{ __('Ronde afbreken') }}</x-busy-button>
-	@else
-		<x-busy-button action="startRound" class="btn primary" :busy="__('Lenzen oproepen...')" :disabled="! $canDeliver || $rounds->count() >= $maxRounds">{{ $latestRound ? __('Opnieuw beoordelen') : __('Naar de lenzen') }}</x-busy-button>
+	@elseif (! $loopStatus->needsYou())
+		<x-busy-button action="startRound" class="btn primary" :busy="__('Lenzen oproepen...')" :disabled="! $canDeliver">{{ $latestRound ? __('Opnieuw beoordelen') : __('Naar de lenzen') }}</x-busy-button>
 	@endif
 </div>

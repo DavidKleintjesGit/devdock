@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Src\Worktree\Actions;
 
 use Src\Packages\Cqrs\Command;
+use Src\Review\Contracts\AgentContextRepositoryContract;
 use Src\Session\Contracts\SessionFileRepositoryContract;
 use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
 use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
@@ -49,6 +50,11 @@ class RemoveWorktreeAction extends Command
 		// the database read its name from the copy, so it goes first
 		if ($worktreeEntity->ownDatabase !== null) {
 			resolve(WorktreeDatabaseRepositoryContract::class)->drop($worktreeEntity->path, $worktreeEntity->ownDatabase);
+		}
+
+		// a folder DevDock did not make stays, but the round reports of this task were ours
+		if ($worktreeEntity->card !== null) {
+			resolve(AgentContextRepositoryContract::class)->removeReports($worktreeEntity->path, $worktreeEntity->card);
 		}
 
 		if (! $worktreeRepository->remove($this->worktreeId)) {

@@ -22,6 +22,7 @@ class PromptRunRepository implements PromptRunRepositoryContract
 	{
 		$promptRunEloquent = PromptRunEloquent::query()->create([
 			'card' => $promptRunObject->card,
+			'review_round_id' => $promptRunObject->reviewRoundId,
 			'project' => $promptRunObject->project,
 			'branch' => $promptRunObject->branch,
 			'directory' => $promptRunObject->directory,
@@ -134,6 +135,23 @@ class PromptRunRepository implements PromptRunRepositoryContract
 		return storage_path('app/prompts/' . $promptRunId->id . '.jsonl');
 	}
 
+	public function writeInstructions(PromptRunId $promptRunId, string $instructions): string
+	{
+		$instructionsPath = $this->instructionsPath($promptRunId);
+
+		File::ensureDirectoryExists(dirname($instructionsPath));
+		File::put($instructionsPath, $instructions);
+
+		return $instructionsPath;
+	}
+
+	public function getInstructions(PromptRunId $promptRunId): ?string
+	{
+		$instructionsPath = $this->instructionsPath($promptRunId);
+
+		return is_file($instructionsPath) ? (string) file_get_contents($instructionsPath) : null;
+	}
+
 	public function countLogsForCard(string $card): int
 	{
 		return $this->logPathsFor($card)->count();
@@ -144,8 +162,25 @@ class PromptRunRepository implements PromptRunRepositoryContract
 		$logPaths = $this->logPathsFor($card);
 
 		File::delete($logPaths->all());
+		File::delete($this->runIdsFor($card)->map(fn (PromptRunId $promptRunId) => $this->instructionsPath($promptRunId))->all());
 
 		return $logPaths->count();
+	}
+
+	private function instructionsPath(PromptRunId $promptRunId): string
+	{
+		return storage_path('app/prompts/' . $promptRunId->id . '.instructions.md');
+	}
+
+	/**
+	 * @return Collection<int, PromptRunId>
+	 */
+	private function runIdsFor(string $card): Collection
+	{
+		return PromptRunEloquent::query()
+			->where('card', $card)
+			->pluck('id')
+			->map(fn (mixed $id) => new PromptRunId(id: (int) $id));
 	}
 
 	/**

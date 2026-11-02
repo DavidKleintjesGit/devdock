@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Src\Prompt\Objects;
 
+use Illuminate\Support\Collection;
 use Src\Packages\ValueObject\ValueObject;
+use Src\Worktree\Objects\ChangeObject;
 
 /**
  * What a round did along the way, read from its event log: every step it
@@ -46,6 +48,27 @@ class TranscriptObject extends ValueObject
 			$this->changeCount() === 0 ? null : trans_choice(':count aangepast|:count aangepast', $this->changeCount(), ['count' => $this->changeCount()]),
 			$this->commandCount() === 0 ? null : trans_choice(':count commando|:count commando\'s', $this->commandCount(), ['count' => $this->commandCount()]),
 		])->filter()->implode(', ');
+	}
+
+	/**
+	 * The files this round changed, each once, with the lines it put in and
+	 * took out. A file whose first step was a write is new.
+	 *
+	 * @return array<int, ChangeObject>
+	 */
+	public function changedFiles(): array
+	{
+		return collect($this->steps)
+			->filter(fn (StepObject $stepObject) => $stepObject->changesFiles())
+			->groupBy(fn (StepObject $stepObject) => $stepObject->subject)
+			->map(fn (Collection $steps, string $path) => ChangeObject::from([
+				'path' => $path,
+				'status' => $steps->first()->tool === 'Write' ? 'A' : 'M',
+				'added' => $steps->sum('added'),
+				'removed' => $steps->sum('removed'),
+			]))
+			->values()
+			->all();
 	}
 
 	public function readCount(): int

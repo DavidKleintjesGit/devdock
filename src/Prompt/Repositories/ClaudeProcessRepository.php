@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Src\Prompt\Repositories;
 
 use Closure;
+use Dotenv\Dotenv;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
@@ -37,13 +38,17 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 * Opens Claude Code in a terminal window of its own. The window stays open
 	 * after Claude stops, so an error is still readable.
 	 */
-	public function openInTerminal(string $directory, ?string $sessionUuid, array $alsoReads = []): void
+	public function openInTerminal(string $directory, ?string $sessionUuid, array $alsoReads = [], ?string $instructionsFile = null): void
 	{
 		$claude = escapeshellarg($this->claudeBinary());
 		$resume = $sessionUuid === null ? '' : ' --resume ' . escapeshellarg($sessionUuid);
 
 		foreach ($this->alsoReads($alsoReads) as $argument) {
 			$claude .= ' ' . escapeshellarg($argument);
+		}
+
+		if ($instructionsFile !== null && is_file($instructionsFile)) {
+			$claude .= ' --append-system-prompt-file ' . escapeshellarg($instructionsFile);
 		}
 
 		// start opens the window and /d puts it in the right folder, so the
@@ -88,20 +93,22 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 * session id next to the answer, so a fresh session can be tied to the
 	 * board and renamed afterwards.
 	 */
-	public function run(PromptRunEntity $promptRunEntity, array $alsoReads, string $logPath, string $instructions): PromptResultObject
+	public function run(PromptRunEntity $promptRunEntity, array $alsoReads, string $logPath, string $instructionsPath): PromptResultObject
 	{
 		$directory = $promptRunEntity->directory ?? base_path();
 
+		// the prompt goes in through stdin: on Windows the command line passes cmd.exe,
+		// which cuts it off past 8191 characters, and a long prompt then arrives empty
 		$arguments = [
 			...$this->alsoReads($alsoReads),
+			...$this->readOnly(),
 			'-p',
-			$promptRunEntity->prompt,
 			'--output-format',
 			'stream-json',
 			'--verbose',
 			'--include-partial-messages',
-			'--append-system-prompt',
-			$instructions,
+			'--append-system-prompt-file',
+			$instructionsPath,
 		];
 
 		if (filled($promptRunEntity->sessionUuid)) {
@@ -119,6 +126,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 
 		$result = Process::path($directory)
 			->env($this->environment())
+			->input($promptRunEntity->prompt)
 			->timeout((int) config('devdock.prompt_timeout'))
 			->run(
 				[$this->claudeBinary(), ...$arguments],
@@ -194,20 +202,23 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 		$answer = null;
 		$rest = '';
 
-		if ($logPath !== null) {
-			File::ensureDirectoryExists(dirname($logPath));
+		// the lenses of a round start together and share this folder; whoever is second finds it made
+		if ($logPath !== null && ! is_dir(dirname($logPath))) {
+			@mkdir(dirname($logPath), 0755, true);
 		}
 
 		Process::path(is_dir($directory) ? $directory : base_path())
 			->env($this->environment())
+			// through stdin for the same reason as in run()
+			->input($question)
 			->timeout((int) config('devdock.review.lens_timeout'))
 			->idleTimeout((int) config('devdock.review.lens_idle'))
 			->run(
 				[
 					$this->claudeBinary(),
 					...$this->alsoReads($alsoReads),
+					...$this->readOnly(),
 					'-p',
-					$question,
 					'--output-format',
 					'stream-json',
 					'--verbose',
@@ -249,7 +260,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 
 	public function ask(string $directory, ?string $sessionUuid, string $question): ?string
 	{
-		$arguments = ['-p', $question, '--output-format', 'json'];
+		$arguments = ['-p', '--output-format', 'json'];
 
 		if (filled($sessionUuid)) {
 			$arguments = ['--resume', $sessionUuid, ...$arguments];
@@ -257,6 +268,8 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 
 		$result = Process::path(is_dir($directory) ? $directory : base_path())
 			->env($this->environment())
+			// through stdin for the same reason as in run()
+			->input($question)
 			->timeout(self::ASK_TIMEOUT)
 			->run([$this->claudeBinary(), ...$arguments]);
 
@@ -268,12 +281,21 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	}
 
 	/**
-	 * The long-lived token, handed to the process rather than set on the
-	 * machine. Without one, Claude Code falls back on the session you are
-	 * signed in with, which expires.
+	 * Denies every tool that writes to Jira, Confluence, Bitbucket or Claude
+	 * Docs, on every server in devdock.read_only; reading stays open.
 	 *
-	 * @return array<string, string>
+	 * @return array<int, string>
 	 */
+	private function readOnly(): array
+	{
+		$deniedTools = collect((array) config('devdock.read_only.servers'))
+			->crossJoin((array) config('devdock.read_only.writing_tools'))
+			->map(fn (array $pair) => 'mcp__' . $pair[0] . '__' . $pair[1])
+			->implode(',');
+
+		return $deniedTools === '' ? [] : ['--disallowedTools', $deniedTools];
+	}
+
 	/**
 	 * The folders outside the working copy this session may open. Nothing is
 	 * added by itself, so a session stays where it was put.
@@ -295,11 +317,20 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 		return $arguments;
 	}
 
+	/**
+	 * What Claude starts with: DevDock's own .env settings taken out, and the
+	 * long-lived token put in. Without a token, Claude Code falls back on the
+	 * session you are signed in with, which expires.
+	 */
 	private function environment(): array
 	{
 		$token = (string) config('devdock.claude_token');
 
-		return $token === '' ? [] : ['CLAUDE_CODE_OAUTH_TOKEN' => $token];
+		// Laravel writes DevDock's .env into the process environment, and a project
+		// run from here would read DB_CONNECTION and APP_ENV as its own; false unsets them
+		$ownSettings = array_fill_keys(array_keys(Dotenv::parse((string) @file_get_contents(base_path('.env')))), false);
+
+		return $token === '' ? $ownSettings : [...$ownSettings, 'CLAUDE_CODE_OAUTH_TOKEN' => $token];
 	}
 
 	/**

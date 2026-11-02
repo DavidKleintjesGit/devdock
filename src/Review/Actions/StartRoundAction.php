@@ -25,13 +25,17 @@ use Src\Worktree\Contracts\WorktreeRepositoryContract;
  *
  * A round runs at every delivery, not at every prompt.
  *
- * @method static ?ReviewRoundEntity execute(string $card, ?string $directory)
+ * A loop holds at most the rounds the workflow allows. Restarting it starts a
+ * new series, after you looked at what went wrong.
+ *
+ * @method static ?ReviewRoundEntity execute(string $card, ?string $directory, bool $startsSeries = false)
  */
 class StartRoundAction extends Command
 {
 	public function __construct(
 		public readonly string $card,
 		public readonly ?string $directory,
+		public readonly bool $startsSeries = false,
 	) {}
 
 	public function handle(
@@ -54,7 +58,9 @@ class StartRoundAction extends Command
 			return $standing;
 		}
 
-		if ($rounds->count() >= GetWorkflowSettingAction::execute($cardObject->project)->maxRounds) {
+		$latest = collect($rounds)->last();
+
+		if (! $this->startsSeries && $latest !== null && $latest->positionInSeries() >= GetWorkflowSettingAction::execute($cardObject->project)->maxRounds) {
 			return null;
 		}
 
@@ -91,6 +97,7 @@ class StartRoundAction extends Command
 			$this->directory,
 			$lenses,
 			$worktreeRepository->getFingerprint($this->directory),
+			$this->startsSeries,
 		);
 
 		$jobs = [];

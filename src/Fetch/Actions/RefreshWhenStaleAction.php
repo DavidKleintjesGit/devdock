@@ -27,7 +27,8 @@ class RefreshWhenStaleAction extends Command
 
 		$latest = $fetchRunRepository->getLatest();
 
-		if ($latest?->isRunning() === true) {
+		// a round that runs past the hang limit is dead, and must not hold up every round after it
+		if ($latest?->isRunning() === true && $latest->startedWithin(StartFetchAction::HANGS_AFTER_MINUTES)) {
 			return null;
 		}
 

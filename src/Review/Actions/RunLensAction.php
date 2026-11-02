@@ -49,6 +49,11 @@ class RunLensAction extends Command implements ShouldQueue
 
 	private int $toolCalls = 0;
 
+	/**
+	 * The last message of the lens that held a verdict block.
+	 */
+	private ?string $verdictMessage = null;
+
 	public function __construct(
 		public readonly ReviewRoundId $reviewRoundId,
 		public readonly LensId $lensId,
@@ -93,15 +98,21 @@ class RunLensAction extends Command implements ShouldQueue
 			GetReadableDirectoriesAction::execute($reviewRoundEntity->card),
 		);
 
-		$verdictObject = ReadVerdictAction::execute($answer);
+		// the answer is only the last message; a lens that was woken again after
+		// its verdict, by a background task finishing, ends on a line without it
+		$verdictObject = ReadVerdictAction::execute(
+			str_contains((string) $answer, '```verdict') ? $answer : ($this->verdictMessage ?? $answer),
+		);
 
-		return $reviewRoundRepository->writeResult(
+		$reviewRoundEntity = $reviewRoundRepository->writeResult(
 			$this->reviewRoundId,
 			$this->lensId,
 			$verdictObject->verdict,
 			$verdictObject->findings,
 			$verdictObject->report,
 		);
+
+		return CloseRoundAction::execute($this->reviewRoundId) ?? $reviewRoundEntity;
 	}
 
 	/**
@@ -128,6 +139,8 @@ class RunLensAction extends Command implements ShouldQueue
 			0,
 			$throwable->getMessage(),
 		);
+
+		CloseRoundAction::execute($this->reviewRoundId);
 	}
 
 	/**
@@ -149,6 +162,7 @@ class RunLensAction extends Command implements ShouldQueue
 		}
 
 		if (($event['type'] ?? null) === 'assistant') {
+			$this->rememberVerdict($event);
 			$this->toolCalls += count($this->toolNames($event));
 			$activity ??= $this->toolNames($event)[0] ?? null;
 		}
@@ -165,6 +179,15 @@ class RunLensAction extends Command implements ShouldQueue
 			$cost,
 			$sessionUuid,
 		);
+	}
+
+	private function rememberVerdict(array $event): void
+	{
+		foreach ($event['message']['content'] ?? [] as $block) {
+			if (($block['type'] ?? null) === 'text' && str_contains((string) ($block['text'] ?? ''), '```verdict')) {
+				$this->verdictMessage = (string) $block['text'];
+			}
+		}
 	}
 
 	/**

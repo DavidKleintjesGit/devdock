@@ -8,9 +8,8 @@ use Src\Packages\Cqrs\Command;
 use Src\Review\Contracts\AgentContextRepositoryContract;
 
 /**
- * Lays the way of working down in the working copy itself. Claude Code reads
- * every markdown file under .claude/rules on its own, so the agent gets this
- * without a line of it ending up in a prompt.
+ * Lays the way of working down in the working copy itself, where every turn
+ * of the agent picks it up next to its prompt.
  *
  * It is written again at every round, so it always says where the task stands.
  *

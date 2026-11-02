@@ -59,9 +59,11 @@ class ComposeLensContextAction extends Command
 		}
 
 		return implode("\n", [
-			__('Je vorige ronde liet dit open. Loop het per punt na en zeg of het is opgelost:'),
+			__('Dit vond je in de vorige ronde, en de agent heeft er sindsdien aan gewerkt:'),
 			'',
 			$this->previousReport,
+			'',
+			__('Kijk eerst of deze bevindingen zijn opgelost, en zoek pas daarna naar nieuwe. Neem alleen mee wat toen OPEN of nieuw was; wat al RESOLVED stond laat je weg.'),
 			'',
 		]);
 	}
@@ -86,6 +88,7 @@ class ComposeLensContextAction extends Command
 
 		return implode("\n", [
 			...$lines,
+			__('- Wil je weten waarom code er zo uitziet, kijk dan in het Jira-ticket, in eerdere pull requests in Bitbucket (zoek de operatie met discover, roep hem aan met executeRead) of in git log en git blame. Je oordeel gaat over deze wijziging.'),
 			__('- Verander geen bestand, commit niet en push niet. Je levert alleen een oordeel.'),
 			__('- Noem alleen wat echt fout is. Smaak is geen bevinding.'),
 			'',
@@ -103,6 +106,38 @@ class ComposeLensContextAction extends Command
 			'1. <bestand>:<regel>',
 			'   <wat er mis is, in een of twee zinnen>',
 			'```',
+			...$this->earlierFindingsFormat(),
 		]);
+	}
+
+	/**
+	 * How a lens with a previous round writes down what became of its earlier
+	 * findings. RESOLVED and OPEN are read by ReadVerdictAction and stay as
+	 * written here.
+	 *
+	 * @return array<int, string>
+	 */
+	private function earlierFindingsFormat(): array
+	{
+		if (blank($this->previousReport)) {
+			return [];
+		}
+
+		return [
+			'',
+			__('Omdat je een vorige ronde hebt, begint je blok met wat er van je eerdere bevindingen werd, één regel per bevinding. Daaronder volgen de nieuwe, genummerd. PASS alleen als niets meer OPEN staat en je niets nieuws vond:'),
+			'',
+			'```verdict',
+			'FAIL',
+			'',
+			__('Eerder gevonden:'),
+			__('- RESOLVED <bestand>:<regel> <wat er was, in een paar woorden>'),
+			__('- OPEN <bestand>:<regel> <wat er nog mis is>'),
+			'',
+			__('Nieuw:'),
+			'1. <bestand>:<regel>',
+			'   <wat er mis is, in een of twee zinnen>',
+			'```',
+		];
 	}
 }

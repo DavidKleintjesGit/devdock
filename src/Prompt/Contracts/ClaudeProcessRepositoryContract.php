@@ -24,9 +24,10 @@ interface ClaudeProcessRepositoryContract
 
 	/**
 	 * Opens Claude Code in a terminal of its own, in that folder and on that
-	 * session, so you can carry on by hand where the board left off.
+	 * session, so you can carry on by hand where the board left off. An
+	 * instructions file goes along as the task context of that session.
 	 */
-	public function openInTerminal(string $directory, ?string $sessionUuid, array $alsoReads = []): void;
+	public function openInTerminal(string $directory, ?string $sessionUuid, array $alsoReads = [], ?string $instructionsFile = null): void;
 
 	/**
 	 * Breaks off the round that is working on this row. The process tree goes
@@ -36,12 +37,12 @@ interface ClaudeProcessRepositoryContract
 
 	/**
 	 * Carries out the prompt and waits for the answer, writing every event to
-	 * the log on the way. The instructions go along as an addition to the
-	 * system prompt, so they hold for every round and not only a built one.
+	 * the log on the way. The instructions file goes along as an addition to
+	 * the system prompt, so it holds for every round and not only a built one.
 	 *
 	 * @param  array<int, string>  $alsoReads
 	 */
-	public function run(PromptRunEntity $promptRunEntity, array $alsoReads, string $logPath, string $instructions): PromptResultObject;
+	public function run(PromptRunEntity $promptRunEntity, array $alsoReads, string $logPath, string $instructionsPath): PromptResultObject;
 
 	/**
 	 * Asks one short question and waits for the answer. Meant for something

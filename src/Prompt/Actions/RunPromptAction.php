@@ -7,9 +7,11 @@ namespace Src\Prompt\Actions;
 use Src\Packages\Cqrs\Command;
 use Src\Prompt\Contracts\ClaudeProcessRepositoryContract;
 use Src\Prompt\Contracts\PromptRunRepositoryContract;
+use Src\Prompt\Enums\ReportStatusEnum;
 use Src\Prompt\Objects\PromptRunEntity;
 use Src\Prompt\Objects\PromptRunId;
 use Src\Review\Actions\StartRoundAction;
+use Src\Review\Contracts\AgentContextRepositoryContract;
 use Src\Session\Actions\RenameSessionAction;
 use Src\Session\Actions\ScanSessionsAction;
 use Src\Session\Objects\SessionEntity;
@@ -46,7 +48,10 @@ class RunPromptAction extends Command
 				$promptRunEntity,
 				GetReadableDirectoriesAction::execute($promptRunEntity->card),
 				$promptRunRepository->logPath($this->promptRunId),
-				DescribeChatAction::execute(),
+				$promptRunRepository->writeInstructions($this->promptRunId, implode("\n\n", array_filter([
+					DescribeChatAction::execute(),
+					$promptRunEntity->directory === null ? null : resolve(AgentContextRepositoryContract::class)->getAgentContext($promptRunEntity->directory),
+				]))),
 			);
 		} catch (Throwable $failure) {
 			return $promptRunRepository->markFailed($this->promptRunId, $failure->getMessage());
@@ -60,9 +65,9 @@ class RunPromptAction extends Command
 			resolve(WorktreeRepositoryContract::class)->forgetStatus($promptRunEntity->directory);
 		}
 
-		// deze beurt hoorde bij een ronde: de punten zijn bijgewerkt, dus de
-		// lenzen mogen er opnieuw over
-		if ($promptRunEntity->reviewRoundId !== null) {
+		// a turn on a round sends the lenses back over the work, but only when the
+		// agent reports it done; a question or open points wait for you
+		if ($promptRunEntity->reviewRoundId !== null && ReadReportAction::execute($promptRunEntity->output)?->status === ReportStatusEnum::DONE) {
 			StartRoundAction::execute($promptRunEntity->card, $promptRunEntity->directory);
 		}
 

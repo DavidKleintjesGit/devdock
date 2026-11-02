@@ -15,11 +15,13 @@ use Src\Packages\Cqrs\Command;
 use Src\Project\Actions\ScanProjectsAction;
 use Src\PullRequest\Actions\FetchPullRequestsAction;
 use Src\PullRequest\Contracts\PullRequestSourceRepositoryContract;
+use Src\Review\Actions\ResumeReviewLoopsAction;
 use Src\Rule\Actions\ScanRulesAction;
 use Src\Session\Actions\ScanSessionsAction;
 use Src\Skill\Actions\ScanSkillsAction;
 use Src\Ticket\Actions\FetchTicketsAction;
 use Src\Ticket\Contracts\TicketSourceRepositoryContract;
+use Src\Worktree\Actions\ForgetMovedLinksAction;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Throwable;
 
@@ -83,6 +85,20 @@ class RunFetchAction extends Command
 			resolve(WorktreeRepositoryContract::class)->refreshStatuses($this->statusKeepSeconds());
 		} catch (Throwable $failure) {
 			$failures[] = 'worktrees: ' . $this->shortened($failure);
+		}
+
+		// a linked folder that was put on another branch outside DevDock lets go of its task
+		try {
+			ForgetMovedLinksAction::execute();
+		} catch (Throwable $failure) {
+			$failures[] = 'links: ' . $this->shortened($failure);
+		}
+
+		// a review loop that lost its way is picked up here, at most a round later
+		try {
+			ResumeReviewLoopsAction::execute();
+		} catch (Throwable $failure) {
+			$failures[] = 'review: ' . $this->shortened($failure);
 		}
 
 		return $fetchRunRepository->markFinished(

@@ -49,6 +49,7 @@ class ComposeAgentContextAction extends Command
 			'# DevDock — the task you work in',
 			$blocks['standing'] ?? '',
 			$this->whereYouAre($cardObject),
+			$this->whereToLookThingsUp($cardObject),
 			$this->theRoute($step),
 			$this->whereTheReportsAre($agentContextRepository),
 			"## What is asked of you now\n\n" . ($blocks[$step->value] ?? ''),
@@ -68,6 +69,24 @@ class ComposeAgentContextAction extends Command
 	}
 
 	/**
+	 * What the agent may read outside the code. The tools that write there are
+	 * denied to it in ClaudeProcessRepository; this tells it what is open.
+	 */
+	private function whereToLookThingsUp(CardObject $cardObject): string
+	{
+		return implode("\n", [
+			'## Where to look things up',
+			'',
+			'You may look up context outside the code, to read only:',
+			'- the Jira ticket' . ($cardObject->ticketKey === null ? '' : ' ' . $cardObject->ticketKey) . ' and the tickets linked to it, with getJiraIssue and searchJiraIssuesUsingJql;',
+			'- earlier pull requests in Bitbucket, their comments and their commits: find the operation with discover, then call it with executeRead;',
+			'- why a line is the way it is, with git log and git blame in this working copy.',
+			'',
+			'Writing to Jira, Confluence or Bitbucket is closed to you. When something should go there, put it to David.',
+		]);
+	}
+
+	/**
 	 * Where the lenses leave what they made of a round. They are not loaded
 	 * for you: you open the one you need, which is why they are named after
 	 * the lens that wrote it.
@@ -78,9 +97,9 @@ class ComposeAgentContextAction extends Command
 			'## What the lenses left',
 			'',
 			'Every lens that judged this task writes a report of its own in '
-. $agentContextRepository->reportFolder() . ', one file per lens,',
-			'named after it: approved, with points, or not looked at. They are rewritten at every round,',
-			'so what is there is about the round that just ran and nothing older.',
+. dirname($agentContextRepository->reportFolder($this->card, 1)) . ', a folder per round',
+			'(' . basename($agentContextRepository->reportFolder($this->card, 1)) . ' and so on) with one file per lens, named after it:',
+			'approved, with findings, or not looked at. The highest round is the one that just ran.',
 		]);
 	}
 

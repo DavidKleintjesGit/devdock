@@ -75,6 +75,7 @@ Kleuren, schaduwen en lettertypes staan als custom properties op `:root`, met ee
 | Menu's | `menu` `menu-pop` `picker-*` `popt` | menu achter ⋯ en de projectkiezer |
 | Bord | `board-scroll` `cols` `col` `col-head` `kcard` `prio` | kolommen en kaarten van 116 px hoog |
 | Lade | `drawer` `dhead` `tabs` `dbody` `dsec` `dfoot` `scrim` | detail van een kaart, sessie, lens of bevinding |
+| Laden | `skeleton` `bone` (`line` `block` `bubble` `dot`) `bone-row` `tab-skeleton` `steps-skeleton` | grijze vormen zolang een kaart of tab onderweg is |
 | Agent | `chat` `chat-banner` `chat-turn` (`you` `agent`) `answer` `agent-steps` `step-list` `caret` `reportbar` (`green` `amber` `red`) `mockup` `composer` | gesprek met de agent: hele antwoorden, ingeklapte stappen, getekende mockups en antwoordknoppen |
 | Sessie | `talk` `say` `turns` `turn` | een gelezen Claude-sessie |
 | Werkkopie | `filerow` `commitrow` `dbar` `progress` | gewijzigde bestanden, commit, database |

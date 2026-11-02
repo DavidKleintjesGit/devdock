@@ -39,12 +39,25 @@ class GetBranchChoicesAction extends Command
 	 */
 	public function handle(WorktreeRepositoryContract $worktreeRepository): array
 	{
-		// elke keuze in de lijst tekent het paneel opnieuw; git hoeft dat niet elke keer opnieuw te vertellen
-		return Cache::remember(
+		// elke keuze in de lijst tekent het paneel opnieuw; git hoeft dat niet elke keer opnieuw te vertellen.
+		// Only the data goes into the cache: it unserializes no classes, so an object comes back incomplete
+		$rows = Cache::remember(
 			'worktree.branch-choices.' . md5($this->project . '|' . $this->ticketKey),
 			self::REMEMBER_SECONDS,
-			fn () => $this->choices($worktreeRepository),
+			fn () => array_map(fn (BranchChoiceObject $branchChoiceObject) => [
+				'name' => $branchChoiceObject->name,
+				'place' => $branchChoiceObject->place->value,
+				'path' => $branchChoiceObject->path,
+				'matches_ticket' => $branchChoiceObject->matchesTicket,
+			], $this->choices($worktreeRepository)),
 		);
+
+		return array_map(fn (array $row) => new BranchChoiceObject(
+			$row['name'],
+			BranchPlaceEnum::from($row['place']),
+			$row['path'],
+			$row['matches_ticket'],
+		), $rows);
 	}
 
 	/**

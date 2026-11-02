@@ -6,6 +6,7 @@ namespace Src\Worktree\Repositories;
 
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use RuntimeException;
 use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
 use Src\Worktree\Objects\SiteName;
 
@@ -38,6 +39,18 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 	public function release(string $path, ?string $site): void
 	{
 		foreach (array_keys((array) config('devdock.worktree.share')) as $folder) {
+			// a vendor borrowed package by package holds links one and two levels deep;
+			// they go first, so removing the folder never reaches into the checkout
+			foreach ([$path . '/' . $folder . '/composer', $path . '/' . $folder] as $level) {
+				if (! is_dir($level) || $this->isLink($level)) {
+					continue;
+				}
+
+				foreach ($this->linkedFolders($level) as $linkedFolder) {
+					$this->drop($linkedFolder);
+				}
+			}
+
 			$this->drop($path . '/' . $folder);
 		}
 
@@ -96,7 +109,7 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 			$packages[] = [
 				'folder' => $folder,
 				'lock' => $lock,
-				'isBorrowed' => is_link($path . '/' . $folder) || $this->isJunction($path . '/' . $folder),
+				'isBorrowed' => $this->isLink($path . '/' . $folder) || $this->holdsLinks($path . '/' . $folder),
 				'isSameLock' => $this->sameFile($repositoryPath . '/' . $lock, $path . '/' . $lock),
 			];
 		}
@@ -105,18 +118,59 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 	}
 
 	/**
+	 * Whether a folder is a link or, on Windows, a junction.
+	 */
+	private function isLink(string $path): bool
+	{
+		return is_link($path) || $this->isJunction($path);
+	}
+
+	/**
+	 * Whether two paths end up in the same folder on disk.
+	 */
+	private function isSameFolder(string $left, string $right): bool
+	{
+		$realLeft = realpath($left);
+		$realRight = realpath($right);
+
+		return $realLeft !== false && $realRight !== false && strcasecmp($realLeft, $realRight) === 0;
+	}
+
+	/**
+	 * Whether a real folder holds borrowed folders, as a vendor borrowed
+	 * package by package does.
+	 */
+	private function holdsLinks(string $path): bool
+	{
+		return $this->linkedFolders($path) !== [];
+	}
+
+	/**
+	 * The borrowed folders directly inside a folder. Read with scandir: a
+	 * junction does not always pass as a folder in php.
+	 *
+	 * @return array<int, string>
+	 */
+	private function linkedFolders(string $path): array
+	{
+		return collect(@scandir($path) ?: [])
+			->reject(fn (string $entry) => $entry === '.' || $entry === '..')
+			->map(fn (string $entry) => $path . '/' . $entry)
+			->filter(fn (string $entry) => $this->isLink($entry))
+			->values()
+			->all();
+	}
+
+	/**
 	 * On Windows a borrowed folder is a junction, which php does not call a
 	 * link.
 	 */
 	private function isJunction(string $path): bool
 	{
-		if (! is_dir($path)) {
-			return false;
-		}
-
+		// no is_dir here: after is_link, php's stat cache holds a junction as mode 0
 		$real = realpath($path);
 
-		return $real !== false && str_replace('\\', '/', $real) !== str_replace('\\', '/', $path);
+		return $real !== false && strcasecmp(str_replace('\\', '/', $real), str_replace('\\', '/', $path)) !== 0;
 	}
 
 	private function exclude(string $repositoryPath): void
@@ -158,7 +212,72 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 				continue;
 			}
 
-			$this->link($target, $link);
+			$folder === 'vendor' ? $this->borrowVendor($target, $link) : $this->link($target, $link);
+		}
+	}
+
+	/**
+	 * Borrows composer's packages one by one and copies its own files in.
+	 * Composer finds the project's classes from the folder its autoload stands
+	 * in; through one link for the whole vendor folder that is the checkout,
+	 * and the tests here would run the checkout's code.
+	 */
+	private function borrowVendor(string $target, string $link): void
+	{
+		// php's realpath cache can still lead a removed junction to the checkout;
+		// a copy onto the file it reads from empties that file
+		clearstatcache(true);
+
+		File::ensureDirectoryExists($link . '/composer');
+
+		if ($this->isSameFolder($link, $target) || $this->isSameFolder($link . '/composer', $target . '/composer')) {
+			throw new RuntimeException(sprintf('%s still leads to %s; nothing is copied.', $link, $target));
+		}
+
+		foreach (['' => ['composer', 'bin'], '/composer' => []] as $level => $copiedFolders) {
+			foreach (File::files($target . $level) as $file) {
+				File::copy($file->getPathname(), $link . $level . '/' . $file->getFilename());
+			}
+
+			foreach (File::directories($target . $level) as $directory) {
+				$name = basename($directory);
+
+				if (in_array($name, $copiedFolders, true) || file_exists($link . $level . '/' . $name)) {
+					continue;
+				}
+
+				$this->link($directory, $link . $level . '/' . $name);
+			}
+		}
+
+		// the bin proxies load the autoload next to them, so they are copied too
+		File::copyDirectory($target . '/bin', $link . '/bin');
+
+		$this->dropProjectClassMap($link . '/composer/autoload_static.php');
+	}
+
+	/**
+	 * Takes the project's own classes out of composer's class map, so they are
+	 * found through PSR-4 in this copy: a class added or moved on this branch
+	 * is then found where it stands now.
+	 */
+	private function dropProjectClassMap(string $file): void
+	{
+		if (! is_file($file)) {
+			return;
+		}
+
+		$standing = (string) file_get_contents($file);
+
+		$trimmed = preg_replace_callback(
+			'/(public static \$classMap = array \(\r?\n)(.*?)(\r?\n\s*\);)/s',
+			fn (array $parts) => $parts[1] . preg_replace("/^[ \t]*'[^']+' => __DIR__ \. '\/\.\.\/\.\.' \. '[^']*',\r?\n?/m", '', $parts[2]) . $parts[3],
+			$standing,
+			1,
+		);
+
+		if ($trimmed !== null && $trimmed !== $standing) {
+			file_put_contents($file, $trimmed);
 		}
 	}
 
@@ -280,13 +399,12 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 			return;
 		}
 
-		if (PHP_OS_FAMILY !== 'Windows') {
-			@unlink($link);
+		PHP_OS_FAMILY === 'Windows'
+			? Process::run(['cmd', '/c', 'rmdir', $this->windows($link)])
+			: @unlink($link);
 
-			return;
-		}
-
-		Process::run(['cmd', '/c', 'rmdir', $this->windows($link)]);
+		// php's realpath cache would otherwise keep leading this path into the target
+		clearstatcache(true);
 	}
 
 	private function sameFile(string $left, string $right): bool

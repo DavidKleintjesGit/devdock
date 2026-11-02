@@ -15,6 +15,8 @@ class StepObject extends ValueObject
 	public function __construct(
 		public readonly string $tool,
 		public readonly string $subject,
+		public readonly int $added = 0,
+		public readonly int $removed = 0,
 	) {
 		parent::__construct();
 	}

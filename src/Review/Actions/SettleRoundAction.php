@@ -52,18 +52,6 @@ class SettleRoundAction extends Command
 			);
 		}
 
-		$settled = $reviewRoundRepository->settle($this->reviewRoundId);
-
-		// the verdicts exist only now, and the agent reads them from files of
-		// their own rather than from something somebody has to paste in
-		if (! $settled->isRunning()) {
-			WriteRoundReportsAction::execute($settled);
-
-			// een ronde die niet schoon terugkwam gaat vanzelf door naar de
-			// agent; pas bij de laatste ronde komt er een mens aan te pas
-			ContinueReviewAction::execute($settled);
-		}
-
-		return $settled;
+		return CloseRoundAction::execute($this->reviewRoundId);
 	}
 }

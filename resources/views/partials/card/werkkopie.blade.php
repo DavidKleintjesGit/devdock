@@ -1,4 +1,20 @@
-@if (! $worktree)
+@if (! $worktree && $externalPlace)
+	<div class="dbody">
+		<section class="dsec">
+			<div class="external-place">
+				<b><x-icon name="branch" small/>{{ __(':branch staat al uitgecheckt', ['branch' => $card->branch]) }}</b>
+				<span>{{ __('In') }} <span class="mono">{{ $externalPlace['path'] }}</span>{{ $externalPlace['isProject'] ? ', ' . __('de projectmap zelf') : '' }}.</span>
+				<span class="hint">{{ __('Hier is buiten DevDock aan gewerkt. Koppel je hem, dan toont DevDock de wijzigingen tegenover de hoofdlijn en kunnen agent en lenzen erin werken. Bij opruimen blijft de map staan; alleen de koppeling gaat weg.') }}</span>
+				<div class="external-actions">
+					<x-busy-button action="adoptExternal" class="btn sm primary" :busy="__('Koppelen...')">{{ __('Aan DevDock koppelen') }}</x-busy-button>
+					@if ($externalPlace['isProject'])
+						<x-busy-button action="moveToOwnWorkingCopy" class="btn sm" :busy="__('Verhuizen...')">{{ __('Eigen werkkopie maken') }}</x-busy-button>
+					@endif
+				</div>
+			</div>
+		</section>
+	</div>
+@elseif (! $worktree)
 	<div class="dbody">
 		<section class="dsec">
 			<div class="empty">
@@ -19,6 +35,21 @@
 			<div class="alert green dfail"><x-icon name="check" small/><span>{{ $committed }}</span></div>
 		@endif
 
+		@if (! $worktree->origin->isOurs())
+			<div class="external-note">
+				<div class="external-where">
+					<span class="label blue">{{ __('extern') }} · {{ $worktree->origin->label() }}</span>
+					<span class="mono">{{ $worktree->path }}</span>
+				</div>
+				@if ($worktree->origin === \Src\Worktree\Enums\WorktreeOriginEnum::PROJECT)
+					<div class="external-where">
+						<span class="hint grow">{{ __('Dit is de projectmap zelf: de agent werkt hier naast jouw eigen werk.') }}</span>
+						<x-busy-button action="moveToOwnWorkingCopy" class="btn xs" :busy="__('Verhuizen...')">{{ __('Naar een eigen werkkopie verhuizen') }}</x-busy-button>
+					</div>
+				@endif
+			</div>
+		@endif
+
 		<section class="dsec">
 			<h3 class="eyebrow">{{ __('Stand van de branch') }}</h3>
 			<div class="list">
@@ -36,8 +67,8 @@
 					<div class="kv">
 						<div class="v">
 							<span class="sdot yours"></span>
-							<span class="grow" style="font-family:inherit;display:flex;flex-direction:column;gap:2px"><b>{{ trans_choice(':count commit nog niet gepusht|:count commits nog niet gepusht', $worktree->ahead, ['count' => $worktree->ahead]) }}</b><span class="hint">{{ $worktree->upstream ? __('Al gecommit, nog niet op :upstream.', ['upstream' => $worktree->upstream]) : __('Al gecommit; de eerste push maakt origin/:branch aan.', ['branch' => $worktree->branch]) }}</span></span>
-							<x-busy-button action="pushBranch" class="btn sm" :busy="__('Pushen...')">{{ __('Pushen') }}</x-busy-button>
+							<span class="grow" style="font-family:inherit;display:flex;flex-direction:column;gap:2px"><b>{{ trans_choice(':count commit nog niet gepusht|:count commits nog niet gepusht', $worktree->ahead, ['count' => $worktree->ahead]) }}</b><span class="hint">@if ($worktree->onlyOnUpstream > 0){{ trans_choice(':upstream heeft nog :count commit die hier niet staat, zoals de versie van vóór een rebase. Pushen overschrijft die.|:upstream heeft nog :count commits die hier niet staan, zoals de versie van vóór een rebase. Pushen overschrijft die.', $worktree->onlyOnUpstream, ['count' => $worktree->onlyOnUpstream, 'upstream' => $worktree->upstream]) }}@elseif ($worktree->upstream){{ __('Al gecommit, nog niet op :upstream.', ['upstream' => $worktree->upstream]) }}@else{{ __('Al gecommit; de eerste push maakt origin/:branch aan.', ['branch' => $worktree->branch]) }}@endif</span></span>
+							<x-busy-button action="pushBranch" class="btn sm" :busy="__('Pushen...')">{{ $worktree->onlyOnUpstream > 0 ? __('Overschrijven') : __('Pushen') }}</x-busy-button>
 						</div>
 						<ol style="margin:0 0 0 21px;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--fg-2)">
 							@foreach ($unpushed as $commit)
@@ -220,7 +251,7 @@
 			<x-busy-button action="commitChanges" class="btn primary" :busy="__('Committen...')" :disabled="$pickedCount === 0">{{ trans_choice('Committen · :count bestand|Committen · :count bestanden', $pickedCount, ['count' => $pickedCount]) }}</x-busy-button>
 		@elseif ($worktree->ahead > 0)
 			<span class="hint">{{ __('Niets meer te committen.') }}</span>
-			<x-busy-button action="pushBranch" class="btn primary" :busy="__('Pushen...')">{{ trans_choice('Pushen · :count commit|Pushen · :count commits', $worktree->ahead, ['count' => $worktree->ahead]) }}</x-busy-button>
+			<x-busy-button action="pushBranch" class="btn primary" :busy="__('Pushen...')">{{ $worktree->onlyOnUpstream > 0 ? trans_choice('Overschrijven op origin · :count commit|Overschrijven op origin · :count commits', $worktree->ahead, ['count' => $worktree->ahead]) : trans_choice('Pushen · :count commit|Pushen · :count commits', $worktree->ahead, ['count' => $worktree->ahead]) }}</x-busy-button>
 		@else
 			<span class="hint">{{ __('Schoon: niets te committen of te pushen.') }}</span>
 		@endif
