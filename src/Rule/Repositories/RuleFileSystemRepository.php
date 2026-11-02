@@ -63,6 +63,36 @@ class RuleFileSystemRepository implements RuleFileSystemRepositoryContract
 		return is_file($path) ? (string) file_get_contents($path) : null;
 	}
 
+	public function getLoadedFiles(string $folder): array
+	{
+		$paths = array_values(array_filter(
+			['CLAUDE.md', 'CLAUDE.local.md'],
+			fn (string $path) => is_file($folder . '/' . $path),
+		));
+
+		foreach ($this->markdownIn($folder, '.claude/rules') as $path) {
+			// DevDock's own files in there are not rules of the project
+			if (! str_starts_with(basename($path), 'devdock-')) {
+				$paths[] = $path;
+			}
+		}
+
+		$files = [];
+
+		foreach ($paths as $path) {
+			$files[$path] = (string) file_get_contents($folder . '/' . $path);
+		}
+
+		return $files;
+	}
+
+	public function getMemoryIndex(string $projectPath): ?string
+	{
+		$file = $this->memoryDirectoryOf($projectPath) . '/MEMORY.md';
+
+		return is_file($file) ? (string) file_get_contents($file) : null;
+	}
+
 	public function copyFromCore(RuleFileEntity $ruleFileEntity): bool
 	{
 		if (blank($ruleFileEntity->coreFile)) {

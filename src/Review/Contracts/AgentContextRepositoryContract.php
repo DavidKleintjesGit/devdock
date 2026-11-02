@@ -31,6 +31,11 @@ interface AgentContextRepositoryContract
 	public function getAgentContext(string $worktreePath): ?string;
 
 	/**
+	 * The assignment one lens got in a working copy; null when it has not run there.
+	 */
+	public function getLensContext(string $worktreePath, string $lens): ?string;
+
+	/**
 	 * Lays down what one lens is asked to judge, as a file it reads itself.
 	 */
 	public function writeLensContext(string $worktreePath, string $lens, string $contents): bool;

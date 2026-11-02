@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\WithContext;
 use App\Livewire\Concerns\WithDrawerStack;
 use App\Livewire\Concerns\WithSessionActions;
 use App\Livewire\Concerns\WithSetup;
@@ -97,6 +98,7 @@ use Throwable;
  */
 class Drawer extends Component
 {
+	use WithContext;
 	use WithDrawerStack;
 	use WithSessionActions;
 	use WithSetup;
@@ -949,6 +951,7 @@ class Drawer extends Component
 			)),
 			'claudeAvailable' => resolve(ClaudeProcessRepositoryContract::class)->isAvailable(),
 			...($tab === 'Werkkopie' ? $this->workingCopyData($cardObject, $worktreeEntity, $changes) : ['worktree' => $worktreeEntity]),
+			...($tab === 'Context' ? $this->contextData($cardObject, $worktreeEntity) : []),
 			'branchSuggestion' => $this->newBranch,
 			'readableProjects' => $taskEntity?->valuesFor(TaskLinkKindEnum::READABLE_PROJECT) ?? [],
 			'projectChoices' => GetProjectsAction::execute()->pluck('name')->sort()->values(),

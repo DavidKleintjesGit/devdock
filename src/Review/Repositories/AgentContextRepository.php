@@ -96,6 +96,13 @@ class AgentContextRepository implements AgentContextRepositoryContract
 		return is_file($file) ? (string) file_get_contents($file) : null;
 	}
 
+	public function getLensContext(string $worktreePath, string $lens): ?string
+	{
+		$file = $worktreePath . '/' . $this->lensPath($lens);
+
+		return is_file($file) ? (string) file_get_contents($file) : null;
+	}
+
 	public function writeLensContext(string $worktreePath, string $lens, string $contents): bool
 	{
 		return $this->lay($worktreePath, $this->lensPath($lens), $contents);

@@ -36,10 +36,16 @@ class WriteLensContextAction extends Command
 			ComposeLensContextAction::execute($this->lensEntity, $this->files, $this->previousReport, $this->rules),
 		);
 
+		return self::assignmentFor($agentContextRepository->lensPath($this->lensEntity->name));
+	}
+
+	/**
+	 * The one line a lens is sent, pointing it at its assignment.
+	 */
+	public static function assignmentFor(string $lensPath): string
+	{
 		return implode("\n", [
-			__('Lees :file en doe wat daar staat.', [
-				'file' => $agentContextRepository->lensPath($this->lensEntity->name),
-			]),
+			__('Lees :file en doe wat daar staat.', ['file' => $lensPath]),
 			__('Antwoord met precies het verdict-blok dat daarin beschreven staat en niets erbuiten.'),
 		]);
 	}

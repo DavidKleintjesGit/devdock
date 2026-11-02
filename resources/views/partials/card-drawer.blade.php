@@ -61,7 +61,7 @@
 		</ol>
 
 		<nav class="tabs" role="tablist" aria-label="{{ __('Panelen') }}">
-			@foreach (['Overzicht', 'Agent', 'Werkkopie', 'Review', 'Koppelingen'] as $name)
+			@foreach (['Overzicht', 'Agent', 'Werkkopie', 'Review', 'Koppelingen', 'Context'] as $name)
 				<button type="button" role="tab" aria-selected="{{ $tab === $name ? 'true' : 'false' }}" :aria-selected="(pendingTab ?? @js($tab)) === @js($name)" @click="if (@js($tab) !== @js($name)) pendingTab = @js($name)" wire:click="setDrawerTab('{{ $name }}')">{{ __($name) }}</button>
 			@endforeach
 			@if ($tab === 'Agent')
@@ -90,6 +90,9 @@
 				@break
 			@case ('Koppelingen')
 				@include('partials.card.koppelingen')
+				@break
+			@case ('Context')
+				@include('partials.card.context')
 				@break
 			@default
 				@include('partials.card.overzicht')
