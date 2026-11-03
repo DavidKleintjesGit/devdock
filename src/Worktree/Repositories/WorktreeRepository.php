@@ -547,7 +547,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	public function push(string $path): bool
 	{
 		$status = $this->readStatus($path);
-		$branch = $this->currentBranch($path);
+		$branch = $this->getBranch($path);
 
 		if ($branch === null) {
 			return false;
@@ -730,7 +730,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		return $result->successful() || $upstream === null;
 	}
 
-	private function currentBranch(string $path): ?string
+	public function getBranch(string $path): ?string
 	{
 		$result = Process::path($path)->run(['git', 'symbolic-ref', '--short', 'HEAD']);
 

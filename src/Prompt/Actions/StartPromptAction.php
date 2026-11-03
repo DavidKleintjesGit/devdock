@@ -13,6 +13,7 @@ use Src\Review\Actions\WriteAgentContextAction;
 use Src\Task\Actions\OpenAgentAction;
 use Src\Task\Contracts\TaskRepositoryContract;
 use Src\Task\Objects\TaskAgentEntity;
+use Src\Worktree\Actions\EnsureOnBranchAction;
 use Src\Worktree\Actions\ResolveWorkingCopyAction;
 use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 
@@ -100,6 +101,12 @@ class StartPromptAction extends Command
 			return config('devdock.paths.sites') . '/' . $project;
 		}
 
-		return ResolveWorkingCopyAction::execute($project, $branch, $this->promptRunObject->card);
+		$directory = ResolveWorkingCopyAction::execute($project, $branch, $this->promptRunObject->card);
+
+		if ($directory !== null) {
+			EnsureOnBranchAction::execute($directory, $branch);
+		}
+
+		return $directory;
 	}
 }

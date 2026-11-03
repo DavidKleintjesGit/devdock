@@ -122,6 +122,11 @@ interface WorktreeRepositoryContract
 	public function getHead(string $path): ?string;
 
 	/**
+	 * The branch the folder stands on; null when it stands on a bare commit.
+	 */
+	public function getBranch(string $path): ?string;
+
+	/**
 	 * A hash of everything this branch changed against the main line,
 	 * committed or not. It moves with every change, and not with a commit.
 	 */

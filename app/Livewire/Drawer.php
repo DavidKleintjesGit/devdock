@@ -85,6 +85,7 @@ use Src\Worktree\Actions\RenameToTicketAction;
 use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Enums\DatabaseFillEnum;
+use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Src\Worktree\Objects\ChangeObject;
 use Src\Worktree\Objects\DiffHunkObjectCollection;
 use Src\Worktree\Objects\FileTreeNodeObject;
@@ -325,8 +326,12 @@ class Drawer extends Component
 			return;
 		}
 
-		if (StartRoundAction::execute($cardObject->id, $worktreeEntity->path) === null) {
-			$this->failure = __('Er ging geen ronde open: er staat niets gewijzigd, of het maximum aantal rondes is bereikt.');
+		try {
+			if (StartRoundAction::execute($cardObject->id, $worktreeEntity->path) === null) {
+				$this->failure = __('Er ging geen ronde open: er staat niets gewijzigd, of het maximum aantal rondes is bereikt.');
+			}
+		} catch (WorktreeNotPossibleException $refusal) {
+			$this->failure = $refusal->getMessage();
 		}
 	}
 
@@ -341,8 +346,12 @@ class Drawer extends Component
 		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
 		$worktreeEntity = $this->worktreeFor($cardObject);
 
-		if ($cardObject === null || $worktreeEntity === null || StartRoundAction::execute($cardObject->id, $worktreeEntity->path, true) === null) {
-			$this->failure = __('De loop startte niet opnieuw: er staat niets gewijzigd in de werkkopie.');
+		try {
+			if ($cardObject === null || $worktreeEntity === null || StartRoundAction::execute($cardObject->id, $worktreeEntity->path, true) === null) {
+				$this->failure = __('De loop startte niet opnieuw: er staat niets gewijzigd in de werkkopie.');
+			}
+		} catch (WorktreeNotPossibleException $refusal) {
+			$this->failure = $refusal->getMessage();
 		}
 	}
 

@@ -16,7 +16,9 @@ use Src\Review\Enums\VerdictEnum;
 use Src\Review\Objects\LensEntity;
 use Src\Review\Objects\ReviewRoundEntity;
 use Src\Review\Objects\ReviewRoundId;
+use Src\Worktree\Actions\EnsureOnBranchAction;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
+use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 
 /**
  * Sends the lenses over a delivery. Only the lenses whose paths are touched
@@ -29,6 +31,8 @@ use Src\Worktree\Contracts\WorktreeRepositoryContract;
  * new series, after you looked at what went wrong.
  *
  * @method static ?ReviewRoundEntity execute(string $card, ?string $directory, bool $startsSeries = false)
+ *
+ * @throws WorktreeNotPossibleException
  */
 class StartRoundAction extends Command
 {
@@ -49,6 +53,10 @@ class StartRoundAction extends Command
 
 		if ($cardObject === null || $this->directory === null) {
 			return null;
+		}
+
+		if ($cardObject->branch !== null) {
+			EnsureOnBranchAction::execute($this->directory, $cardObject->branch);
 		}
 
 		$rounds = $reviewRoundRepository->getForCard($this->card);

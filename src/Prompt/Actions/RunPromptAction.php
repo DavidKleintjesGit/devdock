@@ -18,6 +18,7 @@ use Src\Session\Objects\SessionEntity;
 use Src\Task\Actions\GetReadableDirectoriesAction;
 use Src\Task\Contracts\TaskRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
+use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Throwable;
 
 /**
@@ -68,7 +69,11 @@ class RunPromptAction extends Command
 		// a turn on a round sends the lenses back over the work, but only when the
 		// agent reports it done; a question or open points wait for you
 		if ($promptRunEntity->reviewRoundId !== null && ReadReportAction::execute($promptRunEntity->output)?->status === ReportStatusEnum::DONE) {
-			StartRoundAction::execute($promptRunEntity->card, $promptRunEntity->directory);
+			try {
+				StartRoundAction::execute($promptRunEntity->card, $promptRunEntity->directory);
+			} catch (WorktreeNotPossibleException) {
+				// the folder left the branch of the task; the loop waits until you start the next round yourself
+			}
 		}
 
 		// the key is taken now, so the next round resumes it instead of claiming it

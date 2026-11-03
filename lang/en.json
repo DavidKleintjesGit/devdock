@@ -164,6 +164,7 @@
     "Conflict met :main in :count bestand|Conflict met :main in :count bestanden": "Conflict with :main in :count file|Conflict with :main in :count files",
     "De agent, de lenzen en de tests werken pas los van jouw werk in een eigen werkkopie.": "The agent, the lenses and the tests only work apart from your work in a working copy of their own.",
     "De hoofdcheckout gaat terug naar :main": "The main folder goes back to :main",
+    "De map :path staat op :actual, niet op :branch. Een agent of lens zou daar niet aan deze taak werken; verhuis de taak naar een eigen werkkopie.": "The folder :path is on :actual, not on :branch. An agent or lens would not work on this task there; move the task to a working copy of its own.",
     "Deze branch staat in je hoofdcheckout": "This branch is checked out in your main folder",
     "Deze kopie test nu in een eigen database.": "This copy now tests in a database of its own.",
     "Draaien hier en ergens anders tegelijk tests, dan legen ze elkaars database.": "When tests run here and elsewhere at the same time, they empty each other's database.",
