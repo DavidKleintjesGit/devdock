@@ -7,6 +7,7 @@ namespace Src\Fetch\Actions;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Str;
+use Src\Board\Actions\GetBoardAction;
 use Src\Fetch\Contracts\FetchRunRepositoryContract;
 use Src\Fetch\Enums\FetchSourceEnum;
 use Src\Fetch\Objects\FetchRunEntity;
@@ -109,11 +110,22 @@ class RunFetchAction extends Command
 			$failures[] = 'review: ' . $this->shortened($failure);
 		}
 
-		return $fetchRunRepository->markFinished(
+		$fetchRunEntity = $fetchRunRepository->markFinished(
 			$this->fetchRunId,
 			$results,
 			$failures === [] ? null : implode(' · ', $failures),
 		);
+
+		// the board the open pages redraw with once the round is done lies ready
+		// for them; it is built after the round is marked finished, since that changes it too
+		try {
+			GetBoardAction::execute();
+		} catch (Throwable $failure) {
+			// the round itself is done; a page that finds no board ready builds it itself
+			report($failure);
+		}
+
+		return $fetchRunEntity;
 	}
 
 	/**

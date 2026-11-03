@@ -7,6 +7,7 @@ namespace Src\Worktree\Repositories;
 use Illuminate\Process\Pool;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
+use Src\Packages\Process\LocalCommand;
 use Src\Worktree\Contracts\BranchStandingRepositoryContract;
 use Src\Worktree\Objects\BranchStandingObject;
 
@@ -164,7 +165,7 @@ class BranchStandingRepository implements BranchStandingRepositoryContract
 	 */
 	private function shasIn(string $repositoryPath): array
 	{
-		$result = Process::path($repositoryPath)->run(['git', 'for-each-ref', '--format=%(refname) %(objectname)', 'refs/heads', 'refs/remotes/origin']);
+		$result = LocalCommand::run($repositoryPath, ['git', 'for-each-ref', '--format=%(refname) %(objectname)', 'refs/heads', 'refs/remotes/origin']);
 
 		if (! $result->successful()) {
 			return [];
@@ -194,8 +195,7 @@ class BranchStandingRepository implements BranchStandingRepositoryContract
 	private function mainBranch(string $repositoryPath): string
 	{
 		return Cache::remember('worktree.main.' . md5($repositoryPath), 86400, function () use ($repositoryPath): string {
-			$result = Process::path($repositoryPath)
-				->run(['git', 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD']);
+			$result = LocalCommand::run($repositoryPath, ['git', 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD']);
 
 			$name = trim($result->output());
 

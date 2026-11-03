@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Src\Review\Repositories;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Src\Review\Contracts\ReviewRoundRepositoryContract;
@@ -33,6 +34,17 @@ class ReviewRoundRepository implements ReviewRoundRepositoryContract
 		return ReviewRoundEntityCollection::fromArray($reviewRoundEntities);
 	}
 
+	public function getLatestForCard(string $card): ?ReviewRoundEntity
+	{
+		$reviewRoundEloquent = ReviewRoundEloquent::query()
+			->with(['results.lens'])
+			->where('card', $card)
+			->orderByDesc('number')
+			->first();
+
+		return $reviewRoundEloquent === null ? null : $this->mapToEntity($reviewRoundEloquent);
+	}
+
 	public function getFinishedSince(CarbonImmutable $since): array
 	{
 		return ReviewRoundEloquent::query()
@@ -47,9 +59,13 @@ class ReviewRoundRepository implements ReviewRoundRepositoryContract
 	{
 		$latest = [];
 
-		// het bord vraagt dit voor elke kaart; één vraag in plaats van honderd
+		// het bord vraagt dit voor elke kaart; één vraag in plaats van honderd,
+		// en alleen de rondes waar op hun kaart geen latere na kwam
 		$reviewRoundEloquents = ReviewRoundEloquent::query()
 			->with(['results.lens'])
+			->whereNotExists(fn (Builder $query) => $query->from('review_rounds as later')
+				->whereColumn('later.card', 'review_rounds.card')
+				->whereColumn('later.number', '>', 'review_rounds.number'))
 			->orderBy('number')
 			->get();
 

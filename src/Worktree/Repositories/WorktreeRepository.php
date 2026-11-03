@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Src\Worktree\Repositories;
 
 use Carbon\CarbonImmutable;
+use Closure;
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Process\Pool;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
+use Src\Packages\Process\LocalCommand;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Enums\DiffViewEnum;
 use Src\Worktree\Enums\WorktreeOriginEnum;
@@ -41,6 +43,18 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	private const DEVDOCK_FOLDER = '.devdock';
 
 	private const REBASE_FILE = '.devdock/rebase.json';
+
+	/**
+	 * How long what the fetch round read ahead stays. A copy that moves is
+	 * read again in the next round, so this only bounds a copy left alone.
+	 */
+	private const READ_AHEAD_SECONDS = 3600;
+
+	/**
+	 * Set while the fetch round reads ahead: every reader then reads git again
+	 * and keeps the answer this long, instead of handing back what it kept.
+	 */
+	private ?int $readAheadSeconds = null;
 
 	public function create(WorktreeObject $worktreeObject): WorktreeEntity
 	{
@@ -79,7 +93,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getPlaces(string $repositoryPath): array
 	{
-		$result = Process::path($repositoryPath)->run(['git', 'worktree', 'list', '--porcelain']);
+		$result = LocalCommand::run($repositoryPath, ['git', 'worktree', 'list', '--porcelain']);
 
 		if (! $result->successful()) {
 			return [];
@@ -223,8 +237,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function isMerged(string $repositoryPath, string $branch): bool
 	{
-		return Process::path($repositoryPath)
-			->run(['git', 'merge-base', '--is-ancestor', 'refs/heads/' . $branch, 'origin/' . $this->mainBranch($repositoryPath)])
+		return LocalCommand::run($repositoryPath, ['git', 'merge-base', '--is-ancestor', 'refs/heads/' . $branch, 'origin/' . $this->mainBranch($repositoryPath)])
 			->successful();
 	}
 
@@ -245,9 +258,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return ChangeObjectCollection::fromArray([]);
 		}
 
-		$rows = Cache::remember(
+		$rows = $this->remember(
 			$this->branchChangesKey($path),
-			(int) config('devdock.worktree.status_seconds'),
 			fn () => $this->readChangesSince($path, $this->branchBase($path)),
 		);
 
@@ -321,7 +333,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 */
 	private function branchBase(string $path): ?string
 	{
-		$result = Process::path($path)->run(['git', 'merge-base', 'origin/' . $this->mainBranch($path), 'HEAD']);
+		$result = LocalCommand::run($path, ['git', 'merge-base', 'origin/' . $this->mainBranch($path), 'HEAD']);
 
 		return $result->successful() ? (trim($result->output()) ?: null) : null;
 	}
@@ -334,9 +346,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 		// alleen de gegevens gaan de cache in: objecten overleven het opslaan
 		// niet en komen er half terug
-		$rows = Cache::remember(
+		$rows = $this->remember(
 			$this->changesKey($path),
-			(int) config('devdock.worktree.status_seconds'),
 			// by content, so a file that only changed its line endings does not count
 			fn () => $this->readChangesSince($path, 'HEAD'),
 		);
@@ -357,9 +368,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return ChangeObjectCollection::fromArray([]);
 		}
 
-		$rows = Cache::remember(
+		$rows = $this->remember(
 			'worktree.unpushed-changes.' . md5($path),
-			(int) config('devdock.worktree.status_seconds'),
 			fn () => $this->readChangesSince($path, $this->pushedBase($path)),
 		);
 
@@ -375,9 +385,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return null;
 		}
 
-		$result = Process::path($path)
-			->timeout(self::TIMEOUT)
-			->run(['git', 'diff', '--no-color', '--unified=' . $context, $this->diffBase($path, $view), '--', $file]);
+		$result = LocalCommand::run($path, ['git', 'diff', '--no-color', '--unified=' . $context, $this->diffBase($path, $view), '--', $file]);
 
 		$patch = trim($result->output());
 
@@ -399,7 +407,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		$marked = [];
 
 		// one call for every file: "path: linguist-generated: set"
-		$result = Process::path($path)->input(implode("\n", $files) . "\n")->run(['git', 'check-attr', '--stdin', 'linguist-generated']);
+		$result = LocalCommand::run($path, ['git', 'check-attr', '--stdin', 'linguist-generated'], implode("\n", $files) . "\n");
 
 		foreach (preg_split('/\R/', trim($result->output())) ?: [] as $line) {
 			if (preg_match('/^(.+): linguist-generated: (set|true)$/', $line, $found) === 1) {
@@ -417,9 +425,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	private function diffBase(string $path, DiffViewEnum $view): string
 	{
 		// the code reader reads every file on its own; working out the base takes up to five git calls
-		return Cache::remember(
+		return $this->remember(
 			$this->diffBaseKey($path, $view),
-			(int) config('devdock.worktree.status_seconds'),
 			fn (): string => match ($view) {
 				// what changed since the last commit
 				DiffViewEnum::UNCOMMITTED => 'HEAD',
@@ -482,7 +489,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return 'HEAD';
 		}
 
-		$merged = $fork === null ? null : Process::path($path)->run(['git', 'merge-tree', '--write-tree', '--no-messages', $fork, $upstream]);
+		$merged = $fork === null ? null : LocalCommand::run($path, ['git', 'merge-tree', '--write-tree', '--no-messages', $fork, $upstream]);
 
 		// exit code 1 is a clash: the tree still holds everything that merged, and the clashing files differ for real
 		if ($merged !== null && in_array($merged->exitCode(), [0, 1], true)) {
@@ -490,7 +497,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		}
 
 		// no tree at all; fall back to the commit before the oldest new one
-		$parent = Process::path($path)->run(['git', 'rev-parse', '--verify', '--quiet', $newCommits[0] . '^']);
+		$parent = LocalCommand::run($path, ['git', 'rev-parse', '--verify', '--quiet', $newCommits[0] . '^']);
 
 		return $parent->successful() && trim($parent->output()) !== '' ? trim($parent->output()) : null;
 	}
@@ -502,7 +509,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	private function pushedRef(string $path): ?string
 	{
 		foreach (['@{upstream}', 'refs/remotes/origin/' . $this->getBranch($path)] as $ref) {
-			$result = Process::path($path)->run(['git', 'rev-parse', '--verify', '--quiet', $ref]);
+			$result = LocalCommand::run($path, ['git', 'rev-parse', '--verify', '--quiet', $ref]);
 
 			if ($result->successful() && trim($result->output()) !== '') {
 				return trim($result->output());
@@ -525,7 +532,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 		return Cache::rememberForever('worktree.laid-commit.' . $tree . '.' . $parent, function () use ($path, $tree, $parent): ?string {
 			// the commit hangs on no branch; git clears such loose objects away by itself
-			$commit = Process::path($path)->run(['git', 'commit-tree', $tree, '-p', $parent, '-m', 'devdock: origin laid on the main line']);
+			$commit = LocalCommand::run($path, ['git', 'commit-tree', $tree, '-p', $parent, '-m', 'devdock: origin laid on the main line']);
 
 			return $commit->successful() ? (trim($commit->output()) ?: null) : null;
 		});
@@ -561,16 +568,15 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return null;
 		}
 
-		return Cache::remember(
+		return $this->remember(
 			'worktree.fingerprint.' . md5($path),
-			(int) config('devdock.worktree.status_seconds'),
 			function () use ($path) {
 				$main = $this->mainBranch($path);
 
 				// against the main line, so a commit of the judged work does not
 				// count as a change; files git never saw are taken in by content
-				$diff = Process::path($path)->timeout(self::TIMEOUT)->run(['git', 'diff', 'origin/' . $main]);
-				$untracked = Process::path($path)->run(['git', 'ls-files', '--others', '--exclude-standard']);
+				$diff = LocalCommand::run($path, ['git', 'diff', 'origin/' . $main]);
+				$untracked = LocalCommand::run($path, ['git', 'ls-files', '--others', '--exclude-standard']);
 
 				$parts = [$diff->output()];
 
@@ -591,7 +597,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return null;
 		}
 
-		$result = Process::path($path)->run(['git', 'rev-parse', '--short', 'HEAD']);
+		$result = LocalCommand::run($path, ['git', 'rev-parse', '--short', 'HEAD']);
 
 		return $result->successful() ? trim($result->output()) : null;
 	}
@@ -606,9 +612,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		// Het bord vraagt dit bij elke klik om te weten of er iets op te leveren
 		// valt, dus het blijft even staan; wat DevDock zelf verandert haalt het
 		// samen met de staat weg
-		return Cache::remember(
+		return $this->remember(
 			$this->changedFilesKey($path),
-			(int) config('devdock.worktree.status_seconds'),
 			fn () => $this->readChangedFiles($path),
 		);
 	}
@@ -620,13 +625,9 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	{
 		$main = $this->mainBranch($path);
 
-		$committed = Process::path($path)
-			->timeout(self::TIMEOUT)
-			->run(['git', 'diff', '--name-only', 'origin/' . $main . '...HEAD']);
+		$committed = LocalCommand::run($path, ['git', 'diff', '--name-only', 'origin/' . $main . '...HEAD']);
 
-		$standing = Process::path($path)
-			->timeout(self::TIMEOUT)
-			->run(['git', 'status', '--porcelain=v1']);
+		$standing = LocalCommand::run($path, ['git', 'status', '--porcelain=v1']);
 
 		$files = preg_split('/\R/', trim($committed->output())) ?: [];
 
@@ -722,7 +723,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return trim($fetched->errorOutput()) ?: __('Ophalen van origin lukte niet.');
 		}
 
-		$before = Process::path($path)->run(['git', 'rev-parse', 'HEAD']);
+		$before = LocalCommand::run($path, ['git', 'rev-parse', 'HEAD']);
 
 		// what is not committed yet is put aside for the rebase and laid back after it
 		$rebased = Process::path($path)->timeout(self::TIMEOUT)->run(['git', 'rebase', '--autostash', 'origin/' . $main]);
@@ -783,7 +784,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getUncommittedFiles(string $repositoryPath): array
 	{
-		$status = Process::path($repositoryPath)->run(['git', 'status', '--porcelain', '--untracked-files=no']);
+		$status = LocalCommand::run($repositoryPath, ['git', 'status', '--porcelain', '--untracked-files=no']);
 
 		if (! $status->successful()) {
 			return [];
@@ -836,7 +837,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 */
 	private function stashEntry(string $path, ?string $label, ?string $sha = null): ?array
 	{
-		$list = Process::path($path)->run(['git', 'stash', 'list', '--format=%gd%x09%H%x09%gs']);
+		$list = LocalCommand::run($path, ['git', 'stash', 'list', '--format=%gd%x09%H%x09%gs']);
 
 		foreach (preg_split('/\R/', trim($list->output())) ?: [] as $line) {
 			[$ref, $entrySha, $subject] = array_pad(explode("\t", $line, 3), 3, '');
@@ -856,8 +857,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		}
 
 		// kept as long as the status, and thrown away with it after a commit or push
-		$output = Cache::remember($this->unpushedKey($path), (int) config('devdock.worktree.status_seconds'), function () use ($path): string {
-			$result = Process::path($path)->run(['git', 'log', '--format=%h%x09%cI%x09%s', 'HEAD', '--not', '--remotes']);
+		$output = $this->remember($this->unpushedKey($path), function () use ($path): string {
+			$result = LocalCommand::run($path, ['git', 'log', '--format=%h%x09%cI%x09%s', 'HEAD', '--not', '--remotes']);
 
 			return $result->successful() ? trim($result->output()) : '';
 		});
@@ -877,7 +878,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getRemoteBranches(string $path): array
 	{
-		$result = Process::path($path)->run(['git', 'branch', '-r', '--format=%(refname:short)']);
+		$result = LocalCommand::run($path, ['git', 'branch', '-r', '--format=%(refname:short)']);
 
 		if (! $result->successful()) {
 			return [];
@@ -908,7 +909,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getBranch(string $path): ?string
 	{
-		$result = Process::path($path)->run(['git', 'symbolic-ref', '--short', 'HEAD']);
+		$result = LocalCommand::run($path, ['git', 'symbolic-ref', '--short', 'HEAD']);
 
 		return $result->successful() && trim($result->output()) !== '' ? trim($result->output()) : null;
 	}
@@ -918,7 +919,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 */
 	private function shaOf(string $path, string $ref): string
 	{
-		$result = Process::path($path)->run(['git', 'rev-parse', '--verify', $ref]);
+		$result = LocalCommand::run($path, ['git', 'rev-parse', '--verify', $ref]);
 
 		return $result->successful() ? trim($result->output()) : '';
 	}
@@ -926,9 +927,9 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	/**
 	 * @return list<string>
 	 */
-	private function lines(string $path, string|array $command): array
+	private function lines(string $path, array $command): array
 	{
-		$result = Process::path($path)->run($command);
+		$result = LocalCommand::run($path, $command);
 
 		if (! $result->successful()) {
 			return [];
@@ -1016,8 +1017,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	private function hasRef(string $repositoryPath, string $ref): bool
 	{
-		return Process::path($repositoryPath)
-			->run(['git', 'show-ref', '--verify', '--quiet', $ref])
+		return LocalCommand::run($repositoryPath, ['git', 'show-ref', '--verify', '--quiet', $ref])
 			->successful();
 	}
 
@@ -1049,8 +1049,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	{
 		// the main line of a remote does not move; asking git every time does
 		return Cache::remember('worktree.main.' . md5($repositoryPath), 86400, function () use ($repositoryPath): string {
-			$result = Process::path($repositoryPath)
-				->run(['git', 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD']);
+			$result = LocalCommand::run($repositoryPath, ['git', 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD']);
 
 			$name = trim($result->output());
 
@@ -1066,7 +1065,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 */
 	private function repositoryPathOf(string $path): string
 	{
-		$result = Process::path($path)->run(['git', 'rev-parse', '--git-common-dir']);
+		$result = LocalCommand::run($path, ['git', 'rev-parse', '--git-common-dir']);
 
 		if (! $result->successful()) {
 			return $path;
@@ -1083,7 +1082,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function checkedOutAt(string $repositoryPath, string $branch): ?string
 	{
-		$result = Process::path($repositoryPath)->run(['git', 'worktree', 'list', '--porcelain']);
+		$result = LocalCommand::run($repositoryPath, ['git', 'worktree', 'list', '--porcelain']);
 
 		if (! $result->successful()) {
 			return null;
@@ -1162,20 +1161,88 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		// bord vraagt het van elke werkkopie bij elke klik. Een paar seconden
 		// onthouden scheelt seconden wachten; wat DevDock zelf verandert haalt
 		// de regel meteen weg
-		return Cache::remember(
+		return $this->remember(
 			$this->statusKey($path),
-			(int) config('devdock.worktree.status_seconds'),
 			fn () => $this->readStatus($path),
 		);
 	}
 
 	public function refreshStatuses(int $keepSeconds): void
 	{
-		$this->warmStatuses(
-			WorktreeEloquent::query()->pluck('path')->map(fn (mixed $path) => (string) $path)->all(),
-			$keepSeconds,
-			again: true,
-		);
+		$paths = WorktreeEloquent::query()->pluck('path')->map(fn (mixed $path) => (string) $path)->all();
+
+		$this->warmStatuses($paths, $keepSeconds, again: true);
+
+		// what a card's panel reads lies ready too, so opening one never waits on git;
+		// reading all of it takes seconds per copy, so only a copy that moved is read again
+		$this->readAheadSeconds = self::READ_AHEAD_SECONDS;
+
+		try {
+			foreach (array_filter($paths, is_dir(...)) as $path) {
+				$signature = $this->readAheadSignature($path);
+
+				if (Cache::get($this->readAheadKey($path)) === $signature) {
+					continue;
+				}
+
+				foreach (DiffViewEnum::cases() as $diffView) {
+					$this->diffBase($path, $diffView);
+					$this->getChangesFor($path, $diffView);
+				}
+
+				$this->getChangedFiles($path);
+				$this->getFingerprint($path);
+
+				Cache::put($this->readAheadKey($path), $signature, self::READ_AHEAD_SECONDS);
+			}
+		} finally {
+			$this->readAheadSeconds = null;
+		}
+	}
+
+	/**
+	 * Everything that changes what the readers would find: where HEAD and the
+	 * main line on origin stand, which files differ, and when those last
+	 * changed on disk, since a file that was already changed shows the same
+	 * status line after the next edit.
+	 */
+	private function readAheadSignature(string $path): string
+	{
+		$status = LocalCommand::run($path, ['git', 'status', '--porcelain=v2', '--branch', '--untracked-files=all']);
+		$main = LocalCommand::run($path, ['git', 'rev-parse', '--verify', '--quiet', 'origin/' . $this->mainBranch($path)]);
+		$modifiedAt = [];
+
+		foreach (preg_split('/\R/', $status->output()) ?: [] as $line) {
+			// the path is the last field of a change line; a rename puts the old one after a tab
+			if ($line !== '' && $line[0] !== '#') {
+				$file = explode("\t", (string) last(explode(' ', $line)))[0];
+				$modifiedAt[] = @filemtime($path . '/' . $file) ?: 0;
+			}
+		}
+
+		return md5($status->output() . $main->output() . implode(',', $modifiedAt));
+	}
+
+	private function readAheadKey(string $path): string
+	{
+		return 'worktree.read-ahead.' . md5($path);
+	}
+
+	/**
+	 * What a reader kept for status_seconds, read again while the fetch round
+	 * reads ahead.
+	 */
+	private function remember(string $key, Closure $read): mixed
+	{
+		if ($this->readAheadSeconds === null) {
+			return Cache::remember($key, (int) config('devdock.worktree.status_seconds'), $read);
+		}
+
+		$value = $read();
+
+		Cache::put($key, $value, $this->readAheadSeconds);
+
+		return $value;
 	}
 
 	public function forgetStatus(string $path): void
@@ -1189,6 +1256,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		Cache::forget('worktree.fingerprint.' . md5($path));
 		Cache::forget($this->diffBaseKey($path, DiffViewEnum::UNPUSHED));
 		Cache::forget($this->diffBaseKey($path, DiffViewEnum::BRANCH));
+		Cache::forget($this->readAheadKey($path));
 	}
 
 	private function unpushedKey(string $path): string
@@ -1243,8 +1311,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		return $this->parseStatus(
 			$path,
 			$main,
-			Process::path($path)->run($this->statusCommand()),
-			Process::path($path)->run($this->sidesCommand($main)),
+			LocalCommand::run($path, $this->statusCommand()),
+			LocalCommand::run($path, $this->sidesCommand($main)),
 		);
 	}
 

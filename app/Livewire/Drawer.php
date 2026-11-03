@@ -17,9 +17,9 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use Src\Board\Actions\BuildBoardAction;
 use Src\Board\Actions\BuildTaskPromptAction;
 use Src\Board\Actions\DeleteTodoAction;
+use Src\Board\Actions\GetBoardAction;
 use Src\Board\Actions\PlanTodoLaterAction;
 use Src\Board\Contracts\CardViewRepositoryContract;
 use Src\Board\Enums\BoardColumnEnum;
@@ -964,6 +964,7 @@ class Drawer extends Component
 		$ticketEntity = $this->ticketFor($cardObject);
 		$latestRound = $this->latestRound($cardObject->id);
 		$roundTurns = $tab === 'Review' ? GetRoundTurnsAction::execute($cardObject->id) : [];
+		$rounds = $tab === 'Review' ? collect(GetRoundsAction::execute($cardObject->id))->reverse()->values() : collect();
 		$worktreeEntity = $this->worktreeFor($cardObject);
 		$changes = $tab === 'Werkkopie' && $worktreeEntity !== null ? $this->changesFor($cardObject) : collect();
 		// a task with a working copy but without an agent is not set up yet: the panel stays until all three steps are done
@@ -991,13 +992,11 @@ class Drawer extends Component
 			'databaseSuggestion' => $worktreeEntity === null && ($isSetup || $tab === 'Werkkopie') ? $this->databaseSuggestionFor($cardObject) : null,
 			'run' => $promptRunEntity,
 			'lastReport' => ReadReportAction::execute($promptRunEntity?->output),
-			'rounds' => $tab === 'Review' ? collect(GetRoundsAction::execute($cardObject->id))->reverse()->values() : collect(),
-			'roundRows' => $tab === 'Review'
-				? collect(GetRoundsAction::execute($cardObject->id))->reverse()->values()->map(fn (ReviewRoundEntity $reviewRoundEntity) => [
-					'round' => $reviewRoundEntity,
-					'turn' => $roundTurns[(int) $reviewRoundEntity->reviewRoundId->id] ?? null,
-				])
-				: collect(),
+			'rounds' => $rounds,
+			'roundRows' => $rounds->map(fn (ReviewRoundEntity $reviewRoundEntity) => [
+				'round' => $reviewRoundEntity,
+				'turn' => $roundTurns[(int) $reviewRoundEntity->reviewRoundId->id] ?? null,
+			]),
 			'loopStatus' => $tab === 'Review'
 				? GetLoopStatusAction::execute($latestRound, $latestRound === null ? null : $roundTurns[(int) $latestRound->reviewRoundId->id] ?? null, $workflowSetting->maxRounds)
 				: null,
@@ -1390,7 +1389,7 @@ class Drawer extends Component
 	 */
 	private function latestRound(string $card): ?ReviewRoundEntity
 	{
-		return collect(GetRoundsAction::execute($card))->last();
+		return resolve(ReviewRoundRepositoryContract::class)->getLatestForCard($card);
 	}
 
 	/**
@@ -1513,17 +1512,21 @@ class Drawer extends Component
 	{
 		$source = UnreadSourceEnum::tryFrom($tab);
 
-		if ($source === null) {
+		// a tab without a badge has nothing to take off, and writing anyway would make the board build again
+		if ($source === null || ($this->cardById($this->board(), $card)?->unreadOnTab($tab) ?? 0) === 0) {
 			return;
 		}
 
 		resolve(CardViewRepositoryContract::class)->markSeen($card, $source);
 		$this->dispatch('board-changed')->to(Board::class);
+
+		// the panel draws its own tab badges from the board too
+		$this->cardObjects = null;
 	}
 
 	private function board(): Collection
 	{
-		return $this->cardObjects ??= collect(BuildBoardAction::execute());
+		return $this->cardObjects ??= collect(GetBoardAction::execute());
 	}
 
 	private function cardById(Collection $cardObjects, string $id): ?CardObject

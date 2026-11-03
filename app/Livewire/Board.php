@@ -12,8 +12,8 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Session;
 use Livewire\Component;
-use Src\Board\Actions\BuildBoardAction;
 use Src\Board\Actions\CreateTodoAction;
+use Src\Board\Actions\GetBoardAction;
 use Src\Board\Enums\BoardColumnEnum;
 use Src\Board\Enums\BoardSignalEnum;
 use Src\Board\Objects\CardObject;
@@ -282,7 +282,7 @@ class Board extends Component
 	 */
 	private function board(): Collection
 	{
-		return $this->cardObjects ??= collect(BuildBoardAction::execute());
+		return $this->cardObjects ??= collect(GetBoardAction::execute());
 	}
 
 	/**

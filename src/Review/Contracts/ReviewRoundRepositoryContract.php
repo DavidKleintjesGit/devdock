@@ -19,6 +19,11 @@ interface ReviewRoundRepositoryContract
 	public function getForCard(string $card): ReviewRoundEntityCollection;
 
 	/**
+	 * The newest round of one task, without reading the ones before it.
+	 */
+	public function getLatestForCard(string $card): ?ReviewRoundEntity;
+
+	/**
 	 * When each review round finished after the given moment, by card.
 	 *
 	 * @return array<string, array<int, CarbonImmutable>>

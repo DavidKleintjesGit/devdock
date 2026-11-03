@@ -7,7 +7,7 @@ namespace App\View\Components;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\View\Component;
 use Illuminate\View\View;
-use Src\Board\Actions\BuildBoardAction;
+use Src\Board\Actions\GetBoardAction;
 use Src\Board\Objects\CardObject;
 use Src\Library\Actions\GetLibrariesAction;
 use Src\Library\Actions\GetStandingsAction;
@@ -43,7 +43,7 @@ class AppLayout extends Component
 	private function navigation(): array
 	{
 		$signals = Cache::remember('navigation.signals', self::SIGNAL_SECONDS, fn () => [
-			'yours' => collect(BuildBoardAction::execute())->filter(fn (CardObject $cardObject) => $cardObject->isYourTurn())->count(),
+			'yours' => collect(GetBoardAction::execute())->filter(fn (CardObject $cardObject) => $cardObject->isYourTurn())->count(),
 			'sessions' => $this->sessionsThatCanGo(),
 			'behind' => $this->projectsBehind(),
 		]);

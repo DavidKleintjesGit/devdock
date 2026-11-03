@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Src\Prompt\Repositories;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Src\Prompt\Contracts\PromptRunRepositoryContract;
@@ -80,8 +81,12 @@ class PromptRunRepository implements PromptRunRepositoryContract
 	{
 		$latest = [];
 
-		// the board asks this for every card; one query instead of a hundred
+		// the board asks this for every card; one query instead of a hundred,
+		// and only the runs no later one on their card followed
 		$promptRunEloquents = PromptRunEloquent::query()
+			->whereNotExists(fn (Builder $query) => $query->from('prompt_runs as later')
+				->whereColumn('later.card', 'prompt_runs.card')
+				->whereColumn('later.id', '>', 'prompt_runs.id'))
 			->orderBy('id')
 			->get();
 
