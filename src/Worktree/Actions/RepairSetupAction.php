@@ -162,7 +162,9 @@ class RepairSetupAction extends Command
 				? __('DevDock migreert nooit de database van het project.')
 				: $workingCopyStateRepository->runStep($path, [$php, 'artisan', 'migrate', '--force'], $logPath, self::STEP_SECONDS),
 			SetupCheckEnum::STORAGE_LINK => $workingCopyStateRepository->runStep($path, [$php, 'artisan', 'storage:link'], $logPath, self::STEP_SECONDS),
-			SetupCheckEnum::WORKING_COPY => __('Een werkkopie koppel je op de tab Werkkopie.'),
+			SetupCheckEnum::WORKING_COPY => $worktreeEntity->card === null
+				? __('Een werkkopie koppel je op de tab Werkkopie.')
+				: LinkWorkingCopyAction::execute($worktreeEntity->card, $worktreeEntity->project, $worktreeEntity->branch),
 		};
 	}
 

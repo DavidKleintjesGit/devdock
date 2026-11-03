@@ -81,16 +81,6 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		return $this->mapToEntity($worktreeEloquent);
 	}
 
-	public function adopt(string $project, string $branch, string $path, WorktreeOriginEnum $origin, ?string $card): WorktreeEntity
-	{
-		$worktreeEloquent = WorktreeEloquent::query()->updateOrCreate(
-			['project' => $project, 'branch' => $branch],
-			['path' => $path, 'card' => $card, 'origin' => $origin, 'branch_created' => false],
-		);
-
-		return $this->mapToEntity($worktreeEloquent);
-	}
-
 	public function getPlaces(string $repositoryPath): array
 	{
 		$result = LocalCommand::run($repositoryPath, ['git', 'worktree', 'list', '--porcelain']);

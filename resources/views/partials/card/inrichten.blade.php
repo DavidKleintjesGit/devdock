@@ -65,11 +65,11 @@
 								<span class="setup-plan">
 									<span @class(['plan-text', 'warn' => $preparePlan['isProject']])>
 										<x-icon :name="$preparePlan['icon']" small/>
-										<span>{{ $preparePlan['text'] }}@if ($preparePlan['isProject']) <button class="btn text xs" type="button" wire:click="keepOwnWorkingCopy">{{ __('Liever een eigen werkkopie') }}</button>@endif</span>
+										<span>{{ $preparePlan['text'] }}</span>
 									</span>
 									<x-busy-button action="prepareWorkingCopy" class="btn primary sm" :busy="__('Bezig...')">{{ __('Klaarzetten') }}</x-busy-button>
 								</span>
-								<span class="hint" wire:loading wire:target="prepareWorkingCopy">{{ $preparePlan['isNew'] ? __('De werkkopie wordt gemaakt en de database gekopieerd; dat kan een halve minuut duren.') : __('De werkkopie wordt gekoppeld.') }}</span>
+								<span class="hint" wire:loading wire:target="prepareWorkingCopy">{{ $preparePlan['isNew'] ? __('De werkkopie wordt gemaakt; de database en de rest volgen in de achtergrond.') : __('De werkkopie wordt gekoppeld.') }}</span>
 							</span>
 						@endif
 					@else

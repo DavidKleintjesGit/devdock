@@ -23,8 +23,7 @@ use Src\Worktree\Objects\WorktreeEntity;
 
 /**
  * The checklist a working copy has to pass before an agent or a lens may
- * work in it. Only a working copy DevDock knows, outside the checkout of the
- * project, can pass.
+ * work in it. Only a working copy DevDock made itself can pass.
  *
  * The migrations are only counted on a thorough check, since that runs
  * artisan in the copy; otherwise the count of the last thorough check holds
@@ -66,11 +65,17 @@ class CheckReadinessAction extends Command
 			? null
 			: GetProjectsAction::execute()->first(fn (ProjectEntity $projectEntity): bool => $projectEntity->name === $worktreeEntity->project);
 
-		if ($worktreeEntity === null || $worktreeEntity->origin === WorktreeOriginEnum::PROJECT || $projectEntity === null || ! is_dir($worktreeEntity->path)) {
+		if ($worktreeEntity === null || $worktreeEntity->origin !== WorktreeOriginEnum::MADE || $projectEntity === null || ! is_dir($worktreeEntity->path)) {
 			return new ReadinessObject(
 				directory: (string) $this->directory,
 				projectKind: null,
-				setupChecks: [new SetupCheckObject(SetupCheckEnum::WORKING_COPY, CheckStateEnum::OPEN, $this->noWorkingCopy($worktreeEntity))],
+				setupChecks: [new SetupCheckObject(
+					SetupCheckEnum::WORKING_COPY,
+					CheckStateEnum::OPEN,
+					$this->noWorkingCopy($worktreeEntity),
+					// a task linked to the project itself or to a folder from elsewhere moves into a copy of its own
+					$worktreeEntity?->card !== null && $worktreeEntity->origin !== WorktreeOriginEnum::MADE ? __('eigen werkkopie maken') : null,
+				)],
 				checkedAt: CarbonImmutable::now(),
 			);
 		}
@@ -117,6 +122,7 @@ class CheckReadinessAction extends Command
 			$this->directory === null => __('Deze taak heeft nog geen werkkopie. Koppel eerst een werkkopie.'),
 			$worktreeEntity === null => __('Deze map is geen werkkopie van DevDock. Koppel eerst een werkkopie.'),
 			$worktreeEntity->origin === WorktreeOriginEnum::PROJECT => __('Deze taak werkt in de checkout van het project zelf. Een agent werkt alleen in een eigen werkkopie.'),
+			$worktreeEntity->origin === WorktreeOriginEnum::ADOPTED => __('Deze map is buiten DevDock gemaakt. Een agent werkt alleen in een werkkopie die DevDock zelf maakte.'),
 			default => __('De werkkopie of het project staat niet meer op schijf.'),
 		};
 	}

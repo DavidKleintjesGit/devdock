@@ -10,7 +10,6 @@ use Src\Project\Objects\ProjectEntity;
 use Src\Worktree\Actions\EnsureWorktreeAction;
 use Src\Worktree\Actions\GetBranchChoicesAction;
 use Src\Worktree\Actions\LinkWorkingCopyAction;
-use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Enums\BranchPlaceEnum;
 use Src\Worktree\Enums\DatabaseFillEnum;
 use Src\Worktree\Objects\BranchChoiceObject;
@@ -72,26 +71,6 @@ trait WithSetup
 	}
 
 	/**
-	 * Puts the project itself back on the main line, so the branch that stood
-	 * open there gets a working copy of its own.
-	 */
-	public function keepOwnWorkingCopy(): void
-	{
-		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
-		$projectPath = $this->projectPathOf($cardObject?->project);
-
-		if ($projectPath === null) {
-			return;
-		}
-
-		$this->failure = resolve(WorktreeRepositoryContract::class)->switchToMain($projectPath);
-
-		if ($this->failure === null) {
-			$this->prepareWorkingCopy();
-		}
-	}
-
-	/**
 	 * Starts the setup of a card on the branch it already has, or else the
 	 * one carrying its ticket number, or else a new one.
 	 */
@@ -147,7 +126,6 @@ trait WithSetup
 			'preparePlan' => $worktreeEntity === null && $cardObject->project !== null ? $this->preparePlan($cardObject, $chosen) : null,
 			'databaseModes' => [
 				'own' => __('Eigen, kopie van het project'),
-				'shared' => __('Delen met het project'),
 				'migrate' => __('Eigen, leeg met migraties'),
 				'empty' => __('Eigen, helemaal leeg'),
 			],
@@ -171,8 +149,8 @@ trait WithSetup
 		if ($place === BranchPlaceEnum::PROJECT) {
 			return [
 				'icon' => 'alert',
-				'text' => __('Deze branch staat open in het project zelf, dus dat wordt de werkkopie: :path, met de database van het project.', ['path' => $chosen->path]),
-				'isNew' => false,
+				'text' => __('Deze branch staat open in het project zelf. Het project gaat eerst terug naar :main, daarna krijgt de branch een eigen werkkopie. Dat wordt geweigerd zolang er in het project werk staat dat niet gecommit is.', ['main' => $cardObject->mainBranch ?? 'master']),
+				'isNew' => true,
 				'isProject' => true,
 			];
 		}
@@ -183,13 +161,17 @@ trait WithSetup
 		$database = (string) $this->databaseSuggestionFor($cardObject);
 
 		$text = match ($this->newDatabaseMode) {
-			'shared' => __('Maakt een nieuwe werkkopie in :path en deelt de database van het project.', ['path' => $path ?? '…']),
 			'migrate' => __('Maakt een nieuwe werkkopie in :path met database :database, leeg en daarna de migraties.', ['path' => $path ?? '…', 'database' => $database]),
 			'empty' => __('Maakt een nieuwe werkkopie in :path met een lege database :database.', ['path' => $path ?? '…', 'database' => $database]),
 			default => __('Maakt een nieuwe werkkopie in :path met database :database, een kopie van het project.', ['path' => $path ?? '…', 'database' => $database]),
 		};
 
-		return ['icon' => 'folder', 'text' => $text, 'isNew' => true, 'isProject' => false];
+		return [
+			'icon' => 'folder',
+			'text' => $text . ' ' . __('Daarna maakt DevDock hem in de achtergrond compleet: pakketten, assets, testdatabase, site.'),
+			'isNew' => true,
+			'isProject' => false,
+		];
 	}
 
 	/**

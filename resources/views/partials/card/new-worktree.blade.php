@@ -13,18 +13,11 @@
 	<div class="field">
 		<label for="new-database">{{ __('Database') }}</label>
 		<select id="new-database" class="input" wire:model.live="newDatabaseMode">
-			<option value="own">{{ __('Eigen database aanmaken') }}</option>
-			<option value="shared">{{ __('Database van het project delen') }}</option>
+			<option value="own">{{ __('Een kopie van de database van het project') }}</option>
 			<option value="empty">{{ __('Leeg, zelf inrichten') }}</option>
 		</select>
 		@if ($databaseSuggestion)
-			<span class="hint">
-				@if ($newDatabaseMode === 'shared')
-					{{ __('Een migratie in de kopie verandert dan ook de database van het project.') }}
-				@else
-					{{ __('Wordt') }} <span class="mono">{{ $databaseSuggestion }}</span>{{ $newDatabaseMode === 'own' ? __(', als kopie van de projectdatabase.') : __(', leeg.') }} {{ __('De naam pas je later aan op Deze kopie.') }}
-				@endif
-			</span>
+			<span class="hint">{{ __('Wordt') }} <span class="mono">{{ $databaseSuggestion }}</span>{{ $newDatabaseMode === 'own' ? __(', als kopie van de projectdatabase.') : __(', leeg.') }} {{ __('DevDock maakt de werkkopie daarna in de achtergrond compleet.') }}</span>
 		@endif
 	</div>
 </section>

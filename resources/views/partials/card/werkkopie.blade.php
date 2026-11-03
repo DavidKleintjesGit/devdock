@@ -1,23 +1,16 @@
 @if (! $worktree && $mainCheckout)
 	<div class="dbody">
 		@include('partials.card.main-checkout', ['canCommitHere' => false])
-		<section class="dsec">
-			<span class="hint">{{ __('Of laat hem staan waar hij staat en koppel de projectmap aan DevDock; dan werkt de agent naast jouw eigen werk.') }}</span>
-			<span class="v"><x-busy-button action="adoptExternal" class="btn sm" :busy="__('Koppelen...')">{{ __('Aan DevDock koppelen') }}</x-busy-button></span>
-		</section>
 	</div>
 @elseif (! $worktree && $externalPlace)
 	<div class="dbody">
 		<section class="dsec">
 			<div class="external-place">
-				<b><x-icon name="branch" small/>{{ __(':branch staat al uitgecheckt', ['branch' => $card->branch]) }}</b>
-				<span>{{ __('In') }} <span class="mono">{{ $externalPlace['path'] }}</span>{{ $externalPlace['isProject'] ? ', ' . __('de projectmap zelf') : '' }}.</span>
-				<span class="hint">{{ __('Hier is buiten DevDock aan gewerkt. Koppel je hem, dan toont DevDock de wijzigingen tegenover de hoofdlijn en kunnen agent en lenzen erin werken. Bij opruimen blijft de map staan; alleen de koppeling gaat weg.') }}</span>
+				<b><x-icon name="branch" small/>{{ __(':branch staat elders uitgecheckt', ['branch' => $card->branch]) }}</b>
+				<span>{{ __('In') }} <span class="mono">{{ $externalPlace['path'] }}</span>.</span>
+				<span class="hint">{{ __('Git staat één map per branch toe, en DevDock laat een agent alleen werken in een kopie die het zelf maakte. Zet die map op een andere branch of haal hem weg; dan krijgt deze taak een eigen werkkopie.') }}</span>
 				<div class="external-actions">
-					<x-busy-button action="adoptExternal" class="btn sm primary" :busy="__('Koppelen...')">{{ __('Aan DevDock koppelen') }}</x-busy-button>
-					@if ($externalPlace['isProject'])
-						<x-busy-button action="moveToOwnWorkingCopy" class="btn sm" :busy="__('Verhuizen...')">{{ __('Eigen werkkopie maken') }}</x-busy-button>
-					@endif
+					<x-busy-button action="$refresh" class="btn sm" :busy="__('Nakijken...')">{{ __('Opnieuw kijken') }}</x-busy-button>
 				</div>
 			</div>
 		</section>

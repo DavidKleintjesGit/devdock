@@ -10,7 +10,6 @@ use Src\Session\Contracts\SessionFileRepositoryContract;
 use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
 use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
-use Src\Worktree\Enums\WorktreeOriginEnum;
 use Src\Worktree\Objects\WorktreeEntity;
 use Src\Worktree\Objects\WorktreeId;
 
@@ -40,8 +39,8 @@ class RemoveWorktreeAction extends Command
 			return false;
 		}
 
-		// the project itself borrows nothing; its own packages are real folders
-		if ($worktreeEntity->origin !== WorktreeOriginEnum::PROJECT) {
+		// only a copy DevDock made borrowed anything; the packages of the project or of a folder from elsewhere are its own
+		if ($worktreeEntity->origin->isOurs()) {
 			// the borrowed folders only point at the checkout, and git empties the
 			// folder it is told to remove
 			$workingCopyRepository->release($worktreeEntity->path, $worktreeEntity->site);

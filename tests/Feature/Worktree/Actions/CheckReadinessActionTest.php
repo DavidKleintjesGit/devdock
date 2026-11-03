@@ -61,6 +61,23 @@ class CheckReadinessActionTest extends TestCase
 	}
 
 	#[Test]
+	public function execute_holds_back_a_folder_made_outside_devdock(): void
+	{
+		$project = Project::factory()->create(['path' => $this->repository->path]);
+		$path = $this->repository->addWorktree('feature/billing');
+		Worktree::factory()->create([
+			'project' => $project->name,
+			'branch' => 'feature/billing',
+			'path' => $path,
+			'origin' => WorktreeOriginEnum::ADOPTED,
+		]);
+
+		$readinessObject = CheckReadinessAction::execute($path);
+
+		$this->assertFalse($readinessObject->isReady());
+	}
+
+	#[Test]
 	public function execute_passes_a_complete_working_copy(): void
 	{
 		$project = Project::factory()->create(['path' => $this->repository->path]);

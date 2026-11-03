@@ -54,9 +54,9 @@ class LinkWorkingCopyAction extends Command
 
 		$known = $worktreeRepository->getFor($this->project, $this->branch);
 
-		// a link to the project itself or to a folder made elsewhere is no working copy of DevDock; only the link goes
+		// a link to the project itself or to a folder made elsewhere is no working copy of DevDock; only the record goes, the folder is left as it is
 		if ($known !== null && $known->origin !== WorktreeOriginEnum::MADE) {
-			RemoveWorktreeAction::execute($known->worktreeId);
+			$worktreeRepository->remove($known->worktreeId);
 			$known = null;
 		}
 

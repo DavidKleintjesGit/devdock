@@ -284,33 +284,6 @@ trait WithWorkingCopy
 	}
 
 	/**
-	 * Takes a folder where the branch of this task already stands checked out
-	 * as its working copy: the project itself, or a copy made outside DevDock.
-	 * Cleaning up leaves such a folder where it is.
-	 */
-	public function adoptExternal(): void
-	{
-		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
-		$place = $cardObject === null ? null : $this->externalPlace($cardObject);
-
-		if ($place === null) {
-			$this->failure = __('De branch staat niet meer uitgecheckt; ververs even.');
-
-			return;
-		}
-
-		resolve(WorktreeRepositoryContract::class)->adopt(
-			(string) $cardObject->project,
-			(string) $cardObject->branch,
-			$place['path'],
-			$place['isProject'] ? WorktreeOriginEnum::PROJECT : WorktreeOriginEnum::ADOPTED,
-			$cardObject->id,
-		);
-
-		$this->committed = __('Gekoppeld aan DevDock.');
-	}
-
-	/**
 	 * Puts the project back on the main line and gives the branch a working
 	 * copy of its own, so the agent no longer works next to you in the project.
 	 * Refused while the project has uncommitted work.

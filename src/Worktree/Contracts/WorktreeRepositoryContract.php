@@ -6,7 +6,6 @@ namespace Src\Worktree\Contracts;
 
 use Carbon\CarbonImmutable;
 use Src\Worktree\Enums\DiffViewEnum;
-use Src\Worktree\Enums\WorktreeOriginEnum;
 use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Src\Worktree\Objects\ChangeObjectCollection;
 use Src\Worktree\Objects\RebaseObject;
@@ -57,12 +56,6 @@ interface WorktreeRepositoryContract
 	 */
 	public function getPlaces(string $repositoryPath): array;
 
-	/**
-	 * Writes down a folder DevDock did not make as the working copy of a
-	 * branch: one that already stood there, or the project itself. Cleaning
-	 * up leaves such a folder where it is.
-	 */
-	public function adopt(string $project, string $branch, string $path, WorktreeOriginEnum $origin, ?string $card): WorktreeEntity;
 
 	/**
 	 * Whether the main line on origin already holds every commit of this
