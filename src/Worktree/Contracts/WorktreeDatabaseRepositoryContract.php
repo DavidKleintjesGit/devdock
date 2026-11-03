@@ -42,9 +42,10 @@ interface WorktreeDatabaseRepositoryContract
 	public function describeTesting(string $repositoryPath, string $path): ?DatabaseObject;
 
 	/**
-	 * Creates an empty test database named after the branch and points the
-	 * .env.testing of the working copy at it, so two copies never test in the
-	 * same database. Returns why it failed, or null.
+	 * Creates a test database named after the branch, with the tables of the
+	 * project's test database, and points the .env.testing of the working copy
+	 * at it, so two copies never test in the same database. An own test database
+	 * that is still empty gets the tables too. Returns why it failed, or null.
 	 */
 	public function giveOwnTestDatabase(string $repositoryPath, string $path, string $branch): ?string;
 

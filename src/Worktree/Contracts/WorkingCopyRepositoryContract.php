@@ -39,6 +39,12 @@ interface WorkingCopyRepositoryContract
 	public function carryOverAgain(string $repositoryPath, string $path): void;
 
 	/**
+	 * Gives the packages with a command line script a folder of their own in
+	 * a borrowed vendor, also in a copy that was borrowed before.
+	 */
+	public function standScriptsHere(string $target, string $link): void;
+
+	/**
 	 * Per package folder whether the copy borrows it from the checkout, and
 	 * whether the lock file still matches.
 	 *

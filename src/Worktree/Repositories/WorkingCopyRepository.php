@@ -39,16 +39,10 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 	public function release(string $path, ?string $site): void
 	{
 		foreach (array_keys((array) config('devdock.worktree.share')) as $folder) {
-			// a vendor borrowed package by package holds links one and two levels deep;
+			// a vendor borrowed package by package holds links at every depth;
 			// they go first, so removing the folder never reaches into the checkout
-			foreach ([$path . '/' . $folder . '/composer', $path . '/' . $folder] as $level) {
-				if (! is_dir($level) || $this->isLink($level)) {
-					continue;
-				}
-
-				foreach ($this->linkedFolders($level) as $linkedFolder) {
-					$this->drop($linkedFolder);
-				}
+			if (is_dir($path . '/' . $folder) && ! $this->isLink($path . '/' . $folder)) {
+				$this->dropLinksIn($path . '/' . $folder);
 			}
 
 			$this->drop($path . '/' . $folder);
@@ -254,6 +248,105 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 		File::copyDirectory($target . '/bin', $link . '/bin');
 
 		$this->dropProjectClassMap($link . '/composer/autoload_static.php');
+
+		$this->standScriptsHere($target, $link);
+	}
+
+	public function standScriptsHere(string $target, string $link): void
+	{
+		// a script such as phpunit looks for the autoload from the folder it stands in;
+		// through a junction that is the checkout, whose autoload then meets the copy's
+		$folders = $this->scriptFolders($target);
+
+		foreach (array_filter($folders, fn (string $folder) => ! str_contains($folder, '/')) as $name) {
+			if ($this->isLink($link . '/' . $name)) {
+				$this->drop($link . '/' . $name);
+			}
+
+			if (! file_exists($link . '/' . $name) && is_dir($target . '/' . $name)) {
+				$this->borrowFolder($target . '/' . $name, $link . '/' . $name, $name, $folders);
+			}
+		}
+	}
+
+	/**
+	 * The folders under vendor that hold a package's script, with every
+	 * folder above them, by their path inside vendor.
+	 *
+	 * @return array<int, string>
+	 */
+	private function scriptFolders(string $vendor): array
+	{
+		$installed = json_decode((string) @file_get_contents($vendor . '/composer/installed.json'), true);
+		$folders = [];
+
+		foreach ((array) ($installed['packages'] ?? $installed ?? []) as $package) {
+			foreach ((array) ($package['bin'] ?? []) as $script) {
+				$path = trim($package['name'] . '/' . dirname((string) $script), '/.');
+				$parts = explode('/', $path);
+
+				foreach (array_keys($parts) as $depth) {
+					$folders[] = implode('/', array_slice($parts, 0, $depth + 1));
+				}
+			}
+		}
+
+		return array_values(array_unique($folders));
+	}
+
+	/**
+	 * A real folder in the copy: its files are hard links to the checkout's,
+	 * the folders on the way to a script are made the same way, and every
+	 * other folder is borrowed as a whole.
+	 *
+	 * @param  array<int, string>  $scriptFolders
+	 */
+	private function borrowFolder(string $target, string $link, string $relative, array $scriptFolders): void
+	{
+		File::ensureDirectoryExists($link);
+
+		foreach (File::files($target) as $file) {
+			$copy = $link . '/' . $file->getFilename();
+
+			// a hard link costs no space and still has the path of the copy
+			if (! file_exists($copy) && ! @link($file->getPathname(), $copy)) {
+				File::copy($file->getPathname(), $copy);
+			}
+		}
+
+		foreach (File::directories($target) as $directory) {
+			$name = basename($directory);
+			$child = $relative . '/' . $name;
+
+			if (file_exists($link . '/' . $name)) {
+				continue;
+			}
+
+			in_array($child, $scriptFolders, true)
+				? $this->borrowFolder($directory, $link . '/' . $name, $child, $scriptFolders)
+				: $this->link($directory, $link . '/' . $name);
+		}
+	}
+
+	/**
+	 * Takes every borrowed folder out of a real one, at any depth, so what is
+	 * left can be removed without reaching into the checkout.
+	 */
+	private function dropLinksIn(string $folder): void
+	{
+		foreach (@scandir($folder) ?: [] as $entry) {
+			if ($entry === '.' || $entry === '..') {
+				continue;
+			}
+
+			$path = $folder . '/' . $entry;
+
+			if ($this->isLink($path)) {
+				$this->drop($path);
+			} elseif (is_dir($path)) {
+				$this->dropLinksIn($path);
+			}
+		}
 	}
 
 	/**

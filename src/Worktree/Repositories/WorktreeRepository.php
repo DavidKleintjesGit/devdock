@@ -634,8 +634,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 				return __('In het project staat werk dat niet gecommit is. Het blijft op deze branch staan.');
 			}
 
-			// the work is set aside in the repository, so the working copy can lay it back
-			$stashed = Process::path($repositoryPath)->run(['git', 'stash', 'push', '--include-untracked', '--message', 'devdock: carried to a working copy']);
+			// the work is set aside in the repository under a label of its branch, so the working copy can lay it back
+			$stashed = Process::path($repositoryPath)->run(['git', 'stash', 'push', '--include-untracked', '--message', $this->carriedLabel((string) $this->getBranch($repositoryPath))]);
 
 			if (! $stashed->successful()) {
 				return trim($stashed->errorOutput()) ?: __('Het werk in het project kon niet opzij gezet worden.');
@@ -666,11 +666,56 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function layBackCarried(string $path): ?string
 	{
-		$popped = Process::path($path)->run(['git', 'stash', 'pop']);
+		$failure = __('Het werk uit het project kwam niet terug in de werkkopie; het staat nog in git stash.');
+
+		// the stash is shared by every checkout of the repository, so the entry is found by its label, never taken from the top
+		$entry = $this->stashEntry($path, $this->carriedLabel((string) $this->getBranch($path)));
+
+		if ($entry === null) {
+			return $failure;
+		}
+
+		$applied = Process::path($path)->run(['git', 'stash', 'apply', $entry['sha']]);
 
 		$this->forgetStatus($path);
 
-		return $popped->successful() ? null : (trim($popped->errorOutput()) ?: __('Het werk uit het project kwam niet terug in de werkkopie; het staat nog in git stash.'));
+		if (! $applied->successful()) {
+			return trim($applied->errorOutput()) ?: $failure;
+		}
+
+		// found again by its sha: another checkout may have moved it down the stack meanwhile
+		$standing = $this->stashEntry($path, null, $entry['sha']);
+
+		if ($standing !== null) {
+			Process::path($path)->run(['git', 'stash', 'drop', $standing['ref']]);
+		}
+
+		return null;
+	}
+
+	private function carriedLabel(string $branch): string
+	{
+		return 'devdock: carried ' . $branch . ' to a working copy';
+	}
+
+	/**
+	 * One entry of the stash, found by its message or by its sha.
+	 *
+	 * @return array{ref: string, sha: string}|null
+	 */
+	private function stashEntry(string $path, ?string $label, ?string $sha = null): ?array
+	{
+		$list = Process::path($path)->run(['git', 'stash', 'list', '--format=%gd%x09%H%x09%gs']);
+
+		foreach (preg_split('/\R/', trim($list->output())) ?: [] as $line) {
+			[$ref, $entrySha, $subject] = array_pad(explode("\t", $line, 3), 3, '');
+
+			if (($label !== null && str_ends_with($subject, $label)) || ($sha !== null && $entrySha === $sha)) {
+				return ['ref' => $ref, 'sha' => $entrySha];
+			}
+		}
+
+		return null;
 	}
 
 	public function getUnpushedCommits(string $path): array

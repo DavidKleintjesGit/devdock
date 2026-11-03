@@ -170,17 +170,26 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 	{
 		$describe = $this->describeTesting($repositoryPath, $path);
 
-		if ($describe === null || ! $describe->isShared || blank($describe->projectDatabase)) {
+		if ($describe === null || blank($describe->projectDatabase)) {
 			return null;
 		}
 
 		// the part after the last slash names the task: feature/CSM-3554 becomes test_partnerportal_csm_3554
 		$suffix = trim((string) preg_replace('/[^a-z0-9]+/', '_', strtolower(basename($branch))), '_');
-		$name = substr($describe->projectDatabase . '_' . $suffix, 0, 64);
+		$name = $describe->isShared ? substr($describe->projectDatabase . '_' . $suffix, 0, 64) : (string) $describe->database;
+
+		if (preg_match('/^[A-Za-z0-9_]+$/', $name) !== 1) {
+			return null;
+		}
 
 		try {
-			// empty on purpose: the tests migrate the database they run in themselves
-			$this->server($this->environment($path, self::TESTING_FILE))->exec('CREATE DATABASE IF NOT EXISTS `' . $name . '`');
+			$server = $this->server($this->environment($path, self::TESTING_FILE));
+			$server->exec('CREATE DATABASE IF NOT EXISTS `' . $name . '`');
+
+			// a test run that does not migrate expects the tables of the project's test database
+			if ($this->tableCount($server, $name) === 0) {
+				$this->copyTables($server, $describe->projectDatabase, $name);
+			}
 		} catch (Throwable $failure) {
 			return $failure->getMessage();
 		}
@@ -188,6 +197,14 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 		$this->pointAt($path, self::TESTING_FILE, $name);
 
 		return null;
+	}
+
+	private function tableCount(PDO $server, string $database): int
+	{
+		$count = $server->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?');
+		$count->execute([$database]);
+
+		return (int) $count->fetchColumn();
 	}
 
 	/**
