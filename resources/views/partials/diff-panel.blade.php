@@ -21,7 +21,7 @@
 				@if ($diffView === \Src\Worktree\Enums\DiffViewEnum::UNCOMMITTED)
 					{{ __('Tegenover de laatste commit') }}
 				@elseif ($diffView === \Src\Worktree\Enums\DiffViewEnum::UNPUSHED)
-					{{ trans_choice(':count commit staat nog op geen enkele remote|:count commits staan nog op geen enkele remote', $unpushedCount, ['count' => $unpushedCount]) }}
+					{{ trans_choice(':count commit met wijzigingen die nog niet op origin staan|:count commits met wijzigingen die nog niet op origin staan', $unpushedCount, ['count' => $unpushedCount]) }}
 				@else
 					{{ __('Gecommit en niet gecommit samen, tegenover :main', ['main' => $worktree?->mainBranch ?? 'master']) }}
 				@endif

@@ -430,22 +430,81 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		return $this->newFile($path, $file);
 	}
 
+	public function getNewCommitCount(string $path): int
+	{
+		return count($this->newCommits($path));
+	}
+
 	/**
-	 * The commit right before the oldest commit no remote holds yet, so the
-	 * diff from there is exactly what a push would bring; null when everything
-	 * is pushed. After a rebase that is the whole branch, main line excluded.
+	 * The commits whose content origin does not hold yet, oldest first. A commit
+	 * a rebase gave a new sha but the same change counts as pushed; so does
+	 * everything that came from the main line.
+	 *
+	 * @return array<int, string>
+	 */
+	private function newCommits(string $path): array
+	{
+		$upstream = $this->pushedRef($path);
+
+		if ($upstream === null) {
+			return $this->lines($path, ['git', 'rev-list', '--reverse', '--no-merges', 'HEAD', '--not', '--remotes']);
+		}
+
+		return $this->lines($path, [
+			'git', 'rev-list', '--reverse', '--no-merges', '--right-only', '--cherry-pick',
+			$upstream . '...HEAD', '^origin/' . $this->mainBranch($path),
+		]);
+	}
+
+	/**
+	 * What to set HEAD against to see what a push would change: the branch as
+	 * origin holds it, laid on the same main line as HEAD, so neither a rebase
+	 * nor the main line moving on shows up as a change. Null when there is
+	 * nothing to push.
 	 */
 	private function pushedBase(string $path): ?string
 	{
-		$unpushed = $this->lines($path, ['git', 'rev-list', '--reverse', 'HEAD', '--not', '--remotes']);
+		$newCommits = $this->newCommits($path);
 
-		if ($unpushed === []) {
+		if ($newCommits === []) {
 			return null;
 		}
 
-		$parent = Process::path($path)->run(['git', 'rev-parse', '--verify', '--quiet', $unpushed[0] . '^']);
+		$upstream = $this->pushedRef($path);
+		$fork = $this->branchBase($path);
+
+		if ($upstream === null) {
+			return $fork;
+		}
+
+		$merged = $fork === null ? null : Process::path($path)->run(['git', 'merge-tree', '--write-tree', '--no-messages', $fork, $upstream]);
+
+		// exit code 1 is a clash: the tree still holds everything that merged, and the clashing files differ for real
+		if ($merged !== null && in_array($merged->exitCode(), [0, 1], true)) {
+			return strtok(trim($merged->output()), "\n") ?: null;
+		}
+
+		// no tree at all; fall back to the commit before the oldest new one
+		$parent = Process::path($path)->run(['git', 'rev-parse', '--verify', '--quiet', $newCommits[0] . '^']);
 
 		return $parent->successful() && trim($parent->output()) !== '' ? trim($parent->output()) : null;
+	}
+
+	/**
+	 * The branch on origin: its upstream, or the branch of the same name; null
+	 * when it was never pushed.
+	 */
+	private function pushedRef(string $path): ?string
+	{
+		foreach (['@{upstream}', 'refs/remotes/origin/' . $this->getBranch($path)] as $ref) {
+			$result = Process::path($path)->run(['git', 'rev-parse', '--verify', '--quiet', $ref]);
+
+			if ($result->successful() && trim($result->output()) !== '') {
+				return trim($result->output());
+			}
+		}
+
+		return null;
 	}
 
 	/**

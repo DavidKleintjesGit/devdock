@@ -57,7 +57,7 @@
     ":count commando|:count commando's": ":count command|:count commands",
     ":count commit achter op :main|:count commits achter op :main": ":count commit behind :main|:count commits behind :main",
     ":count commit nog niet gepusht|:count commits nog niet gepusht": ":count commit not pushed|:count commits not pushed",
-    ":count commit staat nog op geen enkele remote|:count commits staan nog op geen enkele remote": ":count commit is on no remote yet|:count commits are on no remote yet",
+    ":count commit met wijzigingen die nog niet op origin staan|:count commits met wijzigingen die nog niet op origin staan": ":count commit with changes origin does not have yet|:count commits with changes origin does not have yet",
     ":count conflict|:count conflicten": ":count conflict|:count conflicts",
     ":count d": ":count d",
     ":count daarvan aangepast|:count daarvan aangepast": ":count of them customised|:count of them customised",

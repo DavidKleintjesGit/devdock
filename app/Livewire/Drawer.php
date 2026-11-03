@@ -998,7 +998,7 @@ class Drawer extends Component
 			'diffTree' => $diffTree,
 			'diffView' => $diffView,
 			'diffViews' => $this->openDiffFile === null ? [] : $this->diffViewCounts($cardObject),
-			'unpushedCount' => $this->openDiffFile === null || $worktreeEntity === null ? 0 : count(resolve(WorktreeRepositoryContract::class)->getUnpushedCommits($worktreeEntity->path)),
+			'unpushedCount' => $this->openDiffFile === null || $worktreeEntity === null ? 0 : resolve(WorktreeRepositoryContract::class)->getNewCommitCount($worktreeEntity->path),
 			'diffHunks' => $diffHunks,
 			'diffAdded' => $this->countLines($diffHunks, 'add'),
 			'diffRemoved' => $this->countLines($diffHunks, 'del'),

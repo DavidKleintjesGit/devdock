@@ -127,6 +127,12 @@ interface WorktreeRepositoryContract
 	 */
 	public function getChangesFor(string $path, DiffViewEnum $view): ChangeObjectCollection;
 
+	/**
+	 * How many commits hold a change origin does not have yet; a commit a
+	 * rebase only gave a new sha does not count.
+	 */
+	public function getNewCommitCount(string $path): int;
+
 	public function getHead(string $path): ?string;
 
 	/**
