@@ -8,12 +8,12 @@ use Src\Packages\Cqrs\Command;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 
 /**
- * Brings the branch up to date with the main line by merging it in. Returns
- * why that did not work, or null when it did.
+ * Puts the commits of the branch on top of the main line. Returns why that
+ * did not work, or null when it did.
  *
  * @method static ?string execute(string $directory)
  */
-class UpdateWorktreeAction extends Command
+class RebaseWorktreeAction extends Command
 {
 	public function __construct(
 		public readonly string $directory,
@@ -21,6 +21,6 @@ class UpdateWorktreeAction extends Command
 
 	public function handle(WorktreeRepositoryContract $worktreeRepository): ?string
 	{
-		return $worktreeRepository->update($this->directory);
+		return $worktreeRepository->rebase($this->directory);
 	}
 }

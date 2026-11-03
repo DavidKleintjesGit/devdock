@@ -36,6 +36,19 @@ interface WorktreeDatabaseRepositoryContract
 	public function use(string $path, string $name): void;
 
 	/**
+	 * The database the tests of the working copy run in, from its .env.testing;
+	 * null when they run on sqlite or there is no such file.
+	 */
+	public function describeTesting(string $repositoryPath, string $path): ?DatabaseObject;
+
+	/**
+	 * Creates an empty test database named after the branch and points the
+	 * .env.testing of the working copy at it, so two copies never test in the
+	 * same database. Returns why it failed, or null.
+	 */
+	public function giveOwnTestDatabase(string $repositoryPath, string $path, string $branch): ?string;
+
+	/**
 	 * Throws away a database DevDock created for a working copy.
 	 */
 	public function drop(string $path, string $name): void;

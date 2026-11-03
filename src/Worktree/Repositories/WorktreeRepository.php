@@ -15,6 +15,7 @@ use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Src\Worktree\Models\Worktree as WorktreeEloquent;
 use Src\Worktree\Objects\ChangeObject;
 use Src\Worktree\Objects\ChangeObjectCollection;
+use Src\Worktree\Objects\RebaseObject;
 use Src\Worktree\Objects\WorktreeEntity;
 use Src\Worktree\Objects\WorktreeEntityCollection;
 use Src\Worktree\Objects\WorktreeId;
@@ -32,6 +33,13 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 * The file that tells WakaTime which project this folder belongs to.
 	 */
 	private const PROJECT_NAME_FILE = '.wakatime-project';
+
+	/**
+	 * Where DevDock keeps what it did in a working copy, out of git.
+	 */
+	private const DEVDOCK_FOLDER = '.devdock';
+
+	private const REBASE_FILE = '.devdock/rebase.json';
 
 	public function create(WorktreeObject $worktreeObject): WorktreeEntity
 	{
@@ -573,7 +581,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		return $pushed;
 	}
 
-	public function update(string $path): ?string
+	public function rebase(string $path): ?string
 	{
 		$main = $this->mainBranch($path);
 
@@ -583,26 +591,55 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return trim($fetched->errorOutput()) ?: __('Ophalen van origin lukte niet.');
 		}
 
-		$merged = Process::path($path)->timeout(self::TIMEOUT)->run(['git', 'merge', '--no-edit', 'origin/' . $main]);
+		$before = Process::path($path)->run(['git', 'rev-parse', 'HEAD']);
+
+		// what is not committed yet is put aside for the rebase and laid back after it
+		$rebased = Process::path($path)->timeout(self::TIMEOUT)->run(['git', 'rebase', '--autostash', 'origin/' . $main]);
 
 		$this->forgetStatus($path);
 
-		if ($merged->successful()) {
-			return null;
+		if (! $rebased->successful()) {
+			// a conflict is left for no one: the branch goes back as it was
+			Process::path($path)->run(['git', 'rebase', '--abort']);
+
+			return __('Rebasen stuit op conflicten met :main. Er is niets veranderd; laat de agent het oplossen of doe het zelf in Claude Code.', ['main' => $main]);
 		}
 
-		// a conflict is left for no one: the merge goes back as it was
-		Process::path($path)->run(['git', 'merge', '--abort']);
+		if ($before->successful()) {
+			if (! is_dir($path . '/' . self::DEVDOCK_FOLDER)) {
+				@mkdir($path . '/' . self::DEVDOCK_FOLDER, 0775, true);
+			}
 
-		return __('Bijwerken stuit op conflicten met :main. Er is niets veranderd; los het op in de werkkopie of laat de agent het doen.', ['main' => $main]);
+			file_put_contents($path . '/' . self::REBASE_FILE, (string) json_encode([
+				'sha_before' => trim($before->output()),
+				'at' => CarbonImmutable::now()->toIso8601String(),
+			]));
+		}
+
+		return null;
 	}
 
-	public function switchToMain(string $repositoryPath): ?string
+	public function getLastRebase(string $path): ?RebaseObject
 	{
-		$status = Process::path($repositoryPath)->run(['git', 'status', '--porcelain', '--untracked-files=no']);
+		$file = $path . '/' . self::REBASE_FILE;
+		$data = is_file($file) ? json_decode((string) file_get_contents($file), true) : null;
 
-		if (! $status->successful() || trim($status->output()) !== '') {
-			return __('In het project staat werk dat niet gecommit is. Het blijft op deze branch staan.');
+		return is_array($data) && isset($data['sha_before'], $data['at']) ? RebaseObject::from($data) : null;
+	}
+
+	public function switchToMain(string $repositoryPath, bool $carryChanges = false): ?string
+	{
+		if ($this->getUncommittedFiles($repositoryPath) !== []) {
+			if (! $carryChanges) {
+				return __('In het project staat werk dat niet gecommit is. Het blijft op deze branch staan.');
+			}
+
+			// the work is set aside in the repository, so the working copy can lay it back
+			$stashed = Process::path($repositoryPath)->run(['git', 'stash', 'push', '--include-untracked', '--message', 'devdock: carried to a working copy']);
+
+			if (! $stashed->successful()) {
+				return trim($stashed->errorOutput()) ?: __('Het werk in het project kon niet opzij gezet worden.');
+			}
 		}
 
 		$main = $this->mainBranch($repositoryPath);
@@ -611,6 +648,29 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		$this->forgetStatus($repositoryPath);
 
 		return $switched->successful() ? null : (trim($switched->errorOutput()) ?: __('Git kon niet terug naar :main.', ['main' => $main]));
+	}
+
+	public function getUncommittedFiles(string $repositoryPath): array
+	{
+		$status = Process::path($repositoryPath)->run(['git', 'status', '--porcelain', '--untracked-files=no']);
+
+		if (! $status->successful()) {
+			return [];
+		}
+
+		return array_values(array_filter(array_map(
+			fn (string $line) => trim(substr($line, 3)),
+			preg_split('/\R/', rtrim($status->output())) ?: [],
+		)));
+	}
+
+	public function layBackCarried(string $path): ?string
+	{
+		$popped = Process::path($path)->run(['git', 'stash', 'pop']);
+
+		$this->forgetStatus($path);
+
+		return $popped->successful() ? null : (trim($popped->errorOutput()) ?: __('Het werk uit het project kwam niet terug in de werkkopie; het staat nog in git stash.'));
 	}
 
 	public function getUnpushedCommits(string $path): array

@@ -22,6 +22,11 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 	 */
 	private const SYSTEM_DATABASES = ['information_schema', 'mysql', 'performance_schema', 'sys'];
 
+	/**
+	 * Where Laravel reads the settings of a test run from.
+	 */
+	private const TESTING_FILE = '.env.testing';
+
 	public function describe(string $repositoryPath, string $path): DatabaseObject
 	{
 		$own = $this->environment($path);
@@ -138,7 +143,59 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 
 	public function use(string $path, string $name): void
 	{
-		$file = $path . '/.env';
+		$this->pointAt($path, '.env', $name);
+	}
+
+	public function describeTesting(string $repositoryPath, string $path): ?DatabaseObject
+	{
+		$own = $this->environment($path, self::TESTING_FILE);
+		$project = $this->environment($repositoryPath, self::TESTING_FILE);
+
+		// a sqlite test database lives in memory or in its own file; only a server is shared
+		if (($own['DB_CONNECTION'] ?? 'sqlite') === 'sqlite') {
+			return null;
+		}
+
+		return new DatabaseObject(
+			connection: (string) $own['DB_CONNECTION'],
+			host: $own['DB_HOST'] ?? '127.0.0.1',
+			port: $own['DB_PORT'] ?? '3306',
+			database: $own['DB_DATABASE'] ?? null,
+			projectDatabase: $project['DB_DATABASE'] ?? null,
+			isShared: ($own['DB_DATABASE'] ?? null) !== null && ($own['DB_DATABASE'] ?? null) === ($project['DB_DATABASE'] ?? null),
+		);
+	}
+
+	public function giveOwnTestDatabase(string $repositoryPath, string $path, string $branch): ?string
+	{
+		$describe = $this->describeTesting($repositoryPath, $path);
+
+		if ($describe === null || ! $describe->isShared || blank($describe->projectDatabase)) {
+			return null;
+		}
+
+		// the part after the last slash names the task: feature/CSM-3554 becomes test_partnerportal_csm_3554
+		$suffix = trim((string) preg_replace('/[^a-z0-9]+/', '_', strtolower(basename($branch))), '_');
+		$name = substr($describe->projectDatabase . '_' . $suffix, 0, 64);
+
+		try {
+			// empty on purpose: the tests migrate the database they run in themselves
+			$this->server($this->environment($path, self::TESTING_FILE))->exec('CREATE DATABASE IF NOT EXISTS `' . $name . '`');
+		} catch (Throwable $failure) {
+			return $failure->getMessage();
+		}
+
+		$this->pointAt($path, self::TESTING_FILE, $name);
+
+		return null;
+	}
+
+	/**
+	 * Points DB_DATABASE in one env file of the working copy at a database.
+	 */
+	private function pointAt(string $path, string $envFile, string $name): void
+	{
+		$file = $path . '/' . $envFile;
 		$contents = is_file($file) ? (string) file_get_contents($file) : '';
 		$line = 'DB_DATABASE=' . $name;
 
@@ -231,9 +288,9 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 	/**
 	 * @return array<string, string|null>
 	 */
-	private function environment(string $path): array
+	private function environment(string $path, string $envFile = '.env'): array
 	{
-		$file = $path . '/.env';
+		$file = $path . '/' . $envFile;
 
 		if (! is_file($file)) {
 			return [];

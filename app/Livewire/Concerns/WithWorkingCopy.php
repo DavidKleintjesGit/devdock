@@ -17,11 +17,13 @@ use Src\Worktree\Actions\CarryOverAgainAction;
 use Src\Worktree\Actions\CommitChangesAction;
 use Src\Worktree\Actions\CreateWorktreeDatabaseAction;
 use Src\Worktree\Actions\DescribeCleanUpAction;
+use Src\Worktree\Actions\EnsureWorktreeAction;
 use Src\Worktree\Actions\PushBranchAction;
+use Src\Worktree\Actions\RebaseWorktreeAction;
 use Src\Worktree\Actions\RemoveWorktreeAction;
 use Src\Worktree\Actions\SetUpstreamAction;
-use Src\Worktree\Actions\UpdateWorktreeAction;
 use Src\Worktree\Actions\UseWorktreeDatabaseAction;
+use Src\Worktree\Contracts\BranchStandingRepositoryContract;
 use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
 use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
@@ -61,7 +63,7 @@ trait WithWorkingCopy
 
 	public string $upstreamChoice = '';
 
-	public function updateFromMain(): void
+	public function rebaseOnMain(): void
 	{
 		$worktreeEntity = $this->openWorktree();
 
@@ -69,10 +71,58 @@ trait WithWorkingCopy
 			return;
 		}
 
-		$failure = UpdateWorktreeAction::execute($worktreeEntity->path);
+		$failure = RebaseWorktreeAction::execute($worktreeEntity->path);
 
 		$this->failure = $failure;
-		$this->committed = $failure === null ? __('Bijgewerkt met :main.', ['main' => $worktreeEntity->mainBranch]) : null;
+		$this->committed = $failure === null ? __('Gerebased op :main.', ['main' => $worktreeEntity->mainBranch]) : null;
+
+		$projectPath = GetProjectsAction::execute()
+			->first(fn (ProjectEntity $projectEntity) => $projectEntity->name === $worktreeEntity->project)
+			?->path;
+
+		// the card shows the new standing right away instead of after the next fetch round
+		if ($projectPath !== null) {
+			resolve(BranchStandingRepositoryContract::class)->warm($projectPath, [$worktreeEntity->branch], again: true);
+		}
+	}
+
+	/**
+	 * Gives an existing working copy a test database of its own, so its tests
+	 * stop sharing one with the project and the other copies.
+	 */
+	public function giveOwnTestDatabase(): void
+	{
+		$worktreeEntity = $this->openWorktree();
+		$projectPath = $worktreeEntity === null ? null : GetProjectsAction::execute()
+			->first(fn (ProjectEntity $projectEntity) => $projectEntity->name === $worktreeEntity->project)
+			?->path;
+
+		if ($projectPath === null) {
+			return;
+		}
+
+		$this->failure = resolve(WorktreeDatabaseRepositoryContract::class)->giveOwnTestDatabase($projectPath, $worktreeEntity->path, $worktreeEntity->branch);
+		$this->committed = $this->failure === null ? __('Deze kopie test nu in een eigen database.') : null;
+	}
+
+	/**
+	 * Asks the agent of this task to rebase and settle the clashing files.
+	 */
+	public function resolveConflictsWithAgent(): void
+	{
+		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
+
+		if ($cardObject === null || ! $cardObject->hasConflict()) {
+			return;
+		}
+
+		$this->prompt = __('Rebase deze branch op origin/:main en los de conflicten op in :files. Draai daarna de tests van wat je aanraakte. Push niet, zeg wanneer het klaar is.', [
+			'main' => $cardObject->mainBranch ?? 'master',
+			'files' => implode(', ', $cardObject->conflictedFiles),
+		]);
+
+		$this->send();
+		$this->setDrawerTab('Agent');
 	}
 
 	public function toggleCommitFile(string $path): void
@@ -265,7 +315,7 @@ trait WithWorkingCopy
 	 * copy of its own, so the agent no longer works next to you in the project.
 	 * Refused while the project has uncommitted work.
 	 */
-	public function moveToOwnWorkingCopy(): void
+	public function moveToOwnWorkingCopy(bool $carryChanges = false): void
 	{
 		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
 		$projectPath = $cardObject === null ? null : $this->projectPathFor($cardObject);
@@ -274,7 +324,8 @@ trait WithWorkingCopy
 			return;
 		}
 
-		$this->failure = resolve(WorktreeRepositoryContract::class)->switchToMain($projectPath);
+		$worktreeRepository = resolve(WorktreeRepositoryContract::class);
+		$this->failure = $worktreeRepository->switchToMain($projectPath, $carryChanges);
 
 		if ($this->failure !== null) {
 			return;
@@ -288,6 +339,12 @@ trait WithWorkingCopy
 		}
 
 		$this->createWorktree();
+
+		$worktreeEntity = $this->openWorktree();
+
+		if ($carryChanges && $this->failure === null && $worktreeEntity !== null) {
+			$this->failure = $worktreeRepository->layBackCarried($worktreeEntity->path);
+		}
 	}
 
 	/**
@@ -299,7 +356,13 @@ trait WithWorkingCopy
 	protected function workingCopyData(CardObject $cardObject, ?WorktreeEntity $worktreeEntity, Collection $changes): array
 	{
 		if ($worktreeEntity === null) {
-			return ['worktree' => null, 'externalPlace' => $this->externalPlace($cardObject)];
+			$externalPlace = $this->externalPlace($cardObject);
+
+			return [
+				'worktree' => null,
+				'externalPlace' => $externalPlace,
+				'mainCheckout' => ($externalPlace['isProject'] ?? false) ? $this->mainCheckout($cardObject) : null,
+			];
 		}
 
 		$worktreeRepository = resolve(WorktreeRepositoryContract::class);
@@ -313,6 +376,8 @@ trait WithWorkingCopy
 		return [
 			'worktree' => $worktreeEntity,
 			'unpushed' => $worktreeRepository->getUnpushedCommits($worktreeEntity->path),
+			'lastRebase' => $worktreeRepository->getLastRebase($worktreeEntity->path),
+			'mainCheckout' => $worktreeEntity->origin === WorktreeOriginEnum::PROJECT ? $this->mainCheckout($cardObject) : null,
 			'outdatedRules' => $this->outdatedRules($cardObject, $worktreeEntity),
 			'changes' => ($this->showAllChanges ? $changes : $changes->take(4))->map(fn (ChangeObject $changeObject) => [
 				'change' => $changeObject,
@@ -324,6 +389,7 @@ trait WithWorkingCopy
 			'added' => $picked->sum('added'),
 			'removed' => $picked->sum('removed'),
 			'database' => $projectPath === null ? null : resolve(WorktreeDatabaseRepositoryContract::class)->describe($projectPath, $worktreeEntity->path),
+			'testDatabase' => $projectPath === null ? null : resolve(WorktreeDatabaseRepositoryContract::class)->describeTesting($projectPath, $worktreeEntity->path),
 			'databases' => $this->databaseDialog === 'choose' ? resolve(WorktreeDatabaseRepositoryContract::class)->getDatabases($worktreeEntity->path) : [],
 			'remoteBranches' => $this->upstreamDialog ? $worktreeRepository->getRemoteBranches($worktreeEntity->path) : [],
 			'packages' => $projectPath === null ? [] : resolve(WorkingCopyRepositoryContract::class)->getPackages($projectPath, $worktreeEntity->path),
@@ -372,6 +438,23 @@ trait WithWorkingCopy
 		return $path === null ? null : [
 			'path' => $path,
 			'isProject' => strcasecmp(rtrim(str_replace('\\', '/', $path), '/'), rtrim(str_replace('\\', '/', $projectPath), '/')) === 0,
+		];
+	}
+
+	/**
+	 * The project folder this branch is checked out in, with what is not
+	 * committed there yet.
+	 *
+	 * @return array{path: string, folder: string, uncommitted: array<int, string>}|null
+	 */
+	private function mainCheckout(CardObject $cardObject): ?array
+	{
+		$projectPath = $this->projectPathFor($cardObject);
+
+		return $projectPath === null || $cardObject->branch === null ? null : [
+			'path' => $projectPath,
+			'folder' => trim((string) config('devdock.worktree.folder'), '/') . '/' . basename(EnsureWorktreeAction::folderFor($projectPath, $cardObject->branch)),
+			'uncommitted' => resolve(WorktreeRepositoryContract::class)->getUncommittedFiles($projectPath),
 		];
 	}
 

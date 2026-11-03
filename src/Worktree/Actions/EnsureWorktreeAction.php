@@ -8,6 +8,7 @@ use Src\Packages\Cqrs\Command;
 use Src\Project\Actions\GetProjectsAction;
 use Src\Project\Objects\ProjectEntity;
 use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
+use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Src\Worktree\Objects\SiteName;
@@ -64,6 +65,9 @@ class EnsureWorktreeAction extends Command
 			$worktreeEntity->path,
 			SiteName::for($this->project, $this->branch),
 		);
+
+		// tests of two working copies at once would empty each other's database
+		resolve(WorktreeDatabaseRepositoryContract::class)->giveOwnTestDatabase($projectEntity->path, $worktreeEntity->path, $this->branch);
 
 		return $worktreeRepository->pinSite($worktreeEntity->worktreeId, $host);
 	}

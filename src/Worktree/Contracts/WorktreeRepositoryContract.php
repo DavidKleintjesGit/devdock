@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Src\Worktree\Enums\WorktreeOriginEnum;
 use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Src\Worktree\Objects\ChangeObjectCollection;
+use Src\Worktree\Objects\RebaseObject;
 use Src\Worktree\Objects\WorktreeEntity;
 use Src\Worktree\Objects\WorktreeEntityCollection;
 use Src\Worktree\Objects\WorktreeId;
@@ -70,10 +71,24 @@ interface WorktreeRepositoryContract
 
 	/**
 	 * Puts the project itself back on the main line, so the branch it stood on
-	 * can get a working copy of its own. Refuses when there is uncommitted
-	 * work; gives back why, or null.
+	 * can get a working copy of its own. Uncommitted work refuses the switch,
+	 * unless it is to be carried: then it goes into a stash for layBackCarried.
+	 * Gives back why it did not work, or null.
 	 */
-	public function switchToMain(string $repositoryPath): ?string;
+	public function switchToMain(string $repositoryPath, bool $carryChanges = false): ?string;
+
+	/**
+	 * The tracked files with changes that are not committed yet.
+	 *
+	 * @return array<int, string>
+	 */
+	public function getUncommittedFiles(string $repositoryPath): array;
+
+	/**
+	 * Lays the work switchToMain set aside back down in a working copy.
+	 * Gives back why it did not work, or null.
+	 */
+	public function layBackCarried(string $path): ?string;
 
 	/**
 	 * Puts the branch and its working copy under another name. Everything on
@@ -142,10 +157,15 @@ interface WorktreeRepositoryContract
 	public function push(string $path): bool;
 
 	/**
-	 * Merges the main line of origin into the branch. Returns why it did not
+	 * Rebases the branch on the main line of origin. Returns why it did not
 	 * work, or null when it did; a conflict leaves everything as it was.
 	 */
-	public function update(string $path): ?string;
+	public function rebase(string $path): ?string;
+
+	/**
+	 * The last rebase DevDock did here; null when there was none.
+	 */
+	public function getLastRebase(string $path): ?RebaseObject;
 
 	/**
 	 * The commits that are on no remote yet, newest first.
