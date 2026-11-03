@@ -62,7 +62,7 @@
 
 		<nav class="tabs" role="tablist" aria-label="{{ __('Panelen') }}">
 			@foreach (['Overzicht', 'Agent', 'Werkkopie', 'Review', 'Koppelingen', 'Context'] as $name)
-				<button type="button" role="tab" aria-selected="{{ $tab === $name ? 'true' : 'false' }}" :aria-selected="(pendingTab ?? @js($tab)) === @js($name)" @click="if (@js($tab) !== @js($name)) pendingTab = @js($name)" wire:click="setDrawerTab('{{ $name }}')">{{ __($name) }}</button>
+				<button type="button" role="tab" aria-selected="{{ $tab === $name ? 'true' : 'false' }}" :aria-selected="(pendingTab ?? @js($tab)) === @js($name)" @click="if (@js($tab) !== @js($name)) pendingTab = @js($name)" wire:click="setDrawerTab('{{ $name }}')">{{ __($name) }}@if ($card->unreadOnTab($name) > 0)<span @class(['tunread', 'question' => $name === 'Agent' && $card->hasUnreadQuestion]) title="{{ trans_choice(':count nieuwe melding|:count nieuwe meldingen', $card->unreadOnTab($name), ['count' => $card->unreadOnTab($name)]) }}">{{ $card->unreadOnTab($name) }}</span>@endif</button>
 			@endforeach
 			@if ($tab === 'Agent')
 				<button class="icon-btn chat-grow" type="button" @click="tall = true" aria-label="{{ __('Chat vergroten') }}" title="{{ __('Chat vergroten') }}"><x-icon name="tall"/></button>

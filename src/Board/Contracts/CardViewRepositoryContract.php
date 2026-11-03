@@ -5,18 +5,20 @@ declare(strict_types=1);
 namespace Src\Board\Contracts;
 
 use Carbon\CarbonImmutable;
+use Src\Board\Enums\UnreadSourceEnum;
 
 interface CardViewRepositoryContract
 {
 	/**
-	 * Notes that you looked at the card now.
+	 * Notes that you looked at one tab of the card now.
 	 */
-	public function markSeen(string $card): void;
+	public function markSeen(string $card, UnreadSourceEnum $source): void;
 
 	/**
-	 * When you last looked at each card, by card id.
+	 * When you last looked at each tab of each card, by card id and by the
+	 * value of the source.
 	 *
-	 * @return array<string, CarbonImmutable>
+	 * @return array<string, array<string, CarbonImmutable>>
 	 */
 	public function getSeenAt(): array;
 

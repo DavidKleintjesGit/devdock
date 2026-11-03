@@ -50,7 +50,7 @@ class CardObject extends ValueObject
 		public readonly array $conflictedFiles = [],
 		public readonly ?CopyPlaceEnum $copyPlace = null,
 		public readonly ?CarbonImmutable $agentActiveAt = null,
-		public readonly int $unreadCount = 0,
+		public readonly array $unreadPerSource = [],
 		public readonly bool $hasUnreadQuestion = false,
 	) {
 		parent::__construct();
@@ -130,7 +130,23 @@ class CardObject extends ValueObject
 	 */
 	public function hasUnread(): bool
 	{
-		return $this->unreadCount > 0;
+		return $this->unreadCount() > 0;
+	}
+
+	/**
+	 * Everything unread on the card, all tabs together.
+	 */
+	public function unreadCount(): int
+	{
+		return array_sum($this->unreadPerSource);
+	}
+
+	/**
+	 * What is unread on one tab of the card; nothing on a tab no notification comes from.
+	 */
+	public function unreadOnTab(string $tab): int
+	{
+		return $this->unreadPerSource[$tab] ?? 0;
 	}
 
 	public function hasConflict(): bool

@@ -27,6 +27,7 @@
 				@foreach ($conversation as $exchange)
 					<div class="chat-turn you" wire:key="turn-you-{{ $exchange->run->promptRunId->id }}" x-data="{ folded: @js($exchange->run->hasLongPrompt()) }">
 						<div class="bubble" :class="{ folded }" title="{{ $exchange->run->startedAt?->calendar() }}">{{ $exchange->run->prompt }}</div>
+						@if ($exchange->run->startedAt)<span class="chat-time">{{ $exchange->run->startedAt->isToday() ? $exchange->run->startedAt->format('H:i') : $exchange->run->startedAt->translatedFormat('j M H:i') }}</span>@endif
 						@if ($exchange->run->hasLongPrompt())
 							<button class="btn text xs unfold" type="button" @click="folded = ! folded" x-text="folded ? @js(__('Hele bericht tonen')) : @js(__('Inklappen'))">{{ __('Hele bericht tonen') }}</button>
 						@endif
@@ -39,7 +40,7 @@
 								{{ $card->agent?->name ?? __('agent') }} · <span class="ink">{{ __('bezig sinds :time', ['time' => $exchange->run->startedAt?->format('H:i')]) }}</span>
 								<button class="btn xs stop" type="button" wire:click="stopPrompt">{{ __('Stoppen') }}</button>
 							@else
-								{{ $card->agent?->name ?? __('agent') }} · {{ __(':count s', ['count' => $exchange->run->seconds()]) }}{{ $exchange->run->costLabel() ? ' · ' . $exchange->run->costLabel() : '' }}
+								{{ $card->agent?->name ?? __('agent') }}@if ($exchange->run->finishedAt) · <span title="{{ $exchange->run->finishedAt->calendar() }}">{{ $exchange->run->finishedAt->isToday() ? $exchange->run->finishedAt->format('H:i') : $exchange->run->finishedAt->translatedFormat('j M H:i') }}</span>@endif · {{ __(':count s', ['count' => $exchange->run->seconds()]) }}{{ $exchange->run->costLabel() ? ' · ' . $exchange->run->costLabel() : '' }}
 							@endif
 						</span>
 

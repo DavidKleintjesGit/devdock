@@ -25,6 +25,7 @@ use Src\Board\Contracts\CardViewRepositoryContract;
 use Src\Board\Enums\BoardColumnEnum;
 use Src\Board\Enums\CardStatusEnum;
 use Src\Board\Enums\PromptSourceEnum;
+use Src\Board\Enums\UnreadSourceEnum;
 use Src\Board\Objects\CardObject;
 use Src\Board\Objects\TodoId;
 use Src\Fetch\Actions\GetLatestFetchRunAction;
@@ -101,7 +102,9 @@ use Throwable;
 class Drawer extends Component
 {
 	use WithContext;
-	use WithDrawerStack;
+	use WithDrawerStack {
+		setDrawerTab as private switchDrawerTab;
+	}
 	use WithSessionActions;
 	use WithSetup;
 	use WithWorkingCopy;
@@ -196,7 +199,7 @@ class Drawer extends Component
 			$this->renameBranch = (string) $this->renameSuggestion($cardObject);
 			$this->resetSetup($cardObject);
 			$this->replaceDrawer('card', $this->openCard, $this->openTab);
-			$this->markSeen($this->openCard);
+			$this->markTabSeen($this->openCard, $this->openTab);
 		}
 	}
 
@@ -232,7 +235,6 @@ class Drawer extends Component
 		$this->renameBranch = (string) $this->renameSuggestion($cardObject);
 		$this->resetSetup($cardObject);
 		$this->replaceDrawer('card', $card);
-		$this->markSeen($card);
 	}
 
 	/**
@@ -241,9 +243,9 @@ class Drawer extends Component
 	 */
 	public function closeDrawer(): void
 	{
-		// what happened while the card was open, you saw
+		// what happened on the tab you had open, you saw
 		if ($this->openCard !== null) {
-			$this->markSeen($this->openCard);
+			$this->markTabSeen($this->openCard, $this->openTab);
 		}
 
 		$this->openCard = null;
@@ -1427,11 +1429,31 @@ class Drawer extends Component
 	 * @return Collection<int, CardObject>
 	 */
 	/**
-	 * Takes the unread badge off the card on the board.
+	 * Switches the tab and reads what is unread on both the tab you leave and
+	 * the one you open.
 	 */
-	private function markSeen(string $card): void
+	public function setDrawerTab(string $tab): void
 	{
-		resolve(CardViewRepositoryContract::class)->markSeen($card);
+		if ($this->openCard !== null) {
+			$this->markTabSeen($this->openCard, $this->openTab);
+			$this->markTabSeen($this->openCard, $tab);
+		}
+
+		$this->switchDrawerTab($tab);
+	}
+
+	/**
+	 * Takes the unread badge of one tab off the card; a tab no notification comes from changes nothing.
+	 */
+	private function markTabSeen(string $card, string $tab): void
+	{
+		$source = UnreadSourceEnum::tryFrom($tab);
+
+		if ($source === null) {
+			return;
+		}
+
+		resolve(CardViewRepositoryContract::class)->markSeen($card, $source);
 		$this->dispatch('board-changed')->to(Board::class);
 	}
 

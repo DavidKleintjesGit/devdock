@@ -11,6 +11,7 @@ use Src\Board\Contracts\TodoRepositoryContract;
 use Src\Board\Enums\BoardColumnEnum;
 use Src\Board\Enums\CardStatusEnum;
 use Src\Board\Enums\CopyPlaceEnum;
+use Src\Board\Enums\UnreadSourceEnum;
 use Src\Board\Objects\CardObject;
 use Src\Board\Objects\CardObjectCollection;
 use Src\Board\Objects\TodoEntity;
@@ -97,7 +98,7 @@ class BuildBoardAction extends Command
 	/** @var Collection<string, ProjectEntity> */
 	private Collection $projectsByName;
 
-	/** @var array<string, CarbonImmutable> */
+	/** @var array<string, array<string, CarbonImmutable>> */
 	private array $seenAt = [];
 
 	private CarbonImmutable $readUntil;
@@ -150,16 +151,29 @@ class BuildBoardAction extends Command
 	}
 
 	/**
-	 * How many agent turns and review rounds finished since you last opened the card.
+	 * How many agent turns or review rounds finished since you last opened the
+	 * tab they belong to, per source.
+	 *
+	 * @return array<string, int>
 	 */
-	private function unreadCount(string $card): int
+	private function unreadPerSource(string $card): array
 	{
-		$seenAt = $this->seenAt[$card] ?? $this->readUntil;
+		$finished = [
+			UnreadSourceEnum::AGENT->value => $this->finishedTurns[$card] ?? [],
+			UnreadSourceEnum::REVIEW->value => $this->finishedRounds[$card] ?? [],
+		];
 
-		return collect($this->finishedTurns[$card] ?? [])
-			->concat($this->finishedRounds[$card] ?? [])
-			->filter(fn (CarbonImmutable $finishedAt) => $finishedAt->greaterThan($seenAt))
-			->count();
+		$unread = [];
+
+		foreach ($finished as $source => $moments) {
+			$seenAt = $this->seenAtFor($card, UnreadSourceEnum::from($source));
+
+			$unread[$source] = collect($moments)
+				->filter(fn (CarbonImmutable $moment) => $moment->greaterThan($seenAt))
+				->count();
+		}
+
+		return $unread;
 	}
 
 	/**
@@ -167,10 +181,13 @@ class BuildBoardAction extends Command
 	 */
 	private function hasUnreadQuestion(string $card, ?PromptRunEntity $promptRunEntity): bool
 	{
-		$seenAt = $this->seenAt[$card] ?? $this->readUntil;
-
-		return $promptRunEntity?->finishedAt?->greaterThan($seenAt) === true
+		return $promptRunEntity?->finishedAt?->greaterThan($this->seenAtFor($card, UnreadSourceEnum::AGENT)) === true
 			&& ReadReportAction::execute($promptRunEntity->output)?->status === ReportStatusEnum::QUESTION;
+	}
+
+	private function seenAtFor(string $card, UnreadSourceEnum $source): CarbonImmutable
+	{
+		return $this->seenAt[$card][$source->value] ?? $this->readUntil;
 	}
 
 	/**
@@ -379,7 +396,7 @@ class BuildBoardAction extends Command
 			conflictedFiles: $standing?->conflictedFiles ?? [],
 			copyPlace: $column->canStall() ? $this->copyPlaceFor($project, $branch, $worktreeEntity) : null,
 			agentActiveAt: $this->agentActiveAt($promptRunEntity),
-			unreadCount: $this->unreadCount($key),
+			unreadPerSource: $this->unreadPerSource($key),
 			hasUnreadQuestion: $this->hasUnreadQuestion($key, $promptRunEntity),
 		);
 	}
@@ -435,7 +452,7 @@ class BuildBoardAction extends Command
 			activePullRequest: $taskEntity?->pullRequest(),
 			agent: $agent,
 			agentActiveAt: $this->agentActiveAt($promptRunEntity),
-			unreadCount: $this->unreadCount($todoEntity->boardKey()),
+			unreadPerSource: $this->unreadPerSource($todoEntity->boardKey()),
 			hasUnreadQuestion: $this->hasUnreadQuestion($todoEntity->boardKey(), $promptRunEntity),
 		);
 	}
