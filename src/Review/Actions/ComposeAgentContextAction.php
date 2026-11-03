@@ -69,8 +69,9 @@ class ComposeAgentContextAction extends Command
 	}
 
 	/**
-	 * What the agent may read outside the code. The tools that write there are
-	 * denied to it in ClaudeProcessRepository; this tells it what is open.
+	 * What the agent may read outside the code, and the one thing it may write
+	 * there. ClaudeProcessRepository and devdock:guard-write enforce it; this
+	 * tells the agent what is open.
 	 */
 	private function whereToLookThingsUp(CardObject $cardObject): string
 	{
@@ -82,7 +83,9 @@ class ComposeAgentContextAction extends Command
 			'- earlier pull requests in Bitbucket, their comments and their commits: find the operation with discover, then call it with executeRead;',
 			'- why a line is the way it is, with git log and git blame in this working copy.',
 			'',
-			'Writing to Jira, Confluence or Bitbucket is closed to you. When something should go there, put it to David.',
+			'When David asks you to open the pull request, create it yourself: find createBitbucketRepoPullRequest with discover and call it with executeWrite, with the branch of this task as the source. Show him the link afterwards.',
+			'',
+			'Every other write to Jira, Confluence or Bitbucket is refused: no comments, no resolved tasks, no tickets. When something should go there, put it to David.',
 		]);
 	}
 

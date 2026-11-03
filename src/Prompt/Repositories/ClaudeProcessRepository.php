@@ -101,7 +101,9 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 		// which cuts it off past 8191 characters, and a long prompt then arrives empty
 		$arguments = [
 			...$this->alsoReads($alsoReads),
-			...$this->readOnly(),
+			...$this->readOnly(['executeWrite']),
+			'--settings',
+			$this->writeGuardSettings(),
 			'-p',
 			'--output-format',
 			'stream-json',
@@ -282,18 +284,46 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 
 	/**
 	 * Denies every tool that writes to Jira, Confluence, Bitbucket or Claude
-	 * Docs, on every server in devdock.read_only; reading stays open.
+	 * Docs, on every server in devdock.read_only, except the tools that stay
+	 * open behind the write guard; reading stays open.
 	 *
+	 * @param  array<int, string>  $guardedTools
 	 * @return array<int, string>
 	 */
-	private function readOnly(): array
+	private function readOnly(array $guardedTools = []): array
 	{
 		$deniedTools = collect((array) config('devdock.read_only.servers'))
-			->crossJoin((array) config('devdock.read_only.writing_tools'))
+			->crossJoin(array_diff((array) config('devdock.read_only.writing_tools'), $guardedTools))
 			->map(fn (array $pair) => 'mcp__' . $pair[0] . '__' . $pair[1])
 			->implode(',');
 
 		return $deniedTools === '' ? [] : ['--disallowedTools', $deniedTools];
+	}
+
+	/**
+	 * The settings file that puts devdock:guard-write in front of every
+	 * executeWrite of an agent, as the path Claude Code reads it from.
+	 */
+	private function writeGuardSettings(): string
+	{
+		$path = storage_path('app/claude/agent-settings.json');
+		$command = sprintf(
+			'"%s" "%s" devdock:guard-write',
+			str_replace('\\', '/', PHP_BINARY),
+			str_replace('\\', '/', base_path('artisan')),
+		);
+
+		File::ensureDirectoryExists(dirname($path));
+		File::put($path, (string) json_encode([
+			'hooks' => [
+				'PreToolUse' => [[
+					'matcher' => 'mcp__.*__executeWrite',
+					'hooks' => [['type' => 'command', 'command' => $command, 'timeout' => 30]],
+				]],
+			],
+		], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+		return $path;
 	}
 
 	/**

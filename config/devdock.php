@@ -206,6 +206,10 @@ return [
 			'update',
 			'delete',
 		],
+		// what an agent may still write through executeWrite; a lens may write nothing
+		'agent_operations' => [
+			'createBitbucketRepoPullRequest',
+		],
 	],
 
 	// hoe lang één prompt mag duren voordat het bord hem afbreekt
