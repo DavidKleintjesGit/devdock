@@ -21,6 +21,7 @@ use Src\Board\Actions\BuildBoardAction;
 use Src\Board\Actions\BuildTaskPromptAction;
 use Src\Board\Actions\DeleteTodoAction;
 use Src\Board\Actions\PlanTodoLaterAction;
+use Src\Board\Contracts\CardViewRepositoryContract;
 use Src\Board\Enums\BoardColumnEnum;
 use Src\Board\Enums\CardStatusEnum;
 use Src\Board\Enums\PromptSourceEnum;
@@ -195,6 +196,7 @@ class Drawer extends Component
 			$this->renameBranch = (string) $this->renameSuggestion($cardObject);
 			$this->resetSetup($cardObject);
 			$this->replaceDrawer('card', $this->openCard, $this->openTab);
+			$this->markSeen($this->openCard);
 		}
 	}
 
@@ -230,6 +232,7 @@ class Drawer extends Component
 		$this->renameBranch = (string) $this->renameSuggestion($cardObject);
 		$this->resetSetup($cardObject);
 		$this->replaceDrawer('card', $card);
+		$this->markSeen($card);
 	}
 
 	/**
@@ -238,6 +241,11 @@ class Drawer extends Component
 	 */
 	public function closeDrawer(): void
 	{
+		// what happened while the card was open, you saw
+		if ($this->openCard !== null) {
+			$this->markSeen($this->openCard);
+		}
+
 		$this->openCard = null;
 		$this->openTab = 'Overzicht';
 		$this->drawerStack = [];
@@ -1418,6 +1426,15 @@ class Drawer extends Component
 	 *
 	 * @return Collection<int, CardObject>
 	 */
+	/**
+	 * Takes the unread badge off the card on the board.
+	 */
+	private function markSeen(string $card): void
+	{
+		resolve(CardViewRepositoryContract::class)->markSeen($card);
+		$this->dispatch('board-changed')->to(Board::class);
+	}
+
 	private function board(): Collection
 	{
 		return $this->cardObjects ??= collect(BuildBoardAction::execute());

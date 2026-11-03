@@ -66,6 +66,16 @@ class PromptRunRepository implements PromptRunRepositoryContract
 		return $promptRunEloquent === null ? null : $this->mapToEntity($promptRunEloquent);
 	}
 
+	public function getFinishedSince(CarbonImmutable $since): array
+	{
+		return PromptRunEloquent::query()
+			->where('finished_at', '>', $since)
+			->get(['card', 'finished_at'])
+			->groupBy('card')
+			->map(fn ($finished) => $finished->pluck('finished_at')->all())
+			->all();
+	}
+
 	public function getLatestPerCard(): array
 	{
 		$latest = [];

@@ -50,6 +50,8 @@ class CardObject extends ValueObject
 		public readonly array $conflictedFiles = [],
 		public readonly ?CopyPlaceEnum $copyPlace = null,
 		public readonly ?CarbonImmutable $agentActiveAt = null,
+		public readonly int $unreadCount = 0,
+		public readonly bool $hasUnreadQuestion = false,
 	) {
 		parent::__construct();
 	}
@@ -121,6 +123,14 @@ class CardObject extends ValueObject
 	public function isYourTurn(): bool
 	{
 		return $this->status->isYours() && $this->column !== BoardColumnEnum::DONE;
+	}
+
+	/**
+	 * Whether something happened on the task since you last opened it.
+	 */
+	public function hasUnread(): bool
+	{
+		return $this->unreadCount > 0;
 	}
 
 	public function hasConflict(): bool

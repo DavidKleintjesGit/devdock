@@ -1,4 +1,7 @@
 <button type="button" @class(['kcard', 'done' => $card->isDone(), 'todo' => $card->isTodo()]) :class="{ open: $store.board.openCard === @js($card->id) }" wire:key="card-{{ $card->id }}" @click="$store.board.pending = { card: @js($card->id), key: @js($card->ticketKey ?? $card->project ?? __('to-do')), title: @js($card->title) }" wire:click="$dispatchTo('drawer', 'open-card', { card: @js($card->id) })">
+	@if ($card->hasUnread())
+		<span @class(['kunread', 'question' => $card->hasUnreadQuestion]) title="{{ $card->hasUnreadQuestion ? __('De agent stelt een vraag') : trans_choice(':count nieuwe melding|:count nieuwe meldingen', $card->unreadCount, ['count' => $card->unreadCount]) }}">{{ $card->unreadCount }}</span>
+	@endif
 	<span class="kline">
 		@if ($card->isHighPriority())<svg class="ic s prio" width="11" height="11" role="img" aria-label="{{ __('Hoge prioriteit') }}"><use href="#i-prio"/></svg>@endif
 		<span class="kkey">{{ $card->ticketKey ?? ($card->isTodo() ? __('to-do') : __('zonder ticket')) }}</span>

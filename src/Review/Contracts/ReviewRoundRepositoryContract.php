@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Review\Contracts;
 
+use Carbon\CarbonImmutable;
 use Src\Review\Enums\VerdictEnum;
 use Src\Review\Objects\LensId;
 use Src\Review\Objects\ReviewRoundEntity;
@@ -16,6 +17,13 @@ interface ReviewRoundRepositoryContract
 	 * Every round of one task, oldest first.
 	 */
 	public function getForCard(string $card): ReviewRoundEntityCollection;
+
+	/**
+	 * When each review round finished after the given moment, by card.
+	 *
+	 * @return array<string, array<int, CarbonImmutable>>
+	 */
+	public function getFinishedSince(CarbonImmutable $since): array;
 
 	/**
 	 * De laatste ronde van elke taak, op kaartsleutel. Het bord heeft ze

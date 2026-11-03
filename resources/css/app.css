@@ -379,7 +379,7 @@ button.row{width:100%;border:0;background:transparent;text-align:left;cursor:poi
 .col-empty b{font-weight:600;color:var(--fg)}
 .col-empty .btn{margin-top:6px}
 .col .more{height:36px;border:0;border-radius:10px;background:transparent;font-size:13px;color:var(--accent);cursor:pointer}
-.kcard{display:flex;flex-direction:column;gap:6px;height:116px;padding:12px 13px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);color:inherit;text-decoration:none;cursor:pointer;text-align:left;font:inherit;width:100%}
+.kcard{position:relative;display:flex;flex-direction:column;gap:6px;height:116px;padding:12px 13px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);color:inherit;text-decoration:none;cursor:pointer;text-align:left;font:inherit;width:100%}
 .kcard:hover{border-color:var(--line-strong);color:inherit}
 .kcard.open{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .kcard.done{background:var(--surface-2)}
@@ -396,6 +396,10 @@ button.row{width:100%;border:0;background:transparent;text-align:left;cursor:poi
 .kcard .kstatus .txt.conflict{color:var(--red)}
 .kcard .kstatus .txt.approved{color:var(--green)}
 .kcard .kplace{flex:none;color:var(--faint)}
+.kcard .kunread,.ubadge{display:inline-grid;place-items:center;min-width:20px;height:20px;box-sizing:border-box;padding:0 6px;border-radius:999px;background:var(--accent);color:var(--accent-fg);font-size:11.5px;font-weight:600;line-height:1}
+.kcard .kunread{position:absolute;top:-8px;right:-8px;box-shadow:0 0 0 2px var(--column)}
+.kcard .kunread.question{background:var(--amber);color:var(--surface)}
+.ubadge{min-width:18px;height:18px;padding:0 5px;font-size:11px}
 .kcard .kline .kbehind{font-family:var(--mono);color:var(--amber)}
 .prio{flex:none;color:var(--red-dot)}
 

@@ -44,12 +44,16 @@
 
 				@foreach ($signals as $signal)
 					<button class="fbtn" type="button" aria-pressed="{{ $attention === $signal['case']->value ? 'true' : 'false' }}" wire:click="toggleAttention('{{ $signal['case']->value }}')" @if ($signal['title']) title="{{ $signal['title'] }}" @endif>
-						@if ($signal['case']->hasPriorityMark())
-							<svg class="ic s prio" width="10" height="10" aria-hidden="true"><use href="#i-prio"/></svg>
+						@if ($signal['case']->hasCountBadge())
+							<span class="ubadge">{{ $signal['count'] }}</span>{{ $signal['case']->label() }}
 						@else
-							<span class="dot {{ $signal['case']->tone() }}"></span>
+							@if ($signal['case']->hasPriorityMark())
+								<svg class="ic s prio" width="10" height="10" aria-hidden="true"><use href="#i-prio"/></svg>
+							@else
+								<span class="dot {{ $signal['case']->tone() }}"></span>
+							@endif
+							{{ $signal['case']->label() }} <span class="n">{{ $signal['count'] }}</span>
 						@endif
-						{{ $signal['case']->label() }} <span class="n">{{ $signal['count'] }}</span>
 					</button>
 				@endforeach
 

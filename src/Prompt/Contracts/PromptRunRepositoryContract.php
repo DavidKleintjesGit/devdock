@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Prompt\Contracts;
 
+use Carbon\CarbonImmutable;
 use Src\Prompt\Objects\PromptResultObject;
 use Src\Prompt\Objects\PromptRunEntity;
 use Src\Prompt\Objects\PromptRunEntityCollection;
@@ -25,6 +26,13 @@ interface PromptRunRepositoryContract
 	 * The last prompt that was let loose on this card.
 	 */
 	public function getLatestForCard(string $card): ?PromptRunEntity;
+
+	/**
+	 * When each agent turn finished after the given moment, by card.
+	 *
+	 * @return array<string, array<int, CarbonImmutable>>
+	 */
+	public function getFinishedSince(CarbonImmutable $since): array;
 
 	/**
 	 * The last turn of every card, keyed by card.

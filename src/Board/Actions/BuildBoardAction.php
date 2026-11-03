@@ -6,6 +6,7 @@ namespace Src\Board\Actions;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Src\Board\Contracts\CardViewRepositoryContract;
 use Src\Board\Contracts\TodoRepositoryContract;
 use Src\Board\Enums\BoardColumnEnum;
 use Src\Board\Enums\CardStatusEnum;
@@ -16,7 +17,9 @@ use Src\Board\Objects\TodoEntity;
 use Src\Packages\Cqrs\Command;
 use Src\Project\Actions\GetProjectsAction;
 use Src\Project\Objects\ProjectEntity;
+use Src\Prompt\Actions\ReadReportAction;
 use Src\Prompt\Contracts\PromptRunRepositoryContract;
+use Src\Prompt\Enums\ReportStatusEnum;
 use Src\Prompt\Objects\PromptRunEntity;
 use Src\PullRequest\Actions\GetPullRequestsAction;
 use Src\PullRequest\Enums\PullRequestRoleEnum;
@@ -94,6 +97,17 @@ class BuildBoardAction extends Command
 	/** @var Collection<string, ProjectEntity> */
 	private Collection $projectsByName;
 
+	/** @var array<string, CarbonImmutable> */
+	private array $seenAt = [];
+
+	private CarbonImmutable $readUntil;
+
+	/** @var array<string, array<int, CarbonImmutable>> */
+	private array $finishedTurns = [];
+
+	/** @var array<string, array<int, CarbonImmutable>> */
+	private array $finishedRounds = [];
+
 	public function handle(TodoRepositoryContract $todoRepository): CardObjectCollection
 	{
 		$projectEntities = collect(GetProjectsAction::execute());
@@ -111,6 +125,10 @@ class BuildBoardAction extends Command
 			->values();
 
 		$this->projectsByName = $projectEntities->keyBy('name');
+		$this->seenAt = resolve(CardViewRepositoryContract::class)->getSeenAt();
+		$this->readUntil = resolve(CardViewRepositoryContract::class)->getReadUntil();
+		$this->finishedTurns = resolve(PromptRunRepositoryContract::class)->getFinishedSince($this->readUntil);
+		$this->finishedRounds = resolve(ReviewRoundRepositoryContract::class)->getFinishedSince($this->readUntil);
 
 		$cardObjects = $this->pieces($projectEntities, collect($todoRepository->getAll()))
 			->groupBy('key')
@@ -129,6 +147,30 @@ class BuildBoardAction extends Command
 	{
 		return [$second->agentActiveAt?->getTimestamp() ?? 0, $second->hasConflict(), $second->changedAt?->getTimestamp() ?? 0]
 			<=> [$first->agentActiveAt?->getTimestamp() ?? 0, $first->hasConflict(), $first->changedAt?->getTimestamp() ?? 0];
+	}
+
+	/**
+	 * How many agent turns and review rounds finished since you last opened the card.
+	 */
+	private function unreadCount(string $card): int
+	{
+		$seenAt = $this->seenAt[$card] ?? $this->readUntil;
+
+		return collect($this->finishedTurns[$card] ?? [])
+			->concat($this->finishedRounds[$card] ?? [])
+			->filter(fn (CarbonImmutable $finishedAt) => $finishedAt->greaterThan($seenAt))
+			->count();
+	}
+
+	/**
+	 * Whether the last turn of the agent ended in a question you have not seen yet.
+	 */
+	private function hasUnreadQuestion(string $card, ?PromptRunEntity $promptRunEntity): bool
+	{
+		$seenAt = $this->seenAt[$card] ?? $this->readUntil;
+
+		return $promptRunEntity?->finishedAt?->greaterThan($seenAt) === true
+			&& ReadReportAction::execute($promptRunEntity->output)?->status === ReportStatusEnum::QUESTION;
 	}
 
 	/**
@@ -337,6 +379,8 @@ class BuildBoardAction extends Command
 			conflictedFiles: $standing?->conflictedFiles ?? [],
 			copyPlace: $column->canStall() ? $this->copyPlaceFor($project, $branch, $worktreeEntity) : null,
 			agentActiveAt: $this->agentActiveAt($promptRunEntity),
+			unreadCount: $this->unreadCount($key),
+			hasUnreadQuestion: $this->hasUnreadQuestion($key, $promptRunEntity),
 		);
 	}
 
@@ -391,6 +435,8 @@ class BuildBoardAction extends Command
 			activePullRequest: $taskEntity?->pullRequest(),
 			agent: $agent,
 			agentActiveAt: $this->agentActiveAt($promptRunEntity),
+			unreadCount: $this->unreadCount($todoEntity->boardKey()),
+			hasUnreadQuestion: $this->hasUnreadQuestion($todoEntity->boardKey(), $promptRunEntity),
 		);
 	}
 
