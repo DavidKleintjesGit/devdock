@@ -4,10 +4,17 @@ declare(strict_types=1);
 
 namespace Src\Prompt\Models;
 
+use Database\Factories\PromptRunFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+#[UseFactory(PromptRunFactory::class)]
 class PromptRun extends Model
 {
+	/** @use HasFactory<PromptRunFactory> */
+	use HasFactory;
+
 	protected $fillable = [
 		'card',
 		'review_round_id',
