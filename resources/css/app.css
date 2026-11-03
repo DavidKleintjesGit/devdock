@@ -246,7 +246,10 @@ h1,h2,h3{text-wrap:balance}
 .label.muted{color:var(--muted)}
 .sdot{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}
 .sdot.yours{background:var(--accent)}
-.sdot.busy{background:var(--amber-dot);box-shadow:0 0 0 3px var(--amber-soft)}
+.sdot.busy{background:var(--amber-dot);animation:pulse 1.4s ease-in-out infinite}
+.sdot.conflict{background:var(--red-dot)}
+.sdot.approved{background:var(--green-dot)}
+.sdot.waiting{box-sizing:border-box;border:1.5px solid var(--blue)}
 .sdot.quiet{border:1.5px solid var(--line-strong)}
 .sdot.red{background:var(--red-dot)}
 .sdot.green{background:var(--green-dot)}
@@ -278,7 +281,7 @@ h1,h2,h3{text-wrap:balance}
 .ldot{width:8px;height:8px;border-radius:50%;background:var(--line-strong)}
 .ldot.pass{background:var(--green-dot)}
 .ldot.fail{background:var(--red-dot)}
-.ldot.busy{background:var(--amber-dot);box-shadow:0 0 0 3px var(--amber-soft)}
+.ldot.busy{background:var(--amber-dot);animation:pulse 1.4s ease-in-out infinite}
 .wicon{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;background:var(--amber-soft);color:var(--amber);flex:none}
 .wicon.pause{background:var(--sunken);color:var(--muted)}
 
@@ -371,6 +374,7 @@ button.row{width:100%;border:0;background:transparent;text-align:left;cursor:poi
 .col-head{display:flex;align-items:center;gap:8px;height:30px;padding:0 4px}
 .col-head h2{margin:0;font-size:14px;font-weight:600;flex:1}
 .col-head .yours{font-size:12px;color:var(--accent-ink)}
+.col-head .conflicts{font-size:12px;color:var(--red)}
 .col-empty{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:14px;border:1px dashed var(--line-strong);border-radius:12px;background:var(--bg);font-size:13px;color:var(--muted)}
 .col-empty b{font-weight:600;color:var(--fg)}
 .col-empty .btn{margin-top:6px}
@@ -389,6 +393,10 @@ button.row{width:100%;border:0;background:transparent;text-align:left;cursor:poi
 .kcard .kstatus{display:flex;align-items:center;gap:8px;font-size:12.5px;min-width:0}
 .kcard .kstatus .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
 .kcard .kstatus .txt.yours{color:var(--accent-ink);font-weight:500}
+.kcard .kstatus .txt.conflict{color:var(--red)}
+.kcard .kstatus .txt.approved{color:var(--green)}
+.kcard .kplace{flex:none;color:var(--faint)}
+.kcard .kline .kbehind{font-family:var(--mono);color:var(--amber)}
 .prio{flex:none;color:var(--red-dot)}
 
 /* ---------- lade ---------- */

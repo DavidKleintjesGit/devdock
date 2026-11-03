@@ -318,6 +318,7 @@ class Board extends Component
 					'case' => $column,
 					'total' => $cardObjects->filter(fn (CardObject $card) => $card->column === $column)->count(),
 					'yours' => $cards->filter(fn (CardObject $card) => $card->isYourTurn())->count(),
+					'conflicts' => $cards->filter(fn (CardObject $card) => $card->hasConflict())->count(),
 					'cards' => $limit === null ? $cards : $cards->take($limit),
 					'hidden' => $limit === null ? 0 : max(0, $cards->count() - $limit),
 				];

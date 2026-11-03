@@ -1036,7 +1036,9 @@ class Drawer extends Component
 		$tone = match ($cardObject->status) {
 			CardStatusEnum::YOURS => 'teal',
 			CardStatusEnum::BUSY => 'amber',
-			CardStatusEnum::QUIET => 'gray',
+			CardStatusEnum::QUIET, CardStatusEnum::WAITING => 'gray',
+			CardStatusEnum::CONFLICT => 'red',
+			CardStatusEnum::APPROVED => 'green',
 		};
 
 		[$text, $hint, $tab, $button] = match ($cardObject->column) {

@@ -7,6 +7,7 @@ namespace Src\Board\Objects;
 use Carbon\CarbonImmutable;
 use Src\Board\Enums\BoardColumnEnum;
 use Src\Board\Enums\CardStatusEnum;
+use Src\Board\Enums\CopyPlaceEnum;
 use Src\Packages\ValueObject\ValueObject;
 use Src\Prompt\Objects\CommitMessageObject;
 use Src\PullRequest\Objects\PullRequestEntity;
@@ -46,6 +47,8 @@ class CardObject extends ValueObject
 		public readonly bool $hasWaitingWork,
 		public readonly ?string $activePullRequest,
 		public readonly ?TaskAgentEntity $agent,
+		public readonly array $conflictedFiles = [],
+		public readonly ?CopyPlaceEnum $copyPlace = null,
 	) {
 		parent::__construct();
 	}
@@ -116,7 +119,12 @@ class CardObject extends ValueObject
 	 */
 	public function isYourTurn(): bool
 	{
-		return $this->status === CardStatusEnum::YOURS && $this->column !== BoardColumnEnum::DONE;
+		return $this->status->isYours() && $this->column !== BoardColumnEnum::DONE;
+	}
+
+	public function hasConflict(): bool
+	{
+		return $this->status === CardStatusEnum::CONFLICT;
 	}
 
 	public function isInBacklog(): bool

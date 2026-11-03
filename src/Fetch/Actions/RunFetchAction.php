@@ -22,6 +22,7 @@ use Src\Skill\Actions\ScanSkillsAction;
 use Src\Ticket\Actions\FetchTicketsAction;
 use Src\Ticket\Contracts\TicketSourceRepositoryContract;
 use Src\Worktree\Actions\ForgetMovedLinksAction;
+use Src\Worktree\Contracts\BranchStandingRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Throwable;
 
@@ -85,6 +86,13 @@ class RunFetchAction extends Command
 			resolve(WorktreeRepositoryContract::class)->refreshStatuses($this->statusKeepSeconds());
 		} catch (Throwable $failure) {
 			$failures[] = 'worktrees: ' . $this->shortened($failure);
+		}
+
+		// how far each branch is behind and where it would clash, for the cards
+		try {
+			resolve(BranchStandingRepositoryContract::class)->refresh($this->statusKeepSeconds());
+		} catch (Throwable $failure) {
+			$failures[] = 'branches: ' . $this->shortened($failure);
 		}
 
 		// a linked folder that was put on another branch outside DevDock lets go of its task

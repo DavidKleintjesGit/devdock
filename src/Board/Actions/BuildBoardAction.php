@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use Src\Board\Contracts\TodoRepositoryContract;
 use Src\Board\Enums\BoardColumnEnum;
 use Src\Board\Enums\CardStatusEnum;
+use Src\Board\Enums\CopyPlaceEnum;
 use Src\Board\Objects\CardObject;
 use Src\Board\Objects\CardObjectCollection;
 use Src\Board\Objects\TodoEntity;
@@ -36,7 +37,10 @@ use Src\Ticket\Actions\GetTicketsAction;
 use Src\Ticket\Objects\TicketEntity;
 use Src\Ticket\Objects\TicketKey;
 use Src\Worktree\Actions\GetWorktreesAction;
+use Src\Worktree\Contracts\BranchStandingRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
+use Src\Worktree\Enums\WorktreeOriginEnum;
+use Src\Worktree\Objects\BranchStandingObject;
 use Src\Worktree\Objects\WorktreeEntity;
 
 /**
@@ -87,6 +91,9 @@ class BuildBoardAction extends Command
 	 */
 	private bool $knowsSprints = false;
 
+	/** @var Collection<string, ProjectEntity> */
+	private Collection $projectsByName;
+
 	public function handle(TodoRepositoryContract $todoRepository): CardObjectCollection
 	{
 		$projectEntities = collect(GetProjectsAction::execute());
@@ -103,6 +110,8 @@ class BuildBoardAction extends Command
 			->filter(fn (SessionEntity $sessionEntity) => $sessionEntity->branch !== null)
 			->values();
 
+		$this->projectsByName = $projectEntities->keyBy('name');
+
 		$cardObjects = $this->pieces($projectEntities, collect($todoRepository->getAll()))
 			->groupBy('key')
 			->map(fn (Collection $pieces, string $key) => $this->cardFrom($key, $pieces))
@@ -114,12 +123,42 @@ class BuildBoardAction extends Command
 	}
 
 	/**
-	 * Your turn first, then what Jira marks urgent, then what moved last.
+	 * A conflict first, then your turn, then what Jira marks urgent, then
+	 * what moved last.
 	 */
 	private function order(CardObject $first, CardObject $second): int
 	{
-		return [$second->isYourTurn(), $second->isHighPriority(), $second->changedAt?->getTimestamp() ?? 0]
-			<=> [$first->isYourTurn(), $first->isHighPriority(), $first->changedAt?->getTimestamp() ?? 0];
+		return [$second->hasConflict(), $second->isYourTurn(), $second->isHighPriority(), $second->changedAt?->getTimestamp() ?? 0]
+			<=> [$first->hasConflict(), $first->isYourTurn(), $first->isHighPriority(), $first->changedAt?->getTimestamp() ?? 0];
+	}
+
+	private function standingFor(?string $project, ?string $branch): ?BranchStandingObject
+	{
+		$projectEntity = $project === null ? null : $this->projectsByName->get($project);
+
+		if ($projectEntity === null || $branch === null || in_array($branch, self::MAIN_BRANCHES, true)) {
+			return null;
+		}
+
+		// read by the fetch round, so the board never waits on git
+		return resolve(BranchStandingRepositoryContract::class)->getKnown($projectEntity->path, $branch);
+	}
+
+	/**
+	 * Where the branch is checked out: a working copy of its own, the project
+	 * folder itself, or nowhere yet.
+	 */
+	private function copyPlaceFor(?string $project, ?string $branch, ?WorktreeEntity $worktreeEntity): ?CopyPlaceEnum
+	{
+		if ($project === null || $branch === null) {
+			return null;
+		}
+
+		return match (true) {
+			$this->projectsByName->get($project)?->branch === $branch, $worktreeEntity?->origin === WorktreeOriginEnum::PROJECT => CopyPlaceEnum::MAIN_CHECKOUT,
+			$worktreeEntity !== null => CopyPlaceEnum::OWN,
+			default => CopyPlaceEnum::NONE,
+		};
 	}
 
 	/**
@@ -248,6 +287,17 @@ class BuildBoardAction extends Command
 			$isStale ? $quietDays : null,
 		);
 
+		$standing = $column->canStall() ? $this->standingFor($project, $branch) : null;
+
+		// a clash with the main line blocks the merge, so it outweighs every other turn but work under way
+		if ($standing?->hasConflict() && $column !== BoardColumnEnum::BUILDING && $status !== CardStatusEnum::BUSY) {
+			[$status, $statusText] = [CardStatusEnum::CONFLICT, trans_choice(
+				'Conflict in :count bestand|Conflict in :count bestanden',
+				count($standing->conflictedFiles),
+				['count' => count($standing->conflictedFiles)],
+			)];
+		}
+
 		return new CardObject(
 			id: $key,
 			column: $column,
@@ -270,11 +320,13 @@ class BuildBoardAction extends Command
 				fn (SessionEntity $sessionEntity) => $sessionEntity->mismatchedTicket() !== null,
 			),
 			isStale: $isStale,
-			behind: $column->canStall() ? ($worktreeEntity?->behind ?? 0) : 0,
-			mainBranch: $worktreeEntity?->mainBranch,
+			behind: $column->canStall() ? ($standing?->behind ?? $worktreeEntity?->behind ?? 0) : 0,
+			mainBranch: $standing?->mainBranch ?? $worktreeEntity?->mainBranch,
 			hasWaitingWork: $worktreeEntity?->holdsWork() ?? false,
 			activePullRequest: $this->activePullRequest($taskEntity, $pullRequestEntities),
 			agent: $agent,
+			conflictedFiles: $standing?->conflictedFiles ?? [],
+			copyPlace: $column->canStall() ? $this->copyPlaceFor($project, $branch, $worktreeEntity) : null,
 		);
 	}
 
@@ -495,7 +547,7 @@ class BuildBoardAction extends Command
 		}
 
 		if ($open->reviewers > 0 && $open->approvals >= $open->reviewers) {
-			return [CardStatusEnum::YOURS, __(':approvals van :reviewers goedgekeurd · mergen in Bitbucket', [
+			return [CardStatusEnum::APPROVED, __(':approvals van :reviewers goedgekeurd · mergen in Bitbucket', [
 				'approvals' => $open->approvals,
 				'reviewers' => $open->reviewers,
 			])];
@@ -505,7 +557,7 @@ class BuildBoardAction extends Command
 			return [CardStatusEnum::QUIET, $this->quietFor($staleDays)];
 		}
 
-		return [CardStatusEnum::QUIET, $open->reviewers === 0
+		return [CardStatusEnum::WAITING, $open->reviewers === 0
 			? __('Wacht op reviewers')
 			: __(':approvals van :reviewers goedgekeurd · wacht op collega\'s', [
 				'approvals' => $open->approvals,

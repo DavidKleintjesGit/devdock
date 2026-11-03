@@ -67,7 +67,8 @@
 						<header class="col-head">
 							<span class="dot {{ $column['case']->tone() }}"></span>
 							<h2>{{ $column['case']->label() }}</h2>
-							@if ($column['yours'] > 0)<span class="yours">{{ __(':count jouw beurt', ['count' => $column['yours']]) }}</span>@endif
+							@if ($column['conflicts'] > 0)<span class="conflicts">{{ trans_choice(':count conflict|:count conflicten', $column['conflicts'], ['count' => $column['conflicts']]) }}</span>
+							@elseif ($column['yours'] > 0)<span class="yours">{{ __(':count jouw beurt', ['count' => $column['yours']]) }}</span>@endif
 							<span class="count">{{ $column['total'] }}</span>
 						</header>
 

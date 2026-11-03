@@ -7,11 +7,12 @@ namespace Src\Board\Enums;
 use Src\Board\Objects\CardObject;
 
 /**
- * The three things that make a task jump the queue.
+ * The things that make a task jump the queue.
  */
 enum BoardSignalEnum: string
 {
 	case YOUR_TURN = 'your-turn';
+	case CONFLICT = 'conflict';
 	case HIGH_PRIORITY = 'high-priority';
 	case STALLED = 'stalled';
 
@@ -19,6 +20,7 @@ enum BoardSignalEnum: string
 	{
 		return __(match ($this) {
 			self::YOUR_TURN => 'Jouw beurt',
+			self::CONFLICT => 'Conflict',
 			self::HIGH_PRIORITY => 'Hoge prioriteit',
 			self::STALLED => 'Stilgevallen',
 		});
@@ -28,6 +30,7 @@ enum BoardSignalEnum: string
 	{
 		return match ($this) {
 			self::YOUR_TURN => 'teal',
+			self::CONFLICT => 'red',
 			self::HIGH_PRIORITY => 'red',
 			self::STALLED => 'gray',
 		};
@@ -46,6 +49,7 @@ enum BoardSignalEnum: string
 	{
 		return match ($this) {
 			self::YOUR_TURN => $cardObject->isYourTurn(),
+			self::CONFLICT => $cardObject->hasConflict(),
 			self::HIGH_PRIORITY => $cardObject->isHighPriority(),
 			self::STALLED => $cardObject->isStale,
 		};
