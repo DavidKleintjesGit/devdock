@@ -8,6 +8,9 @@ use Illuminate\Bus\PendingBatch;
 use Illuminate\Support\Facades\Bus;
 use PHPUnit\Framework\Attributes\Test;
 use Src\Board\Models\Todo;
+use Src\Project\Models\Project;
+use Src\Prompt\Enums\PromptStatusEnum;
+use Src\Prompt\Models\PromptRun;
 use Src\Review\Actions\RunLensAction;
 use Src\Review\Actions\StartRoundAction;
 use Src\Review\Contracts\LensProcessRepositoryContract;
@@ -17,6 +20,9 @@ use Src\Review\Exceptions\RoundNotStartedException;
 use Src\Review\Models\Lens;
 use Src\Review\Models\ReviewResult;
 use Src\Review\Models\ReviewRound;
+use Src\Worktree\Exceptions\SetupIncompleteException;
+use Src\Worktree\Exceptions\WorkingCopyBusyException;
+use Src\Worktree\Models\Worktree;
 use Tests\Support\TemporaryGitRepository;
 use Tests\TestCase;
 
@@ -35,6 +41,16 @@ class StartRoundActionTest extends TestCase
 		$this->spy(LensProcessRepositoryContract::class);
 		Bus::fake([RunLensAction::class]);
 		config(['devdock.review.max_rounds' => 3]);
+
+		// a working copy of DevDock that passes its checklist; there is no Herd to give it a site
+		config(['devdock.herd.sites' => $this->repository->root . '/no-herd']);
+		$this->repository->startBranch('feature/billing');
+		$project = Project::factory()->create(['path' => $this->repository->path]);
+		Worktree::factory()->create([
+			'project' => $project->name,
+			'branch' => 'feature/billing',
+			'path' => $this->repository->path,
+		]);
 	}
 
 	protected function tearDown(): void
@@ -269,5 +285,36 @@ class StartRoundActionTest extends TestCase
 
 		$this->assertNull($reviewRoundEntity);
 		$this->assertDatabaseCount('review_rounds', 0);
+	}
+
+	#[Test]
+	public function execute_refuses_a_round_in_a_copy_that_is_not_ready(): void
+	{
+		$todo = Todo::factory()->create();
+		Lens::factory()->create(['paths' => ['billing/*']]);
+		$this->repository->commit('billing/Invoice.php', '<?php', 'Add an invoice');
+		// the copy stands on another branch than the one of its working copy
+		$this->repository->startBranch('feature/other');
+
+		$this->expectException(SetupIncompleteException::class);
+
+		StartRoundAction::execute('todo:' . $todo->id, $this->repository->path);
+	}
+
+	#[Test]
+	public function execute_refuses_a_round_while_the_agent_works_in_the_copy(): void
+	{
+		$todo = Todo::factory()->create();
+		Lens::factory()->create(['paths' => ['billing/*']]);
+		$this->repository->commit('billing/Invoice.php', '<?php', 'Add an invoice');
+		PromptRun::factory()->create([
+			'directory' => $this->repository->path,
+			'status' => PromptStatusEnum::RUNNING->value,
+			'started_at' => now(),
+		]);
+
+		$this->expectException(WorkingCopyBusyException::class);
+
+		StartRoundAction::execute('todo:' . $todo->id, $this->repository->path);
 	}
 }

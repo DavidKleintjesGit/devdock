@@ -50,8 +50,8 @@ use Src\PullRequest\Actions\GetReviewCommentsAction;
 use Src\PullRequest\Objects\PullRequestEntity;
 use Src\PullRequest\Objects\ReviewCommentEntity;
 use Src\Review\Actions\GetLoopStatusAction;
-use Src\Review\Actions\GetRoundTurnsAction;
 use Src\Review\Actions\GetRoundsAction;
+use Src\Review\Actions\GetRoundTurnsAction;
 use Src\Review\Actions\GetWorkflowSettingAction;
 use Src\Review\Actions\ResolveWorkflowStepAction;
 use Src\Review\Actions\RetryLensAction;
@@ -80,17 +80,26 @@ use Src\Task\Objects\TaskEntity;
 use Src\Ticket\Actions\GetTicketsAction;
 use Src\Ticket\Objects\TicketEntity;
 use Src\Worktree\Actions\BuildFileTreeAction;
+use Src\Worktree\Actions\CheckReadinessAction;
 use Src\Worktree\Actions\CreateWorktreeDatabaseAction;
+use Src\Worktree\Actions\EnsureReadyAction;
 use Src\Worktree\Actions\EnsureWorktreeAction;
 use Src\Worktree\Actions\GetChangesAction;
+use Src\Worktree\Actions\GetReadinessAction;
+use Src\Worktree\Actions\GetRepairStateAction;
 use Src\Worktree\Actions\GetWorktreesAction;
 use Src\Worktree\Actions\ReadDiffAction;
 use Src\Worktree\Actions\RemoveWorktreeAction;
 use Src\Worktree\Actions\RenameToTicketAction;
+use Src\Worktree\Actions\StartRepairAction;
 use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Enums\DatabaseFillEnum;
 use Src\Worktree\Enums\DiffViewEnum;
+use Src\Worktree\Enums\SetupCheckEnum;
+use Src\Worktree\Enums\WorkKindEnum;
+use Src\Worktree\Exceptions\SetupIncompleteException;
+use Src\Worktree\Exceptions\WorkingCopyBusyException;
 use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Src\Worktree\Objects\ChangeObject;
 use Src\Worktree\Objects\DiffHunkObjectCollection;
@@ -336,6 +345,38 @@ class Drawer extends Component
 		$this->failure = null;
 	}
 
+	/**
+	 * Repairs one open point of the checklist of this card's working copy, or
+	 * all of them, in a process of its own.
+	 */
+	public function repairSetup(?string $setupCheck = null): void
+	{
+		$this->failure = null;
+
+		$worktreeEntity = $this->worktreeFor($this->cardById($this->board(), (string) $this->openCard));
+
+		if ($worktreeEntity === null) {
+			return;
+		}
+
+		if (! StartRepairAction::execute($worktreeEntity->path, SetupCheckEnum::tryFrom((string) $setupCheck))) {
+			$this->failure = __('Er loopt al een herstelactie in deze werkkopie.');
+		}
+	}
+
+	/**
+	 * Reads the checklist of this card's working copy again, migrations included.
+	 */
+	public function checkSetupAgain(): void
+	{
+		$worktreeEntity = $this->worktreeFor($this->cardById($this->board(), (string) $this->openCard));
+
+		if ($worktreeEntity !== null) {
+			CheckReadinessAction::execute($worktreeEntity->path, true);
+			GetReadinessAction::forget($worktreeEntity->path);
+		}
+	}
+
 	public function startRound(): void
 	{
 		$this->failure = null;
@@ -355,7 +396,7 @@ class Drawer extends Component
 			if (StartRoundAction::execute($cardObject->id, $worktreeEntity->path) === null) {
 				$this->failure = __('Er ging geen ronde open.');
 			}
-		} catch (WorktreeNotPossibleException|RoundNotStartedException $refusal) {
+		} catch (WorktreeNotPossibleException|RoundNotStartedException|SetupIncompleteException|WorkingCopyBusyException $refusal) {
 			$this->failure = $refusal->getMessage();
 		}
 	}
@@ -381,7 +422,7 @@ class Drawer extends Component
 			if (StartRoundAction::execute($cardObject->id, $worktreeEntity->path, true) === null) {
 				$this->failure = __('Er ging geen ronde open.');
 			}
-		} catch (WorktreeNotPossibleException|RoundNotStartedException $refusal) {
+		} catch (WorktreeNotPossibleException|RoundNotStartedException|SetupIncompleteException|WorkingCopyBusyException $refusal) {
 			$this->failure = $refusal->getMessage();
 		}
 	}
@@ -591,6 +632,14 @@ class Drawer extends Component
 
 		if ($directory === null) {
 			$this->failure = __('Er is nog geen map om Claude in te openen. Maak eerst de werkkopie.');
+
+			return;
+		}
+
+		try {
+			EnsureReadyAction::execute($directory, WorkKindEnum::TERMINAL);
+		} catch (SetupIncompleteException|WorkingCopyBusyException $refusal) {
+			$this->failure = $refusal->getMessage();
 
 			return;
 		}
@@ -1036,6 +1085,8 @@ class Drawer extends Component
 			)),
 			'claudeAvailable' => resolve(ClaudeProcessRepositoryContract::class)->isAvailable(),
 			...($tab === 'Werkkopie' ? $this->workingCopyData($cardObject, $worktreeEntity, $changes) : ['worktree' => $worktreeEntity]),
+			'readiness' => $worktreeEntity === null ? null : GetReadinessAction::execute($worktreeEntity->path),
+			'repairState' => $worktreeEntity === null ? null : GetRepairStateAction::execute($worktreeEntity->path),
 			...($tab === 'Context' ? $this->cardContextData($cardObject, $this->projectPathFor($cardObject), $worktreeEntity?->path ?? $this->projectPathFor($cardObject)) : []),
 			'branchSuggestion' => $this->newBranch,
 			'readableProjects' => $taskEntity?->valuesFor(TaskLinkKindEnum::READABLE_PROJECT) ?? [],

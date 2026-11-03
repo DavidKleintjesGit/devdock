@@ -97,6 +97,18 @@ class PromptRunRepository implements PromptRunRepositoryContract
 		return $latest;
 	}
 
+	public function getRunningSince(CarbonImmutable $since): PromptRunEntityCollection
+	{
+		$promptRunEntities = PromptRunEloquent::query()
+			->where('status', PromptStatusEnum::RUNNING->value)
+			->where('started_at', '>=', $since)
+			->get()
+			->map(fn (PromptRunEloquent $promptRunEloquent) => $this->mapToEntity($promptRunEloquent))
+			->all();
+
+		return PromptRunEntityCollection::fromArray($promptRunEntities);
+	}
+
 	public function getByReviewRounds(string $card): array
 	{
 		$byRound = [];

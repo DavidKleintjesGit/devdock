@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Bus;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 use Src\Board\Models\Todo;
+use Src\Project\Models\Project;
 use Src\Prompt\Actions\RunPromptAction;
 use Src\Prompt\Contracts\ClaudeProcessRepositoryContract;
 use Src\Prompt\Enums\PromptStatusEnum;
@@ -23,6 +24,7 @@ use Src\Review\Models\ReviewResult;
 use Src\Review\Models\ReviewRound;
 use Src\Session\Contracts\SessionFileRepositoryContract;
 use Src\Session\Objects\SessionObjectCollection;
+use Src\Worktree\Models\Worktree;
 use Tests\Support\TemporaryGitRepository;
 use Tests\TestCase;
 
@@ -43,6 +45,16 @@ class RunPromptActionTest extends TestCase
 		$this->mock(SessionFileRepositoryContract::class)->shouldReceive('getAll')->andReturn(SessionObjectCollection::fromArray([]));
 		Bus::fake([RunLensAction::class]);
 		config(['devdock.review.max_rounds' => 3]);
+
+		// a working copy of DevDock that passes its checklist; there is no Herd to give it a site
+		config(['devdock.herd.sites' => $this->repository->root . '/no-herd']);
+		$this->repository->startBranch('feature/billing');
+		$project = Project::factory()->create(['path' => $this->repository->path]);
+		Worktree::factory()->create([
+			'project' => $project->name,
+			'branch' => 'feature/billing',
+			'path' => $this->repository->path,
+		]);
 	}
 
 	protected function tearDown(): void

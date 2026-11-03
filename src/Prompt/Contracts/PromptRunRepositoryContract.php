@@ -42,6 +42,11 @@ interface PromptRunRepositoryContract
 	public function getLatestPerCard(): array;
 
 	/**
+	 * The turns still running that started after the given moment.
+	 */
+	public function getRunningSince(CarbonImmutable $since): PromptRunEntityCollection;
+
+	/**
 	 * De beurten die de agent op een ronde deed, op rondenummer. Daarmee is
 	 * per ronde terug te lezen wat hij met de punten deed.
 	 *

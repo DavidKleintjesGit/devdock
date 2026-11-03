@@ -51,4 +51,16 @@ interface WorkingCopyRepositoryContract
 	 * @return array<int, array{folder: string, lock: string, isBorrowed: bool, isSameLock: bool}>
 	 */
 	public function getPackages(string $repositoryPath, string $path): array;
+
+	/**
+	 * Whether Herd serves this site from a link in its Sites folder; null
+	 * when there is no Herd to ask.
+	 */
+	public function isPublished(string $site): ?bool;
+
+	/**
+	 * Takes one borrowed package folder out of the copy, so it can get an
+	 * installation of its own. The packages in the checkout stay as they are.
+	 */
+	public function returnBorrowed(string $path, string $folder): void;
 }

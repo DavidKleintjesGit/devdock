@@ -39,13 +39,7 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 	public function release(string $path, ?string $site): void
 	{
 		foreach (array_keys((array) config('devdock.worktree.share')) as $folder) {
-			// a vendor borrowed package by package holds links at every depth;
-			// they go first, so removing the folder never reaches into the checkout
-			if (is_dir($path . '/' . $folder) && ! $this->isLink($path . '/' . $folder)) {
-				$this->dropLinksIn($path . '/' . $folder);
-			}
-
-			$this->drop($path . '/' . $folder);
+			$this->returnBorrowed($path, $folder);
 		}
 
 		if ($site !== null) {
@@ -55,6 +49,50 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 				$this->drop($sites . '/' . $this->nameOf($site));
 			}
 		}
+	}
+
+	public function returnBorrowed(string $path, string $folder): void
+	{
+		$this->removeWithoutFollowingLinks($path . '/' . $folder);
+	}
+
+	/**
+	 * Removes a folder that may hold links into the checkout. Every link is
+	 * taken away as a link and never entered, so nothing in the checkout is
+	 * touched; the files of the copy itself, hard links included, go with it.
+	 */
+	private function removeWithoutFollowingLinks(string $path): void
+	{
+		if ($this->isLink($path)) {
+			$this->drop($path);
+
+			return;
+		}
+
+		if (! is_dir($path)) {
+			if (is_file($path)) {
+				@chmod($path, 0666);
+				@unlink($path);
+			}
+
+			return;
+		}
+
+		foreach (@scandir($path) ?: [] as $entry) {
+			if ($entry !== '.' && $entry !== '..') {
+				$this->removeWithoutFollowingLinks($path . '/' . $entry);
+			}
+		}
+
+		@rmdir($path);
+		clearstatcache(true);
+	}
+
+	public function isPublished(string $site): ?bool
+	{
+		$sites = $this->sitesPath();
+
+		return $sites === null || ! is_dir($sites) ? null : file_exists($sites . '/' . $this->nameOf($site));
 	}
 
 	/**
@@ -325,27 +363,6 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 			in_array($child, $scriptFolders, true)
 				? $this->borrowFolder($directory, $link . '/' . $name, $child, $scriptFolders)
 				: $this->link($directory, $link . '/' . $name);
-		}
-	}
-
-	/**
-	 * Takes every borrowed folder out of a real one, at any depth, so what is
-	 * left can be removed without reaching into the checkout.
-	 */
-	private function dropLinksIn(string $folder): void
-	{
-		foreach (@scandir($folder) ?: [] as $entry) {
-			if ($entry === '.' || $entry === '..') {
-				continue;
-			}
-
-			$path = $folder . '/' . $entry;
-
-			if ($this->isLink($path)) {
-				$this->drop($path);
-			} elseif (is_dir($path)) {
-				$this->dropLinksIn($path);
-			}
 		}
 	}
 

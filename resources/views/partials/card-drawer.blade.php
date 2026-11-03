@@ -76,6 +76,8 @@
 			</div>
 		@endif
 
+		@include('partials.card.gereed-balk')
+
 		@include('partials.skeletons.tab')
 
 		@switch ($tab)

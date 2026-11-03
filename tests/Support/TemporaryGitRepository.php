@@ -120,6 +120,26 @@ class TemporaryGitRepository
 	}
 
 	/**
+	 * Cuts a new branch from the current commit and checks it out, without an upstream.
+	 */
+	public function startBranch(string $branch): void
+	{
+		$this->git('checkout', '--quiet', '-b', $branch);
+	}
+
+	/**
+	 * Adds a git worktree on a new branch inside this checkout, the way
+	 * DevDock lays one down, and returns its path.
+	 */
+	public function addWorktree(string $branch): string
+	{
+		$path = $this->path . '/.worktrees/' . str_replace('/', '-', $branch);
+		$this->git('worktree', 'add', '--quiet', '-b', $branch, $path);
+
+		return $path;
+	}
+
+	/**
 	 * Pushes the branch to origin and takes the local one away, so it only
 	 * stands on the remote.
 	 */

@@ -14,6 +14,10 @@ use Src\Prompt\Objects\PromptRunEntity;
 use Src\Prompt\Objects\PromptRunObject;
 use Src\Review\Enums\RoundStatusEnum;
 use Src\Review\Objects\ReviewRoundEntity;
+use Src\Worktree\Actions\EnsureReadyAction;
+use Src\Worktree\Enums\WorkKindEnum;
+use Src\Worktree\Exceptions\SetupIncompleteException;
+use Src\Worktree\Exceptions\WorkingCopyBusyException;
 
 /**
  * Zet de lus door na een ronde die niet schoon terugkwam: de agent krijgt de
@@ -55,7 +59,8 @@ class ContinueReviewAction extends Command
 
 			$prompt = BuildRoundPromptAction::execute($this->reviewRoundEntity);
 
-			if ($prompt === null) {
+			// a copy that is not ready or still busy waits without a failed turn; the card says why, and the next fetch round tries again
+			if ($prompt === null || ! $this->isReady()) {
 				return null;
 			}
 
@@ -75,5 +80,16 @@ class ContinueReviewAction extends Command
 		return $this->reviewRoundEntity->status === RoundStatusEnum::FAILED
 			&& $this->reviewRoundEntity->openFindings() > 0
 			&& $this->reviewRoundEntity->positionInSeries() < GetWorkflowSettingAction::execute($project)->maxRounds;
+	}
+
+	private function isReady(): bool
+	{
+		try {
+			EnsureReadyAction::execute($this->reviewRoundEntity->directory, WorkKindEnum::AGENT_TURN);
+		} catch (SetupIncompleteException|WorkingCopyBusyException) {
+			return false;
+		}
+
+		return true;
 	}
 }

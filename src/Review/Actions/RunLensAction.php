@@ -20,8 +20,12 @@ use Src\Review\Objects\LensId;
 use Src\Review\Objects\ReviewRoundEntity;
 use Src\Review\Objects\ReviewRoundId;
 use Src\Task\Actions\GetReadableDirectoriesAction;
+use Src\Worktree\Actions\EnsureReadyAction;
 use Src\Worktree\Actions\GetWorktreesAction;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
+use Src\Worktree\Enums\WorkKindEnum;
+use Src\Worktree\Exceptions\SetupIncompleteException;
+use Src\Worktree\Exceptions\WorkingCopyBusyException;
 use Src\Worktree\Objects\WorktreeEntity;
 use Throwable;
 
@@ -83,6 +87,12 @@ class RunLensAction extends Command implements ShouldQueue
 		}
 
 		$directory = $reviewRoundEntity->directory;
+
+		try {
+			EnsureReadyAction::execute($directory, WorkKindEnum::LENS);
+		} catch (SetupIncompleteException|WorkingCopyBusyException $refusal) {
+			return $reviewRoundRepository->writeResult($this->reviewRoundId, $this->lensId, VerdictEnum::ERROR, 0, $refusal->getMessage());
+		}
 
 		$reviewRoundRepository->markResultRunning($this->reviewRoundId, $this->lensId, null);
 

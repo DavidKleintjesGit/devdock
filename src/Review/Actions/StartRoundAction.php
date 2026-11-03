@@ -21,8 +21,12 @@ use Src\Review\Objects\LensEntity;
 use Src\Review\Objects\ReviewRoundEntity;
 use Src\Review\Objects\ReviewRoundId;
 use Src\Worktree\Actions\EnsureOnBranchAction;
+use Src\Worktree\Actions\EnsureReadyAction;
 use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
+use Src\Worktree\Enums\WorkKindEnum;
+use Src\Worktree\Exceptions\SetupIncompleteException;
+use Src\Worktree\Exceptions\WorkingCopyBusyException;
 use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 
 /**
@@ -40,6 +44,8 @@ use Src\Worktree\Exceptions\WorktreeNotPossibleException;
  *
  * @throws WorktreeNotPossibleException
  * @throws RoundNotStartedException
+ * @throws SetupIncompleteException
+ * @throws WorkingCopyBusyException
  */
 class StartRoundAction extends Command
 {
@@ -72,6 +78,8 @@ class StartRoundAction extends Command
 		if ($standing !== null) {
 			return $standing;
 		}
+
+		EnsureReadyAction::execute($this->directory, WorkKindEnum::ROUND);
 
 		$latest = collect($rounds)->last();
 

@@ -39,6 +39,8 @@
 	</div>
 @else
 	<div class="dbody">
+		@include('partials.card.gereed-lijst')
+
 		@if ($committed)
 			<div class="alert green dfail"><x-icon name="check" small/><span>{{ $committed }}</span></div>
 		@endif

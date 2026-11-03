@@ -14,7 +14,11 @@ use Src\Task\Actions\OpenAgentAction;
 use Src\Task\Contracts\TaskRepositoryContract;
 use Src\Task\Objects\TaskAgentEntity;
 use Src\Worktree\Actions\EnsureOnBranchAction;
+use Src\Worktree\Actions\EnsureReadyAction;
 use Src\Worktree\Actions\ResolveWorkingCopyAction;
+use Src\Worktree\Enums\WorkKindEnum;
+use Src\Worktree\Exceptions\SetupIncompleteException;
+use Src\Worktree\Exceptions\WorkingCopyBusyException;
 use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 
 /**
@@ -25,8 +29,9 @@ use Src\Worktree\Exceptions\WorktreeNotPossibleException;
  * key of our own before anything leaves, so the session is ours from the first
  * round instead of something we recognise afterwards.
  *
- * A task with a branch runs where that branch stands: in the checkout when it
- * is open there, otherwise in a working copy of its own.
+ * A turn only starts in a working copy that passes its checklist and has no
+ * other work running in it. A refusal is written as a failed turn, so the
+ * chat says why nothing happened.
  *
  * @method static PromptRunEntity execute(PromptRunObject $promptRunObject)
  */
@@ -43,7 +48,8 @@ class StartPromptAction extends Command
 	): PromptRunEntity {
 		try {
 			$directory = $this->directory();
-		} catch (WorktreeNotPossibleException $failure) {
+			EnsureReadyAction::execute($directory, WorkKindEnum::AGENT_TURN);
+		} catch (WorktreeNotPossibleException|SetupIncompleteException|WorkingCopyBusyException $failure) {
 			$promptRunEntity = $promptRunRepository->create($this->promptRunObject);
 
 			return $promptRunRepository->markFailed($promptRunEntity->promptRunId, $failure->getMessage());

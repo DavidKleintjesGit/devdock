@@ -21,6 +21,8 @@ use Src\Session\Objects\SessionEntity;
 use Src\Task\Actions\GetReadableDirectoriesAction;
 use Src\Task\Contracts\TaskRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
+use Src\Worktree\Exceptions\SetupIncompleteException;
+use Src\Worktree\Exceptions\WorkingCopyBusyException;
 use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Throwable;
 
@@ -75,7 +77,7 @@ class RunPromptAction extends Command
 		if ($promptRunEntity->reviewRoundId !== null && ReadReportAction::execute($promptRunEntity->output)?->status === ReportStatusEnum::DONE) {
 			try {
 				StartRoundAction::execute($promptRunEntity->card, $promptRunEntity->directory);
-			} catch (WorktreeNotPossibleException|RoundNotStartedException) {
+			} catch (WorktreeNotPossibleException|RoundNotStartedException|SetupIncompleteException|WorkingCopyBusyException) {
 				// the folder left the branch of the task, or the loop is full; it waits until you start the next round yourself
 			}
 		}
