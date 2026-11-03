@@ -14,7 +14,9 @@ use Src\Review\Contracts\AgentContextRepositoryContract;
 use Src\Review\Contracts\LensProcessRepositoryContract;
 use Src\Review\Contracts\LensRepositoryContract;
 use Src\Review\Contracts\ReviewRoundRepositoryContract;
+use Src\Review\Enums\RoundStatusEnum;
 use Src\Review\Enums\VerdictEnum;
+use Src\Review\Exceptions\RoundNotStartedException;
 use Src\Review\Objects\LensEntity;
 use Src\Review\Objects\ReviewRoundEntity;
 use Src\Review\Objects\ReviewRoundId;
@@ -31,11 +33,13 @@ use Src\Worktree\Exceptions\WorktreeNotPossibleException;
  * A round runs at every delivery, not at every prompt.
  *
  * A loop holds at most the rounds the workflow allows. Restarting it starts a
- * new series, after you looked at what went wrong.
+ * new series, after you looked at what went wrong; so does the first round
+ * after a clean or broken-off one.
  *
  * @method static ?ReviewRoundEntity execute(string $card, ?string $directory, bool $startsSeries = false)
  *
  * @throws WorktreeNotPossibleException
+ * @throws RoundNotStartedException
  */
 class StartRoundAction extends Command
 {
@@ -71,14 +75,20 @@ class StartRoundAction extends Command
 
 		$latest = collect($rounds)->last();
 
-		if (! $this->startsSeries && $latest !== null && $latest->positionInSeries() >= GetWorkflowSettingAction::execute($cardObject->project)->maxRounds) {
-			return null;
+		// a round that left nothing open, or that you broke off, ends its loop, so the next one begins a new series
+		$startsSeries = $this->startsSeries
+			|| $latest?->openFindings() === 0
+			|| $latest?->status === RoundStatusEnum::STOPPED;
+		$maxRounds = GetWorkflowSettingAction::execute($cardObject->project)->maxRounds;
+
+		if (! $startsSeries && $latest !== null && $latest->positionInSeries() >= $maxRounds) {
+			throw RoundNotStartedException::maximumReached($maxRounds);
 		}
 
 		$files = $worktreeRepository->getChangedFiles($this->directory);
 
 		if ($files === []) {
-			return null;
+			throw RoundNotStartedException::nothingChanged();
 		}
 
 		WriteAgentContextAction::execute($this->card, $this->directory);
@@ -112,7 +122,7 @@ class StartRoundAction extends Command
 			$this->directory,
 			$lenses,
 			$worktreeRepository->getFingerprint($this->directory),
-			$this->startsSeries,
+			$startsSeries,
 		);
 
 		$jobs = [];

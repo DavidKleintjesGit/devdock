@@ -59,6 +59,7 @@ use Src\Review\Contracts\AgentContextRepositoryContract;
 use Src\Review\Contracts\ReviewRoundRepositoryContract;
 use Src\Review\Enums\RoundStatusEnum;
 use Src\Review\Enums\WorkflowStepEnum;
+use Src\Review\Exceptions\RoundNotStartedException;
 use Src\Review\Objects\LensId;
 use Src\Review\Objects\ReviewResultEntity;
 use Src\Review\Objects\ReviewRoundEntity;
@@ -350,9 +351,9 @@ class Drawer extends Component
 
 		try {
 			if (StartRoundAction::execute($cardObject->id, $worktreeEntity->path) === null) {
-				$this->failure = __('Er ging geen ronde open: er staat niets gewijzigd, of het maximum aantal rondes is bereikt.');
+				$this->failure = __('Er ging geen ronde open.');
 			}
-		} catch (WorktreeNotPossibleException $refusal) {
+		} catch (WorktreeNotPossibleException|RoundNotStartedException $refusal) {
 			$this->failure = $refusal->getMessage();
 		}
 	}
@@ -368,11 +369,17 @@ class Drawer extends Component
 		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
 		$worktreeEntity = $this->worktreeFor($cardObject);
 
+		if ($cardObject === null || $worktreeEntity === null) {
+			$this->failure = __('Zonder werkkopie is er niets om de lenzen over te laten gaan.');
+
+			return;
+		}
+
 		try {
-			if ($cardObject === null || $worktreeEntity === null || StartRoundAction::execute($cardObject->id, $worktreeEntity->path, true) === null) {
-				$this->failure = __('De loop startte niet opnieuw: er staat niets gewijzigd in de werkkopie.');
+			if (StartRoundAction::execute($cardObject->id, $worktreeEntity->path, true) === null) {
+				$this->failure = __('Er ging geen ronde open.');
 			}
-		} catch (WorktreeNotPossibleException $refusal) {
+		} catch (WorktreeNotPossibleException|RoundNotStartedException $refusal) {
 			$this->failure = $refusal->getMessage();
 		}
 	}

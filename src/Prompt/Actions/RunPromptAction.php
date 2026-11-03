@@ -12,6 +12,7 @@ use Src\Prompt\Objects\PromptRunEntity;
 use Src\Prompt\Objects\PromptRunId;
 use Src\Review\Actions\StartRoundAction;
 use Src\Review\Contracts\AgentContextRepositoryContract;
+use Src\Review\Exceptions\RoundNotStartedException;
 use Src\Session\Actions\RenameSessionAction;
 use Src\Session\Actions\ScanSessionsAction;
 use Src\Session\Objects\SessionEntity;
@@ -71,8 +72,8 @@ class RunPromptAction extends Command
 		if ($promptRunEntity->reviewRoundId !== null && ReadReportAction::execute($promptRunEntity->output)?->status === ReportStatusEnum::DONE) {
 			try {
 				StartRoundAction::execute($promptRunEntity->card, $promptRunEntity->directory);
-			} catch (WorktreeNotPossibleException) {
-				// the folder left the branch of the task; the loop waits until you start the next round yourself
+			} catch (WorktreeNotPossibleException|RoundNotStartedException) {
+				// the folder left the branch of the task, or the loop is full; it waits until you start the next round yourself
 			}
 		}
 
