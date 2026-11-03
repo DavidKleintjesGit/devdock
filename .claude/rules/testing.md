@@ -14,7 +14,7 @@ How tests are written, named, and asserted. Code style inside a test follows `co
 
 ## Naming
 
-- **The pattern is `{subject}_{action}_{description}`.** Subject first, then the verb, then the condition or outcome. Keep the `/** @test */` annotation; no `it_` prefix and no `test` prefix.
+- **The pattern is `{subject}_{action}_{description}`.** Subject first, then the verb, then the condition or outcome. Mark the method with the `#[Test]` attribute (`PHPUnit\Framework\Attributes\Test`), since PHPUnit 12 no longer reads the `/** @test */` annotation; no `it_` prefix and no `test` prefix.
 - **The subject is the entry point being tested** — the method, property, or variable the assertion is directly about. It is never optional: `excludes_unpaid_invoices` leaves the reader guessing what excludes them, the component or the query or the rows.
 - Use the **method name** when testing what a method produces overall — `render_filters_by_status`, `apply_filters_resets_page`.
 - Use a **variable name** only when the test targets one specific named output — `rows_excludes_unpaid_invoices`, `cache_is_filled_after_first_render`.
@@ -67,7 +67,7 @@ Not every method needs all three. A feature with only a happy path is not finish
 ## Request payloads
 
 - **`POST`, `PUT`, and `PATCH` tests get a private `valid{Model}Request(array $overrides = []): array` helper.** Never build a request array inline in the test method.
-- **Helpers live at the top of the class**, above the first `/** @test */` method. They declare what a valid payload looks like, so they belong where a constructor would.
+- **Helpers live at the top of the class**, above the first `#[Test]` method. They declare what a valid payload looks like, so they belong where a constructor would.
 - **The base is `Model::factory()->raw()`.** Related models that must exist as real rows are created with `->create()` inside the helper. Overrides are merged last.
 - **One helper serves both `store` and `update`.** Pass an override only for the field the test is actually about.
 - **A missing required field is a factory problem, not a helper problem.** Add it to `definition()` with a `fake()` value so `raw()` produces a complete payload. The helper may only add `active => 1` — the boolean default converted to a form-valid integer — and foreign keys from its own `->create()` calls. Never a hardcoded literal.
