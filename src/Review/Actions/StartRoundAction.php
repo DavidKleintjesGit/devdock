@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Bus;
 use Src\Board\Actions\BuildBoardAction;
 use Src\Board\Objects\CardObject;
 use Src\Packages\Cqrs\Command;
+use Src\Project\Actions\GetProjectsAction;
+use Src\Project\Objects\ProjectEntity;
 use Src\Review\Contracts\AgentContextRepositoryContract;
 use Src\Review\Contracts\LensProcessRepositoryContract;
 use Src\Review\Contracts\LensRepositoryContract;
@@ -17,6 +19,7 @@ use Src\Review\Objects\LensEntity;
 use Src\Review\Objects\ReviewRoundEntity;
 use Src\Review\Objects\ReviewRoundId;
 use Src\Worktree\Actions\EnsureOnBranchAction;
+use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 
@@ -88,13 +91,17 @@ class StartRoundAction extends Command
 			->filter(fn (LensEntity $lensEntity) => $lensEntity->isEnabled);
 
 		$lenses = [];
+		$sharesDatabase = $this->sharesDatabase($cardObject);
 
 		foreach ($called as $lensEntity) {
 			$touches = $lensEntity->touches($files);
 
+			// a lens that writes data while it tries things out never works in the database of the project
+			$needsOwnDatabase = GetLensBriefAction::execute($lensEntity->name)?->needsOwnDatabase ?? false;
+
 			$lenses[] = [
 				'lens_id' => $lensEntity->lensId,
-				'verdict' => $touches === [] ? VerdictEnum::SKIPPED : VerdictEnum::WAITING,
+				'verdict' => $touches === [] || ($needsOwnDatabase && $sharesDatabase) ? VerdictEnum::SKIPPED : VerdictEnum::WAITING,
 				'touched_files' => count($touches),
 			];
 		}
@@ -143,5 +150,18 @@ class StartRoundAction extends Command
 		}
 
 		return null;
+	}
+
+	/**
+	 * Whether the working copy of the round still uses the database of the project.
+	 */
+	private function sharesDatabase(CardObject $cardObject): bool
+	{
+		$projectPath = GetProjectsAction::execute()
+			->first(fn (ProjectEntity $projectEntity) => $projectEntity->name === $cardObject->project)
+			?->path;
+
+		return $projectPath === null
+			|| resolve(WorktreeDatabaseRepositoryContract::class)->describe($projectPath, (string) $this->directory)->isShared;
 	}
 }

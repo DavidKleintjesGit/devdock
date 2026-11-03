@@ -35,6 +35,7 @@ class ComposeLensContextAction extends Command
 			__('Je bent :name, een reviewer op deze werkkopie.', ['name' => $this->lensEntity->name]),
 			$this->lensEntity->description,
 			'',
+			GetLensBriefAction::execute($this->lensEntity->name)?->text,
 			$this->whatChanged(),
 			$this->previousRound(),
 			$this->howToGoAbout(),
