@@ -90,7 +90,7 @@ class ComposeLensContextAction extends Command
 		return implode("\n", [
 			...$lines,
 			__('- Wil je weten waarom code er zo uitziet, kijk dan in het Jira-ticket, in eerdere pull requests in Bitbucket (zoek de operatie met discover, roep hem aan met executeRead) of in git log en git blame. Je oordeel gaat over deze wijziging.'),
-			__('- Verander geen bestand, commit niet en push niet. Je levert alleen een oordeel.'),
+			__('- Verander geen bestand en schrijf niets in git. Je levert alleen een oordeel.'),
 			__('- Noem alleen wat echt fout is. Smaak is geen bevinding.'),
 			'',
 			__('Antwoord met precies dit blok en niets erbuiten. PASS als je niets vond:'),

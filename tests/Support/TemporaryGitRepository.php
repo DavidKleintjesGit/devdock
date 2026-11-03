@@ -10,6 +10,7 @@ use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RuntimeException;
 use Src\Packages\Process\LocalCommand;
+use Symfony\Component\Process\Process;
 
 /**
  * A git checkout in the temp folder with a bare repository beside it as its
@@ -144,6 +145,20 @@ class TemporaryGitRepository
 	public function branchIn(string $path): string
 	{
 		return $this->run($path, ['git', 'branch', '--show-current']);
+	}
+
+	/**
+	 * Whether a git command goes through when it runs with these extra
+	 * environment variables, as a process started by DevDock would.
+	 *
+	 * @param  array<string, string>  $environment
+	 */
+	public function gitSucceedsWith(array $environment, string ...$arguments): bool
+	{
+		$process = new Process(['git', ...$arguments], $this->path, $environment);
+		$process->run();
+
+		return $process->isSuccessful();
 	}
 
 	public function git(string ...$arguments): string

@@ -143,7 +143,8 @@ class BuildReviewPromptAction extends Command
 			__('- Is het al opgelost, zeg dan welke commit dat deed en stel voor de opmerking af te vinken. Vink zelf niets af.'),
 			__('- Is het nog open, pas het dan aan volgens de regels uit CLAUDE.md en draai de tests van wat je aanraakt.'),
 			__('- Ben je het ergens niet mee eens, schrijf dan een voorstel voor een antwoord en laat het aan mij zien.'),
-			__('- Plaats geen reacties in Bitbucket, vink geen opmerkingen af, commit niet en push niet zonder dat ik daar eerst ja op heb gezegd. Leg het voor, wacht op mijn akkoord en doe het daarna pas.'),
+			__('- Plaats geen reacties in Bitbucket en vink geen opmerkingen af zonder dat ik daar eerst ja op heb gezegd. Leg het voor, wacht op mijn akkoord en doe het daarna pas.'),
+			__('- Git lees je alleen. Committen, pushen en rebasen doe ik met de knoppen in DevDock, en DevDock houdt het voor jou tegen. Laat je werk in de werkkopie staan.'),
 			DescribeReportAction::execute(),
 		]);
 	}

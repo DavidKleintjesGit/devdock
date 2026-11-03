@@ -196,9 +196,10 @@ return [
 	'claude_binary' => env('DEVDOCK_CLAUDE_BINARY'),
 	'claude_token' => env('DEVDOCK_CLAUDE_TOKEN'),
 
-	// agents and lenses may look things up in Jira, Confluence and Bitbucket, but
-	// write nothing there: every one of these tools is denied on every server listed
-	'read_only' => [
+	// what agents, lenses and helpers may reach. They look things up in Jira, Confluence
+	// and Bitbucket, but every writing tool below is denied on every server listed;
+	// git they only read, since committing, pushing and rebasing are done with the buttons
+	'access' => [
 		'servers' => [
 			'claude_ai_Atlassian_MCP',
 			'claude_ai_Atlassian_Rovo',

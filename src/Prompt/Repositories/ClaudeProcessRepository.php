@@ -9,7 +9,9 @@ use Dotenv\Dotenv;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
+use Src\Access\Objects\AccessPolicyObject;
 use Src\Packages\Process\DetachedCommand;
+use Src\Packages\Process\LocalCommand;
 use Src\Prompt\Contracts\ClaudeProcessRepositoryContract;
 use Src\Prompt\Objects\PromptResultObject;
 use Src\Prompt\Objects\PromptRunEntity;
@@ -38,12 +40,12 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 * Opens Claude Code in a terminal window of its own. The window stays open
 	 * after Claude stops, so an error is still readable.
 	 */
-	public function openInTerminal(string $directory, ?string $sessionUuid, array $alsoReads = [], ?string $instructionsFile = null): void
+	public function openInTerminal(AccessPolicyObject $accessPolicyObject, string $directory, ?string $sessionUuid, array $alsoReads = [], ?string $instructionsFile = null): void
 	{
 		$claude = escapeshellarg($this->claudeBinary());
 		$resume = $sessionUuid === null ? '' : ' --resume ' . escapeshellarg($sessionUuid);
 
-		foreach ($this->alsoReads($alsoReads) as $argument) {
+		foreach ([...$this->alsoReads($alsoReads), ...$this->accessArguments($accessPolicyObject)] as $argument) {
 			$claude .= ' ' . escapeshellarg($argument);
 		}
 
@@ -57,13 +59,27 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 			? sprintf('start "Claude" /d %s cmd /k %s%s', escapeshellarg($directory), $claude, $resume)
 			: sprintf('cd %s && %s%s', escapeshellarg($directory), $claude, $resume);
 
-		$handle = popen(
-			PHP_OS_FAMILY === 'Windows' ? $command : resolve(DetachedCommand::class)->cutLoose($command),
-			'r',
-		);
+		// the window inherits this process's environment, so the git guard is put in it only while the window opens
+		$gitGuard = $this->gitGuard($directory);
+		$standing = array_map(fn (string $name): string|false => getenv($name), array_combine(array_keys($gitGuard), array_keys($gitGuard)));
 
-		if (is_resource($handle)) {
-			pclose($handle);
+		foreach ($gitGuard as $name => $value) {
+			putenv($name . '=' . $value);
+		}
+
+		try {
+			$handle = popen(
+				PHP_OS_FAMILY === 'Windows' ? $command : resolve(DetachedCommand::class)->cutLoose($command),
+				'r',
+			);
+
+			if (is_resource($handle)) {
+				pclose($handle);
+			}
+		} finally {
+			foreach ($standing as $name => $value) {
+				putenv($value === false ? $name : $name . '=' . $value);
+			}
 		}
 	}
 
@@ -93,7 +109,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 * session id next to the answer, so a fresh session can be tied to the
 	 * board and renamed afterwards.
 	 */
-	public function run(PromptRunEntity $promptRunEntity, array $alsoReads, string $logPath, string $instructionsPath): PromptResultObject
+	public function run(AccessPolicyObject $accessPolicyObject, PromptRunEntity $promptRunEntity, array $alsoReads, string $logPath, string $instructionsPath): PromptResultObject
 	{
 		$directory = $promptRunEntity->directory ?? base_path();
 
@@ -101,9 +117,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 		// which cuts it off past 8191 characters, and a long prompt then arrives empty
 		$arguments = [
 			...$this->alsoReads($alsoReads),
-			...$this->readOnly(['executeWrite']),
-			'--settings',
-			$this->writeGuardSettings(),
+			...$this->accessArguments($accessPolicyObject),
 			'-p',
 			'--output-format',
 			'stream-json',
@@ -127,7 +141,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 		$rest = '';
 
 		$result = Process::path($directory)
-			->env($this->environment())
+			->env([...$this->environment(), ...$this->gitGuard($directory)])
 			->input($promptRunEntity->prompt)
 			->timeout((int) config('devdock.prompt_timeout'))
 			->run(
@@ -195,6 +209,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 * @param  Closure(array<string, mixed>): void  $onEvent
 	 */
 	public function watch(
+		AccessPolicyObject $accessPolicyObject,
 		string $directory,
 		string $question,
 		?string $logPath,
@@ -209,8 +224,10 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 			@mkdir(dirname($logPath), 0755, true);
 		}
 
-		Process::path(is_dir($directory) ? $directory : base_path())
-			->env($this->environment())
+		$directory = is_dir($directory) ? $directory : base_path();
+
+		Process::path($directory)
+			->env([...$this->environment(), ...$this->gitGuard($directory)])
 			// through stdin for the same reason as in run()
 			->input($question)
 			->timeout((int) config('devdock.review.lens_timeout'))
@@ -219,7 +236,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 				[
 					$this->claudeBinary(),
 					...$this->alsoReads($alsoReads),
-					...$this->readOnly(),
+					...$this->accessArguments($accessPolicyObject),
 					'-p',
 					'--output-format',
 					'stream-json',
@@ -260,16 +277,18 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 		return $answer;
 	}
 
-	public function ask(string $directory, ?string $sessionUuid, string $question): ?string
+	public function ask(AccessPolicyObject $accessPolicyObject, string $directory, ?string $sessionUuid, string $question): ?string
 	{
-		$arguments = ['-p', '--output-format', 'json'];
+		$arguments = [...$this->accessArguments($accessPolicyObject), '-p', '--output-format', 'json'];
 
 		if (filled($sessionUuid)) {
 			$arguments = ['--resume', $sessionUuid, ...$arguments];
 		}
 
-		$result = Process::path(is_dir($directory) ? $directory : base_path())
-			->env($this->environment())
+		$directory = is_dir($directory) ? $directory : base_path();
+
+		$result = Process::path($directory)
+			->env([...$this->environment(), ...$this->gitGuard($directory)])
 			// through stdin for the same reason as in run()
 			->input($question)
 			->timeout(self::ASK_TIMEOUT)
@@ -283,47 +302,78 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	}
 
 	/**
-	 * Denies every tool that writes to Jira, Confluence, Bitbucket or Claude
-	 * Docs, on every server in devdock.read_only, except the tools that stay
-	 * open behind the write guard; reading stays open.
+	 * The tools the role is denied, and the settings file with the hooks in
+	 * front of its shell commands and its writes to Atlassian.
 	 *
-	 * @param  array<int, string>  $guardedTools
-	 * @return array<int, string>
+	 * @return list<string>
 	 */
-	private function readOnly(array $guardedTools = []): array
+	private function accessArguments(AccessPolicyObject $accessPolicyObject): array
 	{
-		$deniedTools = collect((array) config('devdock.read_only.servers'))
-			->crossJoin(array_diff((array) config('devdock.read_only.writing_tools'), $guardedTools))
-			->map(fn (array $pair) => 'mcp__' . $pair[0] . '__' . $pair[1])
-			->implode(',');
+		$arguments = $accessPolicyObject->deniedTools === []
+			? []
+			: ['--disallowedTools', implode(',', $accessPolicyObject->deniedTools)];
 
-		return $deniedTools === '' ? [] : ['--disallowedTools', $deniedTools];
+		return [...$arguments, '--settings', $this->guardSettings($accessPolicyObject)];
 	}
 
 	/**
-	 * The settings file that puts devdock:guard-write in front of every
-	 * executeWrite of an agent, as the path Claude Code reads it from.
+	 * The settings file of a role, as the path Claude Code reads it from:
+	 * devdock:guard-git in front of every shell command, and devdock:guard-write
+	 * in front of every executeWrite when the role may still write through it.
 	 */
-	private function writeGuardSettings(): string
+	private function guardSettings(AccessPolicyObject $accessPolicyObject): string
 	{
-		$path = storage_path('app/claude/agent-settings.json');
-		$command = sprintf(
-			'"%s" "%s" devdock:guard-write',
-			str_replace('\\', '/', PHP_BINARY),
-			str_replace('\\', '/', base_path('artisan')),
-		);
+		$path = storage_path('app/claude/' . $accessPolicyObject->agentRole->value . '-settings.json');
+
+		$guards = [[
+			'matcher' => 'Bash|PowerShell',
+			'hooks' => [['type' => 'command', 'command' => $this->artisanCommand('devdock:guard-git'), 'timeout' => 30]],
+		]];
+
+		if ($accessPolicyObject->guardsAtlassianWrites()) {
+			$guards[] = [
+				'matcher' => 'mcp__.*__executeWrite',
+				'hooks' => [['type' => 'command', 'command' => $this->artisanCommand('devdock:guard-write'), 'timeout' => 30]],
+			];
+		}
 
 		File::ensureDirectoryExists(dirname($path));
-		File::put($path, (string) json_encode([
-			'hooks' => [
-				'PreToolUse' => [[
-					'matcher' => 'mcp__.*__executeWrite',
-					'hooks' => [['type' => 'command', 'command' => $command, 'timeout' => 30]],
-				]],
-			],
-		], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+		File::put($path, (string) json_encode(['hooks' => ['PreToolUse' => $guards]], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
 		return $path;
+	}
+
+	private function artisanCommand(string $command): string
+	{
+		return sprintf(
+			'"%s" "%s" %s',
+			str_replace('\\', '/', PHP_BINARY),
+			str_replace('\\', '/', base_path('artisan')),
+			$command,
+		);
+	}
+
+	/**
+	 * The environment that keeps git read only for everything Claude Code
+	 * starts in this folder, however it calls git: its hooks come from DevDock,
+	 * where every change to a branch of this repository is refused, and every
+	 * push goes to an address that does not exist. Git outside this repository,
+	 * and git you or the buttons run, are left alone.
+	 *
+	 * @return array<string, string>
+	 */
+	private function gitGuard(string $directory): array
+	{
+		$commonDirectory = LocalCommand::run($directory, ['git', 'rev-parse', '--path-format=absolute', '--git-common-dir']);
+
+		return [
+			'GIT_CONFIG_COUNT' => '2',
+			'GIT_CONFIG_KEY_0' => 'core.hooksPath',
+			'GIT_CONFIG_VALUE_0' => str_replace('\\', '/', base_path('resources/git-guard')),
+			'GIT_CONFIG_KEY_1' => 'url.devdock-pushes-with-the-button://.pushInsteadOf',
+			'GIT_CONFIG_VALUE_1' => '',
+			'DEVDOCK_GUARDED_GIT_DIR' => $commonDirectory->successful() ? trim($commonDirectory->output()) : '',
+		];
 	}
 
 	/**

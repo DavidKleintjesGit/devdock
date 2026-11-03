@@ -1,0 +1,14 @@
+#!/bin/sh
+# Refuses every change to a branch, tag or HEAD in the repository an agent of
+# DevDock works in. Only a process DevDock started for an agent, lens or helper
+# reads its hooks from here; committing, pushing and rebasing by hand or with
+# the buttons in DevDock never pass this hook.
+
+[ "$1" = "prepared" ] || exit 0
+
+common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+
+[ "$common" = "$DEVDOCK_GUARDED_GIT_DIR" ] || exit 0
+
+echo "DevDock: an agent only reads git. Committing, pushing and rebasing are done with the buttons in DevDock." >&2
+exit 1

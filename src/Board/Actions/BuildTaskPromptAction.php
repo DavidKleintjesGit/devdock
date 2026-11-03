@@ -119,7 +119,8 @@ class BuildTaskPromptAction extends Command
 			...$lines,
 			__('- Lees eerst de code die hierbij hoort en leg me een plan voor voordat je iets aanpast.'),
 			__('- Volg de regels uit CLAUDE.md en draai de tests van wat je aanraakt.'),
-			__('- Commit niet, push niet en plaats nergens een reactie zonder dat ik daar eerst ja op heb gezegd.'),
+			__('- Git lees je alleen. Committen, pushen en rebasen doe ik met de knoppen in DevDock, en DevDock houdt het voor jou tegen. Laat je werk in de werkkopie staan.'),
+			__('- Plaats nergens een reactie zonder dat ik daar eerst ja op heb gezegd.'),
 			DescribeReportAction::execute(),
 		]);
 	}

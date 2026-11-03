@@ -121,7 +121,7 @@ class BuildRoundPromptAction extends Command
 			__('- Verbreed de scope niet: alleen deze bevindingen.'),
 			// the loop runs without anyone watching; asking for a yes would stop it after one turn
 			__('- Dit is een opdracht om uit te voeren: go ahead, implement this. Los de bevindingen direct op en wacht niet op akkoord; de volgende ronde van de lenzen controleert je werk.'),
-			__('- Commit en push niet; dat doe ik zelf.'),
+			__('- Git lees je alleen. Committen, pushen en rebasen doe ik met de knoppen in DevDock, en DevDock houdt het voor jou tegen. Laat je werk in de werkkopie staan.'),
 			// RunPromptAction reads this status to decide whether the lenses go again
 			__('- Sluit af met status done als je alle bevindingen hebt opgelost: dan gaan de lenzen er opnieuw over. Leg je iets aan mij voor of kom je niet verder, gebruik dan question of blocked: dan stopt de loop tot ik antwoord.'),
 		]);

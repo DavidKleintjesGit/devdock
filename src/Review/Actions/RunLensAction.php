@@ -8,6 +8,8 @@ use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
+use Src\Access\Actions\GetAccessPolicyAction;
+use Src\Access\Enums\AgentRoleEnum;
 use Src\Packages\Cqrs\Command;
 use Src\Prompt\Contracts\ClaudeProcessRepositoryContract;
 use Src\Review\Contracts\LensRepositoryContract;
@@ -85,6 +87,7 @@ class RunLensAction extends Command implements ShouldQueue
 		$reviewRoundRepository->markResultRunning($this->reviewRoundId, $this->lensId, null);
 
 		$answer = $claudeProcessRepository->watch(
+			GetAccessPolicyAction::execute(AgentRoleEnum::LENS),
 			$directory,
 			WriteLensContextAction::execute(
 				$directory,
