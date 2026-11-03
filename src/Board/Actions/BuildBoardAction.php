@@ -123,13 +123,22 @@ class BuildBoardAction extends Command
 	}
 
 	/**
-	 * A conflict first, then your turn, then what Jira marks urgent, then
-	 * what moved last.
+	 * What an agent worked on last first, then a conflict, then what moved last.
 	 */
 	private function order(CardObject $first, CardObject $second): int
 	{
-		return [$second->hasConflict(), $second->isYourTurn(), $second->isHighPriority(), $second->changedAt?->getTimestamp() ?? 0]
-			<=> [$first->hasConflict(), $first->isYourTurn(), $first->isHighPriority(), $first->changedAt?->getTimestamp() ?? 0];
+		return [$second->agentActiveAt?->getTimestamp() ?? 0, $second->hasConflict(), $second->changedAt?->getTimestamp() ?? 0]
+			<=> [$first->agentActiveAt?->getTimestamp() ?? 0, $first->hasConflict(), $first->changedAt?->getTimestamp() ?? 0];
+	}
+
+	/**
+	 * When the agent of a task last worked on it: now while it runs, else when its last turn ended.
+	 */
+	private function agentActiveAt(?PromptRunEntity $promptRunEntity): ?CarbonImmutable
+	{
+		return $promptRunEntity?->isRunning()
+			? CarbonImmutable::now()
+			: ($promptRunEntity?->finishedAt ?? $promptRunEntity?->startedAt);
 	}
 
 	private function standingFor(?string $project, ?string $branch): ?BranchStandingObject
@@ -327,6 +336,7 @@ class BuildBoardAction extends Command
 			agent: $agent,
 			conflictedFiles: $standing?->conflictedFiles ?? [],
 			copyPlace: $column->canStall() ? $this->copyPlaceFor($project, $branch, $worktreeEntity) : null,
+			agentActiveAt: $this->agentActiveAt($promptRunEntity),
 		);
 	}
 
@@ -380,6 +390,7 @@ class BuildBoardAction extends Command
 			hasWaitingWork: false,
 			activePullRequest: $taskEntity?->pullRequest(),
 			agent: $agent,
+			agentActiveAt: $this->agentActiveAt($promptRunEntity),
 		);
 	}
 

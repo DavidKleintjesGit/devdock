@@ -49,6 +49,7 @@ class CardObject extends ValueObject
 		public readonly ?TaskAgentEntity $agent,
 		public readonly array $conflictedFiles = [],
 		public readonly ?CopyPlaceEnum $copyPlace = null,
+		public readonly ?CarbonImmutable $agentActiveAt = null,
 	) {
 		parent::__construct();
 	}
