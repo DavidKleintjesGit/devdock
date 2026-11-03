@@ -9,6 +9,7 @@ use Src\Prompt\Contracts\PromptRunRepositoryContract;
 use Src\Review\Contracts\AgentContextRepositoryContract;
 use Src\Review\Contracts\ReviewRoundRepositoryContract;
 use Src\Session\Contracts\SessionFileRepositoryContract;
+use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Enums\WorktreeOriginEnum;
 use Src\Worktree\Objects\WorktreeEntity;
 
@@ -32,8 +33,12 @@ class DescribeCleanUpAction extends Command
 		ReviewRoundRepositoryContract $reviewRoundRepository,
 		PromptRunRepositoryContract $promptRunRepository,
 		AgentContextRepositoryContract $agentContextRepository,
+		WorktreeDatabaseRepositoryContract $worktreeDatabaseRepository,
 	): array {
 		$worktreeEntity = $this->worktreeEntity;
+		$testDatabase = $worktreeEntity->origin->isOurs() && is_dir($worktreeEntity->path)
+			? $worktreeDatabaseRepository->ownTestDatabase(dirname($worktreeEntity->path, 2), $worktreeEntity->path)
+			: null;
 		$sessions = $worktreeEntity->origin->isOurs() ? $sessionFileRepository->countFor($worktreeEntity->path) : 0;
 		$rounds = $worktreeEntity->card === null ? 0 : $reviewRoundRepository->countLogsForCard($worktreeEntity->card);
 		$agentRounds = $worktreeEntity->card === null ? 0 : $promptRunRepository->countLogsForCard($worktreeEntity->card);
@@ -45,6 +50,7 @@ class DescribeCleanUpAction extends Command
 				WorktreeOriginEnum::PROJECT => __('Niet het project zelf: alleen de koppeling gaat weg'),
 			},
 			$worktreeEntity->ownDatabase === null ? null : __('De eigen database :name', ['name' => $worktreeEntity->ownDatabase]),
+			$testDatabase === null ? null : __('De eigen testdatabase :name', ['name' => $testDatabase]),
 			$worktreeEntity->site === null ? null : __('Het adres :site in Herd', ['site' => $worktreeEntity->site]),
 			$worktreeEntity->origin->isOurs() && $worktreeEntity->branchCreated
 				? __('De branch :branch, als de hoofdlijn hem helemaal bevat', ['branch' => $worktreeEntity->branch])

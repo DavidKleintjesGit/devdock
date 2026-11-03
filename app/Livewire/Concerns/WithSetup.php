@@ -9,7 +9,7 @@ use Src\Project\Actions\GetProjectsAction;
 use Src\Project\Objects\ProjectEntity;
 use Src\Worktree\Actions\EnsureWorktreeAction;
 use Src\Worktree\Actions\GetBranchChoicesAction;
-use Src\Worktree\Actions\PrepareWorkingCopyAction;
+use Src\Worktree\Actions\LinkWorkingCopyAction;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Enums\BranchPlaceEnum;
 use Src\Worktree\Enums\DatabaseFillEnum;
@@ -53,12 +53,11 @@ trait WithSetup
 			return;
 		}
 
-		$this->failure = PrepareWorkingCopyAction::execute(
+		$this->failure = LinkWorkingCopyAction::execute(
 			$cardObject->id,
 			$cardObject->project,
 			$branch,
 			$this->chosenFill(),
-			(string) $this->databaseSuggestionFor($cardObject),
 		);
 	}
 
@@ -208,16 +207,15 @@ trait WithSetup
 	}
 
 	/**
-	 * The database a new working copy starts with; null shares the one of the
-	 * project.
+	 * The database a new working copy starts with: a copy of the project's
+	 * unless you chose an empty or a migrated one.
 	 */
 	private function chosenFill(): ?DatabaseFillEnum
 	{
 		return match ($this->newDatabaseMode) {
-			'shared' => null,
 			'migrate' => DatabaseFillEnum::MIGRATE,
 			'empty' => DatabaseFillEnum::EMPTY,
-			default => DatabaseFillEnum::COPY,
+			default => null,
 		};
 	}
 

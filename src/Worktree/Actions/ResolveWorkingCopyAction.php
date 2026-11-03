@@ -11,8 +11,9 @@ use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 
 /**
- * The folder a task works in. A branch that already stands checked out
- * somewhere is worked on there; anything else gets a working copy of its own.
+ * The working copy of DevDock a task works in, made when it has none yet. A
+ * branch that stands checked out somewhere else is refused: it is linked on
+ * the Working copy tab, which moves it into a copy of its own.
  *
  * @method static string execute(string $project, string $branch, ?string $card)
  *
@@ -43,12 +44,14 @@ class ResolveWorkingCopyAction extends Command
 			]));
 		}
 
-		// the branch may already be open in the checkout itself, and then that is
-		// simply where this task lives
+		// a branch open in the project or in a folder outside DevDock is linked on the Working copy tab, never worked in where it stands
 		$takenAt = $worktreeRepository->checkedOutAt($projectEntity->path, $this->branch);
 
 		if ($takenAt !== null) {
-			return $takenAt;
+			throw new WorktreeNotPossibleException(__('De branch :branch staat uitgecheckt in :path. Koppel de taak op de tab Werkkopie; dan krijgt hij een eigen werkkopie.', [
+				'branch' => $this->branch,
+				'path' => $takenAt,
+			]));
 		}
 
 		return EnsureWorktreeAction::execute($this->project, $this->branch, $this->card)->path;

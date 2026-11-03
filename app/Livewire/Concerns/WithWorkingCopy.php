@@ -18,9 +18,9 @@ use Src\Worktree\Actions\CommitChangesAction;
 use Src\Worktree\Actions\CreateWorktreeDatabaseAction;
 use Src\Worktree\Actions\DescribeCleanUpAction;
 use Src\Worktree\Actions\EnsureWorktreeAction;
+use Src\Worktree\Actions\LinkWorkingCopyAction;
 use Src\Worktree\Actions\PushBranchAction;
 use Src\Worktree\Actions\RebaseWorktreeAction;
-use Src\Worktree\Actions\RemoveWorktreeAction;
 use Src\Worktree\Actions\SetUpstreamAction;
 use Src\Worktree\Actions\UseWorktreeDatabaseAction;
 use Src\Worktree\Contracts\BranchStandingRepositoryContract;
@@ -318,33 +318,12 @@ trait WithWorkingCopy
 	public function moveToOwnWorkingCopy(bool $carryChanges = false): void
 	{
 		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
-		$projectPath = $cardObject === null ? null : $this->projectPathFor($cardObject);
 
-		if ($projectPath === null) {
+		if ($cardObject?->project === null || $cardObject->branch === null) {
 			return;
 		}
 
-		$worktreeRepository = resolve(WorktreeRepositoryContract::class);
-		$this->failure = $worktreeRepository->switchToMain($projectPath, $carryChanges);
-
-		if ($this->failure !== null) {
-			return;
-		}
-
-		$linked = $this->worktreeFor($cardObject);
-
-		// the link to the project itself goes; the folder stays as it is
-		if ($linked !== null && $linked->origin === WorktreeOriginEnum::PROJECT) {
-			RemoveWorktreeAction::execute($linked->worktreeId);
-		}
-
-		$this->createWorktree();
-
-		$worktreeEntity = $this->openWorktree();
-
-		if ($carryChanges && $this->failure === null && $worktreeEntity !== null) {
-			$this->failure = $worktreeRepository->layBackCarried($worktreeEntity->path);
-		}
+		$this->failure = LinkWorkingCopyAction::execute($cardObject->id, $cardObject->project, $cardObject->branch, null, $carryChanges);
 	}
 
 	/**

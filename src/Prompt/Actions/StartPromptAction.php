@@ -101,10 +101,9 @@ class StartPromptAction extends Command
 			return null;
 		}
 
-		// a task without a branch has nothing to check out yet; it runs in the
-		// checkout itself, where a prompt can make the branch first
+		// a task without a branch has no working copy, and the gate refuses it
 		if ($branch === null) {
-			return config('devdock.paths.sites') . '/' . $project;
+			return null;
 		}
 
 		$directory = ResolveWorkingCopyAction::execute($project, $branch, $this->promptRunObject->card);

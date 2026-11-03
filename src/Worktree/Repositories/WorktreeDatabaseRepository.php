@@ -223,6 +223,25 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 		file_put_contents($file, $contents);
 	}
 
+	public function ownTestDatabase(string $repositoryPath, string $path): ?string
+	{
+		$describe = $this->describeTesting($repositoryPath, $path);
+
+		// only the test database DevDock made for this copy: the one of the project with a suffix of the task
+		return $describe === null || $describe->isShared || blank($describe->projectDatabase) || ! str_starts_with((string) $describe->database, $describe->projectDatabase . '_')
+			? null
+			: $describe->database;
+	}
+
+	public function dropTestDatabase(string $repositoryPath, string $path): void
+	{
+		$name = $this->ownTestDatabase($repositoryPath, $path);
+
+		if ($name !== null && preg_match('/^[A-Za-z0-9_]+$/', $name) === 1) {
+			$this->server($this->environment($path, self::TESTING_FILE))->exec('DROP DATABASE IF EXISTS `' . $name . '`');
+		}
+	}
+
 	public function drop(string $path, string $name): void
 	{
 		$environment = $this->environment($path);

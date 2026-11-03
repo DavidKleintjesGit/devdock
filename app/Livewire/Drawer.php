@@ -81,13 +81,12 @@ use Src\Ticket\Actions\GetTicketsAction;
 use Src\Ticket\Objects\TicketEntity;
 use Src\Worktree\Actions\BuildFileTreeAction;
 use Src\Worktree\Actions\CheckReadinessAction;
-use Src\Worktree\Actions\CreateWorktreeDatabaseAction;
 use Src\Worktree\Actions\EnsureReadyAction;
-use Src\Worktree\Actions\EnsureWorktreeAction;
 use Src\Worktree\Actions\GetChangesAction;
 use Src\Worktree\Actions\GetReadinessAction;
 use Src\Worktree\Actions\GetRepairStateAction;
 use Src\Worktree\Actions\GetWorktreesAction;
+use Src\Worktree\Actions\LinkWorkingCopyAction;
 use Src\Worktree\Actions\ReadDiffAction;
 use Src\Worktree\Actions\RemoveWorktreeAction;
 use Src\Worktree\Actions\RenameToTicketAction;
@@ -685,27 +684,15 @@ class Drawer extends Component
 			return;
 		}
 
-		try {
-			$worktreeEntity = EnsureWorktreeAction::execute($cardObject->project, $branch, $cardObject->id);
-		} catch (Throwable $failure) {
-			$this->failure = $failure->getMessage();
+		$this->failure = LinkWorkingCopyAction::execute(
+			$cardObject->id,
+			$cardObject->project,
+			$branch,
+			$this->newDatabaseMode === 'empty' ? DatabaseFillEnum::EMPTY : null,
+		);
 
-			return;
-		}
-
-		// the branch it was cut on is what this task works on from here
-		LinkToTaskAction::execute($cardObject->id, TaskLinkKindEnum::BRANCH, $branch);
-		ActivateLinkAction::execute($cardObject->id, TaskLinkKindEnum::BRANCH, $branch);
-
-		$this->newBranch = '';
-
-		// sharing is what a fresh copy does by itself; anything else is made now
-		if ($this->newDatabaseMode !== 'shared') {
-			$this->failure = CreateWorktreeDatabaseAction::execute(
-				$worktreeEntity,
-				(string) $this->databaseSuggestionFor($cardObject),
-				$this->newDatabaseMode === 'own' ? DatabaseFillEnum::COPY : DatabaseFillEnum::EMPTY,
-			);
+		if ($this->failure === null) {
+			$this->newBranch = '';
 		}
 	}
 
@@ -1255,8 +1242,7 @@ class Drawer extends Component
 	}
 
 	/**
-	 * The folder the work of this task stands in: its own working copy when
-	 * there is one, otherwise wherever the last round ran.
+	 * The working copy of this task, or null when it has none yet.
 	 */
 	private function workingDirectory(): ?string
 	{
@@ -1266,12 +1252,8 @@ class Drawer extends Component
 			return null;
 		}
 
-		$worktreeEntity = $this->worktreeFor($cardObject);
-
-		return $cardObject->agent?->directory
-			?? $worktreeEntity?->path
-			?? GetLatestPromptRunAction::execute($cardObject->id)?->directory
-			?? ($cardObject->project === null ? null : config('devdock.paths.sites') . '/' . $cardObject->project);
+		// an agent only ever works in the working copy of its task
+		return $this->worktreeFor($cardObject)?->path;
 	}
 
 	/**

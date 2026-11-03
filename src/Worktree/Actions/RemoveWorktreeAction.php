@@ -47,9 +47,13 @@ class RemoveWorktreeAction extends Command
 			$workingCopyRepository->release($worktreeEntity->path, $worktreeEntity->site);
 		}
 
-		// the database read its name from the copy, so it goes first
+		// the databases read their names from the copy, so they go first
 		if ($worktreeEntity->ownDatabase !== null) {
 			resolve(WorktreeDatabaseRepositoryContract::class)->drop($worktreeEntity->path, $worktreeEntity->ownDatabase);
+		}
+
+		if ($worktreeEntity->origin->isOurs() && is_dir($worktreeEntity->path)) {
+			resolve(WorktreeDatabaseRepositoryContract::class)->dropTestDatabase(dirname($worktreeEntity->path, 2), $worktreeEntity->path);
 		}
 
 		// a folder DevDock did not make stays, but the round reports of this task were ours

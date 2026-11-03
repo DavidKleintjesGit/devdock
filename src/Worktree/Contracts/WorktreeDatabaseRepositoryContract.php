@@ -50,6 +50,18 @@ interface WorktreeDatabaseRepositoryContract
 	public function giveOwnTestDatabase(string $repositoryPath, string $path, string $branch): ?string;
 
 	/**
+	 * The test database DevDock made for this working copy; null when it uses
+	 * sqlite, the project's own test database, or one DevDock did not name.
+	 */
+	public function ownTestDatabase(string $repositoryPath, string $path): ?string;
+
+	/**
+	 * Throws away the test database DevDock made for this working copy, and
+	 * no other.
+	 */
+	public function dropTestDatabase(string $repositoryPath, string $path): void;
+
+	/**
 	 * Throws away a database DevDock created for a working copy.
 	 */
 	public function drop(string $path, string $name): void;

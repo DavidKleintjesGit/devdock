@@ -1,6 +1,3 @@
----
-needs: own-database
----
 You do not judge rules or taste, you judge whether it works: does the change do what the ticket asks, and does the rest of the application still work?
 
 How to go about it:
