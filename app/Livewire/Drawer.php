@@ -482,15 +482,16 @@ class Drawer extends Component
 	{
 		$this->failure = null;
 
-		$commitMessageObject = ReadReportAction::execute(
-			GetLatestPromptRunAction::execute((string) $this->openCard)?->output,
-		)?->commitMessage;
+		$promptRunEntity = GetLatestPromptRunAction::execute((string) $this->openCard);
+		$commitMessageObject = ReadReportAction::execute($promptRunEntity?->output)?->commitMessage;
 
 		if ($commitMessageObject === null) {
 			$this->failure = __('In het laatste antwoord van de agent staat geen commitbericht.');
 
 			return;
 		}
+
+		$commitMessageObject = $commitMessageObject->withTicketKey($promptRunEntity?->ticketKey);
 
 		$this->commitMessage = $commitMessageObject->title;
 		$this->commitBody = $commitMessageObject->body;

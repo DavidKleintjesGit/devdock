@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Src\Board\Enums\BoardColumnEnum;
 use Src\Board\Enums\CardStatusEnum;
 use Src\Packages\ValueObject\ValueObject;
+use Src\Prompt\Objects\CommitMessageObject;
 use Src\PullRequest\Objects\PullRequestEntity;
 use Src\PullRequest\Objects\PullRequestEntityCollection;
 use Src\Session\Objects\SessionEntity;
@@ -58,21 +59,14 @@ class CardObject extends ValueObject
 	}
 
 	/**
-	 * A commit message to start from: the ticket key, a dash and what the task
-	 * is about, the way this repository writes them.
+	 * A commit message to start from: the ticket key and what the task is
+	 * about.
 	 */
 	public function suggestedCommitMessage(): string
 	{
-		$subject = trim($this->title);
-
-		if ($this->ticketKey === null) {
-			return $subject;
-		}
-
-		// the title of a pull request usually opens with the key already
-		$subject = (string) preg_replace('/^' . preg_quote($this->ticketKey, '/') . '\s*[-:·]?\s*/i', '', $subject);
-
-		return $this->ticketKey . ' - ' . $subject;
+		return CommitMessageObject::from(['title' => $this->title])
+			->withTicketKey($this->ticketKey)
+			->title;
 	}
 
 	public function matches(string $term): bool

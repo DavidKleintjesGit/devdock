@@ -27,6 +27,21 @@ class CommitMessageObject extends ValueObject
 		);
 	}
 
+	/**
+	 * The same message with a title that opens with the ticket key, whatever
+	 * way of writing it the session chose.
+	 */
+	public function withTicketKey(?string $ticketKey): self
+	{
+		if ($ticketKey === null) {
+			return $this;
+		}
+
+		$subject = (string) preg_replace('/^' . preg_quote($ticketKey, '/') . '\s*[-:·]?\s*/i', '', $this->title);
+
+		return new self(title: trim($ticketKey . ' ' . $subject), body: $this->body);
+	}
+
 	public function isEmpty(): bool
 	{
 		return $this->title === '';

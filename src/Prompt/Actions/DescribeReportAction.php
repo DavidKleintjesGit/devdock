@@ -34,7 +34,7 @@ class DescribeReportAction extends Command
 			'```',
 			'',
 			'```commit',
-			'<the commit title: one sentence, imperative, 72 characters at most>',
+			'<the commit title: the ticket number first when the task has one, then one sentence, imperative, 72 characters at most, in the language of the recent commits in this repository>',
 			'',
 			'- <what changed and why>',
 			'```',

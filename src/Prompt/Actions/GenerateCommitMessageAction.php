@@ -45,7 +45,7 @@ class GenerateCommitMessageAction extends Command
 		$standing = ReadReportAction::execute($promptRunEntity->output)?->commitMessage;
 
 		if ($standing !== null) {
-			return $standing;
+			return $standing->withTicketKey($promptRunEntity->ticketKey);
 		}
 
 		$answer = $claudeProcessRepository->ask(
@@ -54,7 +54,7 @@ class GenerateCommitMessageAction extends Command
 			$this->question($promptRunEntity->ticketKey),
 		);
 
-		return ReadReportAction::execute($answer)?->commitMessage;
+		return ReadReportAction::execute($answer)?->commitMessage?->withTicketKey($promptRunEntity->ticketKey);
 	}
 
 	/**
@@ -65,13 +65,14 @@ class GenerateCommitMessageAction extends Command
 	{
 		$opening = $ticketKey === null
 			? __('Begin de titel met wat er is veranderd.')
-			: __('Begin de titel met :ticket gevolgd door een streepje.', ['ticket' => $ticketKey]);
+			: __('Begin de titel met :ticket en een spatie.', ['ticket' => $ticketKey]);
 
 		return implode("\n", [
 			__('Schrijf een commitbericht voor de wijzigingen die je in deze werkmap hebt gemaakt.'),
 			__('Verander niets, draai geen tests en commit niet. Antwoord alleen met het blok hieronder.'),
 			'',
 			$opening,
+			__('Schrijf in de taal van de laatste commits in deze repository; git log laat ze zien.'),
 			__('De eerste regel is de titel: één zin, gebiedende wijs, maximaal 72 tekens.'),
 			__('Daaronder een lege regel en vervolgens per wijziging een regel die begint met een streepje.'),
 			'',
