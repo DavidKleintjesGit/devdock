@@ -10,6 +10,7 @@ use Illuminate\Process\Pool;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
+use Src\Worktree\Enums\DiffViewEnum;
 use Src\Worktree\Enums\WorktreeOriginEnum;
 use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Src\Worktree\Models\Worktree as WorktreeEloquent;
@@ -378,26 +379,115 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		return $rows;
 	}
 
-	public function getDiff(string $path, string $file): ?string
+	public function getChangesFor(string $path, DiffViewEnum $view): ChangeObjectCollection
+	{
+		if ($view !== DiffViewEnum::UNPUSHED) {
+			return $view === DiffViewEnum::UNCOMMITTED ? $this->getChanges($path) : $this->getBranchChanges($path);
+		}
+
+		if (! is_dir($path)) {
+			return ChangeObjectCollection::fromArray([]);
+		}
+
+		$rows = Cache::remember(
+			'worktree.unpushed-changes.' . md5($path),
+			(int) config('devdock.worktree.status_seconds'),
+			fn () => $this->readCommittedChanges($path, $this->pushedBase($path)),
+		);
+
+		return ChangeObjectCollection::fromArray(array_map(
+			fn (array $row) => ChangeObject::from($row),
+			$rows,
+		));
+	}
+
+	public function getDiff(string $path, string $file, DiffViewEnum $view = DiffViewEnum::BRANCH): ?string
 	{
 		if (! is_dir($path) || $file === '') {
 			return null;
 		}
 
-		// tegen de hoofdlijn en niet tegen HEAD: dan staat er wat deze branch
-		// aan dit bestand deed, of het nu al gecommit is of niet
+		$range = match ($view) {
+			// what changed since the last commit
+			DiffViewEnum::UNCOMMITTED => ['HEAD'],
+			// the commits origin does not have yet, without what is not committed
+			DiffViewEnum::UNPUSHED => [$this->pushedBase($path) ?? 'HEAD', 'HEAD'],
+			// against the main line: what this branch did to the file, committed or not
+			DiffViewEnum::BRANCH => [$this->branchBase($path) ?? 'origin/' . $this->mainBranch($path)],
+		};
+
 		$result = Process::path($path)
 			->timeout(self::TIMEOUT)
-			->run(['git', 'diff', $this->branchBase($path) ?? 'origin/' . $this->mainBranch($path), '--', $file]);
+			->run(['git', 'diff', ...$range, '--', $file]);
 
 		$patch = trim($result->output());
 
-		if ($patch !== '') {
-			return $patch;
+		if ($patch !== '' || $view === DiffViewEnum::UNPUSHED) {
+			return $patch === '' ? null : $patch;
 		}
 
 		// git kent dit bestand nog niet, dus er is niets om tegen af te zetten
 		return $this->newFile($path, $file);
+	}
+
+	/**
+	 * The commit right before the oldest commit no remote holds yet, so the
+	 * diff from there is exactly what a push would bring; null when everything
+	 * is pushed. After a rebase that is the whole branch, main line excluded.
+	 */
+	private function pushedBase(string $path): ?string
+	{
+		$unpushed = $this->lines($path, ['git', 'rev-list', '--reverse', 'HEAD', '--not', '--remotes']);
+
+		if ($unpushed === []) {
+			return null;
+		}
+
+		$parent = Process::path($path)->run(['git', 'rev-parse', '--verify', '--quiet', $unpushed[0] . '^']);
+
+		return $parent->successful() && trim($parent->output()) !== '' ? trim($parent->output()) : null;
+	}
+
+	/**
+	 * The files the commits after the given commit changed, without what is
+	 * not committed.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function readCommittedChanges(string $path, ?string $base): array
+	{
+		if ($base === null) {
+			return [];
+		}
+
+		$kinds = [];
+
+		foreach ($this->lines($path, ['git', 'diff', '--name-status', '--find-renames', $base, 'HEAD']) as $line) {
+			$parts = explode("\t", $line);
+			$kinds[end($parts)] = $parts[0];
+		}
+
+		$rows = [];
+
+		foreach ($this->lines($path, ['git', 'diff', '--numstat', '--find-renames', $base, 'HEAD']) as $line) {
+			$parts = explode("\t", $line);
+
+			if (count($parts) < 3) {
+				continue;
+			}
+
+			$file = (string) preg_replace('/\{[^{}]* => ([^{}]*)\}/', '$1', $parts[2]);
+			$file = str_contains($file, ' => ') ? trim(explode(' => ', $file)[1]) : $file;
+
+			$rows[] = [
+				'path' => str_replace('//', '/', $file),
+				'status' => $kinds[$file] ?? 'M',
+				'added' => (int) $parts[0],
+				'removed' => (int) $parts[1],
+			];
+		}
+
+		return $rows;
 	}
 
 	/**
@@ -1077,6 +1167,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		Cache::forget($this->changesKey($path));
 		Cache::forget($this->branchChangesKey($path));
 		Cache::forget($this->unpushedKey($path));
+		Cache::forget('worktree.unpushed-changes.' . md5($path));
 		Cache::forget('worktree.fingerprint.' . md5($path));
 	}
 

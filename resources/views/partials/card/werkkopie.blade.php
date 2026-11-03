@@ -89,6 +89,7 @@
 						<div class="v">
 							<span class="sdot yours"></span>
 							<span class="grow" style="font-family:inherit;display:flex;flex-direction:column;gap:2px"><b>{{ trans_choice(':count commit nog niet gepusht|:count commits nog niet gepusht', $worktree->ahead, ['count' => $worktree->ahead]) }}</b><span class="hint">@if ($worktree->onlyOnUpstream > 0){{ trans_choice(':upstream heeft nog :count commit die hier niet staat, zoals de versie van vóór een rebase. Pushen overschrijft die.|:upstream heeft nog :count commits die hier niet staan, zoals de versie van vóór een rebase. Pushen overschrijft die.', $worktree->onlyOnUpstream, ['count' => $worktree->onlyOnUpstream, 'upstream' => $worktree->upstream]) }}@elseif ($worktree->upstream){{ __('Al gecommit, nog niet op :upstream.', ['upstream' => $worktree->upstream]) }}@else{{ __('Al gecommit; de eerste push maakt origin/:branch aan.', ['branch' => $worktree->branch]) }}@endif</span></span>
+							<button class="btn sm" type="button" wire:click="openUnpushedDiff">{{ __('Bekijken') }}</button>
 							<x-busy-button action="pushBranch" class="btn sm" :busy="__('Pushen...')">{{ $worktree->onlyOnUpstream > 0 ? __('Overschrijven') : __('Pushen') }}</x-busy-button>
 						</div>
 						<ol style="margin:0 0 0 21px;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--fg-2)">
@@ -141,7 +142,7 @@
 								<input type="checkbox" @checked($row['isPicked']) wire:click="toggleCommitFile('{{ $row['change']->path }}')" aria-label="{{ __(':name meenemen', ['name' => $row['change']->name()]) }}">
 								<span class="mark"></span>
 							</label>
-							<button class="filerow grow" type="button" style="padding:0;min-height:44px" wire:click="openDiff('{{ $row['change']->path }}')">
+							<button class="filerow grow" type="button" style="padding:0;min-height:44px" wire:click="openDiff('{{ $row['change']->path }}', 'uncommitted')">
 								<span class="name"><b>{{ $row['change']->name() }}</b><small>{{ $row['change']->folder() }}{{ $row['isPicked'] ? '' : ' · ' . __('gaat niet mee') }}</small></span>
 								<span class="delta">@if ($row['change']->added)<span class="plus">+{{ $row['change']->added }}</span>@endif @if ($row['change']->removed)<span class="minus">−{{ $row['change']->removed }}</span>@endif</span>
 								<x-icon name="chev" small/>
@@ -184,7 +185,7 @@
 				<p class="hint" style="margin:0">{{ __('Alles wat deze branch veranderde, gecommit en niet gecommit samen. Wat de pull request laat zien.') }}</p>
 				<div class="list">
 					@foreach ($branchChanges as $change)
-						<button class="filerow" type="button" wire:click="openDiff('{{ $change->path }}')" wire:key="branch-change-{{ $change->path }}">
+						<button class="filerow" type="button" wire:click="openDiff('{{ $change->path }}', 'branch')" wire:key="branch-change-{{ $change->path }}">
 							<span class="name"><b>{{ $change->name() }}@if ($change->isNew())<span class="label green" style="margin-left:6px">{{ __('nieuw') }}</span>@elseif ($change->isGone())<span class="label red" style="margin-left:6px">{{ __('weg') }}</span>@endif</b><small>{{ $change->folder() }}</small></span>
 							<span class="delta">@if ($change->added)<span class="plus">+{{ $change->added }}</span>@endif @if ($change->removed)<span class="minus">−{{ $change->removed }}</span>@endif</span>
 							<x-icon name="chev" small/>

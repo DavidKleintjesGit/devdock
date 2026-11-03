@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Src\Worktree\Contracts;
 
 use Carbon\CarbonImmutable;
+use Src\Worktree\Enums\DiffViewEnum;
 use Src\Worktree\Enums\WorktreeOriginEnum;
 use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Src\Worktree\Objects\ChangeObjectCollection;
@@ -114,10 +115,17 @@ interface WorktreeRepositoryContract
 	 * The commit the branch stands on, which is what a review round holds for.
 	 */
 	/**
-	 * Wat deze branch aan één bestand deed, tegen de hoofdlijn afgezet, of het
-	 * nu al gecommit is of niet. Null als er niets te tonen valt.
+	 * What happened to one file in one view: since the last commit, in the
+	 * commits origin does not have yet, or on the whole branch against the
+	 * main line. Null when there is nothing to show.
 	 */
-	public function getDiff(string $path, string $file): ?string;
+	public function getDiff(string $path, string $file, DiffViewEnum $view = DiffViewEnum::BRANCH): ?string;
+
+	/**
+	 * The changed files of one view: not committed, committed but not pushed,
+	 * or the whole branch against the main line.
+	 */
+	public function getChangesFor(string $path, DiffViewEnum $view): ChangeObjectCollection;
 
 	public function getHead(string $path): ?string;
 
