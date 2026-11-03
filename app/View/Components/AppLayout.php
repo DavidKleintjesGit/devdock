@@ -56,6 +56,7 @@ class AppLayout extends Component
 				? trans_choice(':count project loopt achter op een bibliotheek|:count projecten lopen achter op een bibliotheek', $signals['behind'], ['count' => $signals['behind']])
 				: null],
 			'skills' => ['label' => 'Skills', 'icon' => 'skills', 'pill' => null, 'count' => null, 'flag' => null],
+			'access' => ['label' => 'Toegang', 'icon' => 'lock', 'pill' => null, 'count' => null, 'flag' => null],
 		];
 	}
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\AgentAssetController;
 use App\Http\Controllers\LocaleController;
+use App\Livewire\Access;
 use App\Livewire\Board;
 use App\Livewire\Rules;
 use App\Livewire\Sessions;
@@ -17,6 +18,7 @@ Route::get('/sessies', Sessions::class)->name('sessions');
 Route::get('/workflows', Workflows::class)->name('workflows');
 Route::get('/regels', Rules::class)->name('rules');
 Route::get('/skills', Skills::class)->name('skills');
+Route::get('/toegang', Access::class)->name('access');
 
 Route::get('/taal/{locale}', [LocaleController::class, 'update'])->name('locale');
 
