@@ -167,7 +167,7 @@
 		@endif
 
 		<section class="dsec">
-			<details class="fold" @if ($databaseDialog || $upstreamDialog) open @endif>
+			<details class="fold" wire:ignore.self @if ($databaseDialog || $upstreamDialog) open @endif>
 				<summary>
 					<x-icon name="chev" small/>
 					<b class="grow">{{ __('Deze kopie') }}</b>

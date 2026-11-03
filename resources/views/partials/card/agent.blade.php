@@ -44,7 +44,7 @@
 						</span>
 
 						@if ($exchange->transcript && $exchange->transcript->steps !== [])
-							<details class="agent-steps">
+							<details class="agent-steps" wire:ignore.self wire:key="steps-{{ $loop->index }}">
 								<summary>
 									<x-icon name="chev" small/>
 									<span class="grow">
