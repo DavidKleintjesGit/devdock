@@ -404,24 +404,15 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		));
 	}
 
-	public function getDiff(string $path, string $file, DiffViewEnum $view = DiffViewEnum::BRANCH): ?string
+	public function getDiff(string $path, string $file, DiffViewEnum $view = DiffViewEnum::BRANCH, int $context = 3): ?string
 	{
 		if (! is_dir($path) || $file === '') {
 			return null;
 		}
 
-		$range = match ($view) {
-			// what changed since the last commit
-			DiffViewEnum::UNCOMMITTED => ['HEAD'],
-			// everything origin does not have yet, committed or not
-			DiffViewEnum::UNPUSHED => [$this->pushedBase($path) ?? 'HEAD'],
-			// against the main line: what this branch did to the file, committed or not
-			DiffViewEnum::BRANCH => [$this->branchBase($path) ?? 'origin/' . $this->mainBranch($path)],
-		};
-
 		$result = Process::path($path)
 			->timeout(self::TIMEOUT)
-			->run(['git', 'diff', ...$range, '--', $file]);
+			->run(['git', 'diff', '--no-color', '--unified=' . $context, $this->diffBase($path, $view), '--', $file]);
 
 		$patch = trim($result->output());
 
@@ -431,6 +422,57 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 		// git kent dit bestand nog niet, dus er is niets om tegen af te zetten
 		return $this->newFile($path, $file);
+	}
+
+	public function getDiffs(string $path, DiffViewEnum $view): array
+	{
+		if (! is_dir($path)) {
+			return [];
+		}
+
+		$base = $this->diffBase($path, $view);
+		$patches = [];
+
+		// one git call for the whole view, cut per file at its "diff --git" line
+		$whole = Process::path($path)->timeout(self::TIMEOUT)->run(['git', 'diff', '--no-color', $base]);
+		$current = null;
+
+		foreach (preg_split('/\R/', $whole->output()) ?: [] as $line) {
+			if (preg_match('#^diff --git a/.+ b/(.+)$#', $line, $found) === 1) {
+				$current = $found[1];
+				$patches[$current] = '';
+			}
+
+			if ($current !== null) {
+				$patches[$current] .= $line . "\n";
+			}
+		}
+
+		foreach ($this->getChangesFor($path, $view) as $changeObject) {
+			$patches[$changeObject->path] ??= null;
+
+			// git diff leaves out a file it never saw
+			if ($patches[$changeObject->path] === null) {
+				$patches[$changeObject->path] = $this->newFile($path, $changeObject->path);
+			}
+		}
+
+		return array_map(fn (?string $patch) => $patch === null ? null : trim($patch), $patches);
+	}
+
+	/**
+	 * What a view sets the working files against.
+	 */
+	private function diffBase(string $path, DiffViewEnum $view): string
+	{
+		return match ($view) {
+			// what changed since the last commit
+			DiffViewEnum::UNCOMMITTED => 'HEAD',
+			// everything origin does not have yet, committed or not
+			DiffViewEnum::UNPUSHED => $this->pushedBase($path) ?? 'HEAD',
+			// against the main line: what this branch did to the file, committed or not
+			DiffViewEnum::BRANCH => $this->branchBase($path) ?? 'origin/' . $this->mainBranch($path),
+		};
 	}
 
 	public function getNewCommitCount(string $path): int

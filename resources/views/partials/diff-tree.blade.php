@@ -11,7 +11,7 @@
 			</div>
 		</div>
 	@else
-		<button type="button" class="tree-row file" style="--depth:{{ $depth }}" aria-current="{{ $openDiffFile === $node->path ? 'true' : 'false' }}" wire:click="openDiff('{{ $node->path }}')" wire:key="tree-{{ $node->path }}" title="{{ $node->path }} · {{ $node->change->kind->label() }}">
+		<button type="button" class="tree-row file" style="--depth:{{ $depth }}" aria-current="{{ $openDiffFile === $node->path ? 'true' : 'false' }}" x-on:click="document.getElementById(@js($node->change->anchor()))?.scrollIntoView({ block: 'start', behavior: 'smooth' })" wire:key="tree-{{ $node->path }}" title="{{ $node->path }} · {{ $node->change->kind->label() }}">
 			<span class="tree-kind {{ $node->change->kind->tone() }}"><x-icon :name="$node->change->kind->icon()" small/></span>
 			<span class="ellipsis grow">{{ $node->name }}</span>
 			@if ($node->change->added)<span class="tree-plus">+{{ $node->change->added }}</span>@endif

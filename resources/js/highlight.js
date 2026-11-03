@@ -68,6 +68,41 @@ function highlightDiffs(root = document) {
 			code.dataset.lit = '';
 		}
 	}
+
+	markChangedParts(root);
+}
+
+// The part of a line that changed comes from the server as a character range;
+// it is laid over the colouring afterwards, so both stay.
+function markChangedParts(root) {
+	for (const code of root.querySelectorAll('.diff .dl .code[data-mark-start]:not([data-marked])')) {
+		const start = Number(code.dataset.markStart);
+		const end = Number(code.dataset.markEnd);
+		const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+		const pieces = [];
+		let offset = 0;
+
+		while (walker.nextNode()) {
+			const node = walker.currentNode;
+			const from = Math.max(start - offset, 0);
+			const to = Math.min(end - offset, node.length);
+
+			if (from < to) {
+				pieces.push([node, from, to]);
+			}
+
+			offset += node.length;
+		}
+
+		for (const [node, from, to] of pieces) {
+			const range = document.createRange();
+			range.setStart(node, from);
+			range.setEnd(node, to);
+			range.surroundContents(Object.assign(document.createElement('mark'), { className: 'wd' }));
+		}
+
+		code.dataset.marked = '';
+	}
 }
 
 document.addEventListener('DOMContentLoaded', () => highlightDiffs());

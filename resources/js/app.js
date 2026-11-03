@@ -315,3 +315,43 @@ window.addEventListener('message', (event) => {
 		}
 	}
 });
+
+// Wat je in de codelezer als bekeken aanvinkt, onthoudt deze browser per taak.
+// Het vinkje hoort bij de stand van het bestand: verandert het daarna, dan is
+// het weer ongezien, zoals op een pull request.
+document.addEventListener('alpine:init', () => {
+	Alpine.data('viewedFiles', (card, fingerprints) => ({
+		key: `devdock.viewed.${card}`,
+		seen: {},
+
+		init() {
+			try {
+				this.seen = JSON.parse(localStorage.getItem(this.key) ?? '{}') ?? {};
+			} catch {
+				this.seen = {};
+			}
+		},
+
+		isViewed(file) {
+			return fingerprints[file] !== undefined && this.seen[file] === fingerprints[file];
+		},
+
+		toggle(file) {
+			if (this.isViewed(file)) {
+				delete this.seen[file];
+			} else {
+				this.seen[file] = fingerprints[file];
+			}
+
+			try {
+				localStorage.setItem(this.key, JSON.stringify(this.seen));
+			} catch {
+				// a private window keeps nothing; the tick then lasts as long as the page
+			}
+		},
+
+		viewedCount() {
+			return Object.keys(fingerprints).filter((file) => this.isViewed(file)).length;
+		},
+	}));
+});

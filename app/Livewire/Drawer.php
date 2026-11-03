@@ -111,6 +111,21 @@ class Drawer extends Component
 	use WithWorkingCopy;
 
 	/**
+	 * A file with more changed lines than this opens closed in the code reader.
+	 */
+	private const LARGE_DIFF_LINES = 600;
+
+	/**
+	 * How many lines one click on an expander shows more.
+	 */
+	private const EXPAND_LINES = 20;
+
+	/**
+	 * Enough lines around a change to show any file whole.
+	 */
+	private const WHOLE_FILE_LINES = 100000;
+
+	/**
 	 * A finished round of fetching brings the panel up to date.
 	 */
 	protected $listeners = ['fetched' => '$refresh'];
@@ -169,6 +184,9 @@ class Drawer extends Component
 
 	/** Which changes the Werkkopie tab and the code reader show; a DiffViewEnum value, or null for the default. */
 	public ?string $diffView = null;
+
+	/** @var array<string, int> the lines around the changes per file the reader was opened up to */
+	public array $diffContext = [];
 
 	public bool $confirmingDeleteTask = false;
 
@@ -423,6 +441,7 @@ class Drawer extends Component
 		}
 
 		$this->diffView = $diffView->value;
+		$this->diffContext = [];
 
 		$paths = collect(resolve(WorktreeRepositoryContract::class)->getChangesFor($worktreeEntity->path, $diffView))->pluck('path');
 
@@ -434,6 +453,15 @@ class Drawer extends Component
 	public function closeDiff(): void
 	{
 		$this->openDiffFile = null;
+		$this->diffContext = [];
+	}
+
+	/**
+	 * Shows more lines around the changes of one file, or the whole file.
+	 */
+	public function expandDiff(string $file, bool $whole = false): void
+	{
+		$this->diffContext[$file] = $whole ? self::WHOLE_FILE_LINES : ($this->diffContext[$file] ?? 3) + self::EXPAND_LINES;
 	}
 
 	/**
@@ -962,9 +990,9 @@ class Drawer extends Component
 		// a task with a working copy but without an agent is not set up yet: the panel stays until all three steps are done
 		$isSetup = in_array($cardObject->column, [BoardColumnEnum::TO_DO, BoardColumnEnum::LATER], true)
 			|| ($cardObject->column === BoardColumnEnum::BUILDING && $cardObject->agent === null && $promptRunEntity === null);
-		$diffHunks = ReadDiffAction::execute($this->diffFor($cardObject));
 		$diffView = $worktreeEntity === null ? DiffViewEnum::BRANCH : $this->diffViewFor($worktreeEntity);
 		$diffTree = $this->openDiffFile === null ? [] : $this->diffTree($cardObject, $diffView);
+		$diffFiles = $this->openDiffFile === null || $worktreeEntity === null ? [] : $this->stackedDiffs($worktreeEntity, $diffView, $diffTree);
 		$workflowSetting = GetWorkflowSettingAction::execute($cardObject->project);
 		$promptSources = $tab === 'Agent' ? $this->promptSources($cardObject, $reviewCommentEntities) : [];
 		$pullRequests = $cardObject->pullRequests
@@ -1000,9 +1028,11 @@ class Drawer extends Component
 			'diffView' => $diffView,
 			'diffViews' => $this->openDiffFile === null || $worktreeEntity === null ? [] : $this->diffViewCounts($worktreeEntity),
 			'unpushedCount' => $this->openDiffFile === null || $worktreeEntity === null ? 0 : resolve(WorktreeRepositoryContract::class)->getNewCommitCount($worktreeEntity->path),
-			'diffHunks' => $diffHunks,
-			'diffAdded' => $this->countLines($diffHunks, 'add'),
-			'diffRemoved' => $this->countLines($diffHunks, 'del'),
+			'diffFiles' => $diffFiles,
+			'diffFingerprints' => collect($diffFiles)->mapWithKeys(fn (array $diffFile) => [$diffFile['change']->path => $diffFile['fingerprint']])->all(),
+			'diffAdded' => collect($diffFiles)->sum(fn (array $diffFile) => $diffFile['change']->added),
+			'diffRemoved' => collect($diffFiles)->sum(fn (array $diffFile) => $diffFile['change']->removed),
+			'openAnchor' => $this->openDiffFile === null ? null : 'df-' . md5($this->openDiffFile),
 			'latestRound' => $latestRound,
 			'renameTo' => $this->renameSuggestion($cardObject),
 			'canDeliver' => $tab === 'Review' ? $this->canDeliver($cardObject) : false,
@@ -1314,31 +1344,40 @@ class Drawer extends Component
 	}
 
 	/**
-	 * Hoeveel regels er bij kwamen of af gingen, over alle stukken heen.
+	 * Every changed file of one view with its pieces, in the order of the
+	 * tree, for the page that shows them under each other.
+	 *
+	 * @param  array<int, FileTreeNodeObject>  $diffTree
+	 * @return array<int, array{change: ChangeObject, hunks: DiffHunkObjectCollection, fingerprint: string, isLarge: bool}>
 	 */
-	private function countLines(DiffHunkObjectCollection $diffHunks, string $kind): int
+	private function stackedDiffs(WorktreeEntity $worktreeEntity, DiffViewEnum $diffView, array $diffTree): array
 	{
-		$total = 0;
+		$worktreeRepository = resolve(WorktreeRepositoryContract::class);
+		$changes = collect($worktreeRepository->getChangesFor($worktreeEntity->path, $diffView))->keyBy('path');
+		$patches = $worktreeRepository->getDiffs($worktreeEntity->path, $diffView);
+		$files = [];
 
-		foreach ($diffHunks as $diffHunkObject) {
-			foreach ($diffHunkObject->lines as $diffLineObject) {
-				$total += $diffLineObject->kind === $kind ? 1 : 0;
+		foreach (array_merge([], ...array_map(fn (FileTreeNodeObject $node) => $node->filePaths(), $diffTree)) as $path) {
+			$changeObject = $changes->get($path);
+
+			if ($changeObject === null) {
+				continue;
 			}
+
+			$files[] = [
+				'change' => $changeObject,
+					// a file opened up further is read again with more lines around each change
+				'hunks' => ReadDiffAction::execute(isset($this->diffContext[$path])
+					? $worktreeRepository->getDiff($worktreeEntity->path, $path, $diffView, $this->diffContext[$path])
+					: ($patches[$path] ?? null)),
+				// taken from the plain patch, so opening the file up further keeps it viewed
+				'fingerprint' => md5((string) ($patches[$path] ?? '')),
+				// a file this large opens closed, so the page stays quick; opening it shows it in full
+				'isLarge' => $changeObject->added + $changeObject->removed > self::LARGE_DIFF_LINES && ! isset($this->diffContext[$path]),
+			];
 		}
 
-		return $total;
-	}
-
-	/**
-	 * De wijziging van het bestand dat openstaat.
-	 */
-	private function diffFor(CardObject $cardObject): ?string
-	{
-		$worktreeEntity = $this->worktreeFor($cardObject);
-
-		return $this->openDiffFile === null || $worktreeEntity === null
-			? null
-			: resolve(WorktreeRepositoryContract::class)->getDiff($worktreeEntity->path, $this->openDiffFile, $this->diffViewFor($worktreeEntity));
+		return $files;
 	}
 
 	private function branchSuggestion(?CardObject $cardObject): string

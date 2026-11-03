@@ -18,6 +18,9 @@ class DiffLineObject extends ValueObject
 		public readonly ?int $oldNumber,
 		public readonly ?int $newNumber,
 		public readonly string $text,
+		// the part of the line that differs from its counterpart on the other side, in characters
+		public readonly ?int $markStart = null,
+		public readonly ?int $markEnd = null,
 	) {
 		parent::__construct();
 	}

@@ -119,13 +119,20 @@ interface WorktreeRepositoryContract
 	 * commits origin does not have yet, or on the whole branch against the
 	 * main line. Null when there is nothing to show.
 	 */
-	public function getDiff(string $path, string $file, DiffViewEnum $view = DiffViewEnum::BRANCH): ?string;
+	public function getDiff(string $path, string $file, DiffViewEnum $view = DiffViewEnum::BRANCH, int $context = 3): ?string;
 
 	/**
 	 * The changed files of one view: not committed, committed but not pushed,
 	 * or the whole branch against the main line.
 	 */
 	public function getChangesFor(string $path, DiffViewEnum $view): ChangeObjectCollection;
+
+	/**
+	 * The patch of every changed file of one view, by path, read in one go.
+	 *
+	 * @return array<string, ?string>
+	 */
+	public function getDiffs(string $path, DiffViewEnum $view): array;
 
 	/**
 	 * How many commits hold a change origin does not have yet; a commit a

@@ -44,6 +44,14 @@ class ChangeObject extends ValueObject
 		return $this->kind === ChangeKindEnum::DELETED;
 	}
 
+	/**
+	 * The id of the file on a page that shows every changed file, for jumping to it.
+	 */
+	public function anchor(): string
+	{
+		return 'df-' . md5($this->path);
+	}
+
 	public function name(): string
 	{
 		return basename($this->path);
