@@ -12,7 +12,7 @@
 			<span class="meta"><span class="mono muted">{{ dirname($openDiffFile) }}</span><span class="plus">+{{ $diffAdded }}</span><span class="minus">−{{ $diffRemoved }}</span></span>
 		</div>
 		<div class="diff-views">
-			<div class="seg" role="group" aria-label="{{ __('Welke wijzigingen') }}">
+			<div class="seg counted" role="group" aria-label="{{ __('Welke wijzigingen') }}">
 				@foreach (\Src\Worktree\Enums\DiffViewEnum::cases() as $view)
 					<button type="button" aria-pressed="{{ $diffView === $view ? 'true' : 'false' }}" wire:click="setDiffView('{{ $view->value }}')" @disabled($diffViews[$view->value] === 0 && $diffView !== $view)>{{ $view->label() }}<span class="n">{{ $diffViews[$view->value] }}</span></button>
 				@endforeach
@@ -21,7 +21,7 @@
 				@if ($diffView === \Src\Worktree\Enums\DiffViewEnum::UNCOMMITTED)
 					{{ __('Tegenover de laatste commit') }}
 				@elseif ($diffView === \Src\Worktree\Enums\DiffViewEnum::UNPUSHED)
-					{{ trans_choice(':count commit met wijzigingen die nog niet op origin staan|:count commits met wijzigingen die nog niet op origin staan', $unpushedCount, ['count' => $unpushedCount]) }}
+					@if ($unpushedCount === 0){{ __('Alleen wat nog niet gecommit is') }}@else{{ trans_choice(':count commit met wijzigingen die nog niet op origin staan|:count commits met wijzigingen die nog niet op origin staan', $unpushedCount, ['count' => $unpushedCount]) }}{{ $diffViews['uncommitted'] > 0 ? ', ' . __('plus wat nog niet gecommit is') : '' }}@endif
 				@else
 					{{ __('Gecommit en niet gecommit samen, tegenover :main', ['main' => $worktree?->mainBranch ?? 'master']) }}
 				@endif

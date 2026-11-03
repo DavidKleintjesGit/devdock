@@ -127,34 +127,52 @@
 		</section>
 
 		<section class="dsec">
-			<div class="headrow" style="align-items:baseline">
-				<h3 class="eyebrow">{{ __('Nog niet gecommit') }}</h3>
-				@if ($changeCount > 0)
-					<span class="hint"><span class="plus">+{{ $added }}</span> <span class="minus">−{{ $removed }}</span> · {{ __(':picked van :total gaan mee', ['picked' => $pickedCount, 'total' => $changeCount]) }}</span>
-				@endif
+			<div class="headrow changes-head">
+				<h3 class="eyebrow grow">{{ __('Wijzigingen') }}</h3>
+				<div class="seg counted" role="group" aria-label="{{ __('Welke wijzigingen') }}">
+					@foreach (\Src\Worktree\Enums\DiffViewEnum::cases() as $view)
+						<button type="button" aria-pressed="{{ $copyView === $view ? 'true' : 'false' }}" wire:click="setDiffView('{{ $view->value }}')" @disabled($viewCounts[$view->value] === 0 && $copyView !== $view)>{{ $view->label() }}<span class="n">{{ $viewCounts[$view->value] }}</span></button>
+					@endforeach
+				</div>
 			</div>
-			@if ($changeCount > 0)
-				<p class="hint" style="margin:0">{{ __('Veranderd sinds de laatste commit. Wat aangevinkt is, gaat mee in de volgende commit.') }}</p>
+			<p class="hint" style="margin:0">
+				@if ($copyView === \Src\Worktree\Enums\DiffViewEnum::UNCOMMITTED)
+					{{ __('Veranderd sinds de laatste commit. Wat aangevinkt is, gaat mee in de volgende commit.') }}@if ($changeCount > 0) · <span class="plus">+{{ $added }}</span> <span class="minus">−{{ $removed }}</span> · {{ __(':picked van :total gaan mee', ['picked' => $pickedCount, 'total' => $changeCount]) }}@endif
+				@elseif ($copyView === \Src\Worktree\Enums\DiffViewEnum::UNPUSHED)
+					@if ($newCommitCount === 0){{ __('Alleen wat nog niet gecommit is') }}@else{{ trans_choice(':count commit met wijzigingen die nog niet op origin staan|:count commits met wijzigingen die nog niet op origin staan', $newCommitCount, ['count' => $newCommitCount]) }}{{ $changeCount > 0 ? ', ' . __('plus wat nog niet gecommit is') : '' }}@endif · <span class="plus">+{{ $viewAdded }}</span> <span class="minus">−{{ $viewRemoved }}</span>
+				@else
+					{{ __('Alles wat deze branch veranderde, gecommit en niet gecommit samen. Wat de pull request laat zien.') }} · <span class="plus">+{{ $viewAdded }}</span> <span class="minus">−{{ $viewRemoved }}</span>
+				@endif
+			</p>
+			@if ($viewChanges->isNotEmpty())
 				<div class="list">
-					@foreach ($changes as $row)
-						<div @class(['filerow', 'off' => ! $row['isPicked']]) wire:key="change-{{ $row['change']->path }}">
-							<label class="tick cell">
-								<input type="checkbox" @checked($row['isPicked']) wire:click="toggleCommitFile('{{ $row['change']->path }}')" aria-label="{{ __(':name meenemen', ['name' => $row['change']->name()]) }}">
-								<span class="mark"></span>
-							</label>
-							<button class="filerow grow" type="button" style="padding:0;min-height:44px" wire:click="openDiff('{{ $row['change']->path }}', 'uncommitted')">
-								<span class="name"><b>{{ $row['change']->name() }}</b><small>{{ $row['change']->folder() }}{{ $row['isPicked'] ? '' : ' · ' . __('gaat niet mee') }}</small></span>
+					@foreach ($viewChanges as $row)
+						@if ($copyView === \Src\Worktree\Enums\DiffViewEnum::UNCOMMITTED)
+							<div @class(['filerow', 'off' => ! $row['isPicked']]) wire:key="change-{{ $row['change']->path }}">
+								<label class="tick cell">
+									<input type="checkbox" @checked($row['isPicked']) wire:click="toggleCommitFile('{{ $row['change']->path }}')" aria-label="{{ __(':name meenemen', ['name' => $row['change']->name()]) }}">
+									<span class="mark"></span>
+								</label>
+								<button class="filerow grow" type="button" style="padding:0;min-height:44px" wire:click="openDiff('{{ $row['change']->path }}', '{{ $copyView->value }}')">
+									<span class="name"><b>{{ $row['change']->name() }}</b><small>{{ $row['change']->folder() }}{{ $row['isPicked'] ? '' : ' · ' . __('gaat niet mee') }}</small></span>
+									<span class="delta">@if ($row['change']->added)<span class="plus">+{{ $row['change']->added }}</span>@endif @if ($row['change']->removed)<span class="minus">−{{ $row['change']->removed }}</span>@endif</span>
+									<x-icon name="chev" small/>
+								</button>
+							</div>
+						@else
+							<button class="filerow" type="button" wire:click="openDiff('{{ $row['change']->path }}', '{{ $copyView->value }}')" wire:key="view-change-{{ $copyView->value }}-{{ $row['change']->path }}">
+								<span class="name"><b>{{ $row['change']->name() }}@if ($row['change']->isNew())<span class="label green" style="margin-left:6px">{{ __('nieuw') }}</span>@elseif ($row['change']->isGone())<span class="label red" style="margin-left:6px">{{ __('weg') }}</span>@endif</b><small>{{ $row['change']->folder() }}</small></span>
 								<span class="delta">@if ($row['change']->added)<span class="plus">+{{ $row['change']->added }}</span>@endif @if ($row['change']->removed)<span class="minus">−{{ $row['change']->removed }}</span>@endif</span>
 								<x-icon name="chev" small/>
 							</button>
-						</div>
+						@endif
 					@endforeach
-					@if ($hiddenChanges > 0)
-						<button class="row" type="button" style="color:var(--accent);font-size:13px;min-height:42px" wire:click="$set('showAllChanges', true)">{{ __('Nog :count bestanden', ['count' => $hiddenChanges]) }}</button>
+					@if ($hiddenViewChanges > 0)
+						<button class="row" type="button" style="color:var(--accent);font-size:13px;min-height:42px" wire:click="$set('showAllChanges', true)">{{ __('Nog :count bestanden', ['count' => $hiddenViewChanges]) }}</button>
 					@endif
 				</div>
 			@else
-				<p class="hint" style="margin:0">{{ __('Alles wat hier stond is vastgelegd in een commit.') }}</p>
+				<p class="hint" style="margin:0">{{ $copyView === \Src\Worktree\Enums\DiffViewEnum::UNCOMMITTED ? __('Alles wat hier stond is vastgelegd in een commit.') : ($copyView === \Src\Worktree\Enums\DiffViewEnum::UNPUSHED ? __('Alles staat op origin.') : __('Deze branch veranderde nog niets tegenover :main.', ['main' => $worktree->mainBranch])) }}</p>
 			@endif
 		</section>
 
@@ -172,28 +190,6 @@
 				<div class="field">
 					<span class="counter-row"><label for="commit-body" style="font-size:13px;font-weight:500;color:var(--fg)">{{ __('Bericht') }}</label><span>{{ __('mag leeg') }}</span></span>
 					<textarea id="commit-body" class="textarea" rows="4" wire:model="commitBody"></textarea>
-				</div>
-			</section>
-		@endif
-
-		@if ($branchChanges->isNotEmpty())
-			<section class="dsec">
-				<div class="headrow" style="align-items:baseline">
-					<h3 class="eyebrow">{{ __('Tegenover :main', ['main' => $worktree->mainBranch]) }}</h3>
-					<span class="hint">{{ trans_choice(':count bestand|:count bestanden', $branchChangeCount, ['count' => $branchChangeCount]) }} · <span class="plus">+{{ $branchAdded }}</span> <span class="minus">−{{ $branchRemoved }}</span></span>
-				</div>
-				<p class="hint" style="margin:0">{{ __('Alles wat deze branch veranderde, gecommit en niet gecommit samen. Wat de pull request laat zien.') }}</p>
-				<div class="list">
-					@foreach ($branchChanges as $change)
-						<button class="filerow" type="button" wire:click="openDiff('{{ $change->path }}', 'branch')" wire:key="branch-change-{{ $change->path }}">
-							<span class="name"><b>{{ $change->name() }}@if ($change->isNew())<span class="label green" style="margin-left:6px">{{ __('nieuw') }}</span>@elseif ($change->isGone())<span class="label red" style="margin-left:6px">{{ __('weg') }}</span>@endif</b><small>{{ $change->folder() }}</small></span>
-							<span class="delta">@if ($change->added)<span class="plus">+{{ $change->added }}</span>@endif @if ($change->removed)<span class="minus">−{{ $change->removed }}</span>@endif</span>
-							<x-icon name="chev" small/>
-						</button>
-					@endforeach
-					@if ($hiddenBranchChanges > 0)
-						<button class="row" type="button" style="color:var(--accent);font-size:13px;min-height:42px" wire:click="$set('showAllBranchChanges', true)">{{ __('Nog :count bestanden', ['count' => $hiddenBranchChanges]) }}</button>
-					@endif
 				</div>
 			</section>
 		@endif

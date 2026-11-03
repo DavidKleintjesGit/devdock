@@ -28,6 +28,7 @@ use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
 use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Enums\DatabaseFillEnum;
+use Src\Worktree\Enums\DiffViewEnum;
 use Src\Worktree\Enums\WorktreeOriginEnum;
 use Src\Worktree\Objects\ChangeObject;
 use Src\Worktree\Objects\DatabaseObject;
@@ -46,12 +47,11 @@ trait WithWorkingCopy
 
 	public bool $showAllChanges = false;
 
-	public bool $showAllBranchChanges = false;
 
 	/**
 	 * How many files of the branch show before "Nog n bestanden".
 	 */
-	private const BRANCH_CHANGES_SHOWN = 4;
+	private const CHANGES_SHOWN = 4;
 
 	public ?string $databaseDialog = null;
 
@@ -370,7 +370,8 @@ trait WithWorkingCopy
 			->first(fn (ProjectEntity $projectEntity) => $projectEntity->name === $worktreeEntity->project)
 			?->path;
 
-		$branchChanges = collect($worktreeRepository->getBranchChanges($worktreeEntity->path));
+		$view = $this->diffViewFor($worktreeEntity);
+		$viewChanges = collect($worktreeRepository->getChangesFor($worktreeEntity->path, $view));
 		$picked = $changes->reject(fn (ChangeObject $changeObject) => in_array($changeObject->path, $this->skippedFiles, true));
 
 		return [
@@ -379,11 +380,6 @@ trait WithWorkingCopy
 			'lastRebase' => $worktreeRepository->getLastRebase($worktreeEntity->path),
 			'mainCheckout' => $worktreeEntity->origin === WorktreeOriginEnum::PROJECT ? $this->mainCheckout($cardObject) : null,
 			'outdatedRules' => $this->outdatedRules($cardObject, $worktreeEntity),
-			'changes' => ($this->showAllChanges ? $changes : $changes->take(4))->map(fn (ChangeObject $changeObject) => [
-				'change' => $changeObject,
-				'isPicked' => ! in_array($changeObject->path, $this->skippedFiles, true),
-			]),
-			'hiddenChanges' => $this->showAllChanges ? 0 : max(0, $changes->count() - 4),
 			'changeCount' => $changes->count(),
 			'pickedCount' => $picked->count(),
 			'added' => $picked->sum('added'),
@@ -396,11 +392,16 @@ trait WithWorkingCopy
 			'carried' => resolve(WorkingCopyRepositoryContract::class)->getCarried($worktreeEntity->path),
 			'fills' => DatabaseFillEnum::cases(),
 			'cleanUp' => DescribeCleanUpAction::execute($worktreeEntity),
-			'branchChanges' => $this->showAllBranchChanges ? $branchChanges : $branchChanges->take(self::BRANCH_CHANGES_SHOWN),
-			'hiddenBranchChanges' => $this->showAllBranchChanges ? 0 : max(0, $branchChanges->count() - self::BRANCH_CHANGES_SHOWN),
-			'branchChangeCount' => $branchChanges->count(),
-			'branchAdded' => $branchChanges->sum('added'),
-			'branchRemoved' => $branchChanges->sum('removed'),
+			'copyView' => $view,
+			'viewCounts' => $this->diffViewCounts($worktreeEntity),
+			'newCommitCount' => $worktreeRepository->getNewCommitCount($worktreeEntity->path),
+			'viewChanges' => ($this->showAllChanges ? $viewChanges : $viewChanges->take(self::CHANGES_SHOWN))->map(fn (ChangeObject $changeObject) => [
+				'change' => $changeObject,
+				'isPicked' => ! in_array($changeObject->path, $this->skippedFiles, true),
+			]),
+			'hiddenViewChanges' => $this->showAllChanges ? 0 : max(0, $viewChanges->count() - self::CHANGES_SHOWN),
+			'viewAdded' => $viewChanges->sum('added'),
+			'viewRemoved' => $viewChanges->sum('removed'),
 		];
 	}
 
@@ -456,6 +457,43 @@ trait WithWorkingCopy
 			'folder' => trim((string) config('devdock.worktree.folder'), '/') . '/' . basename(EnsureWorktreeAction::folderFor($projectPath, $cardObject->branch)),
 			'uncommitted' => resolve(WorktreeRepositoryContract::class)->getUncommittedFiles($projectPath),
 		];
+	}
+
+	/**
+	 * The changes the tab and the code reader show: the one you picked, or else
+	 * what is not committed, what is not pushed, the whole branch, in that order.
+	 */
+	protected function diffViewFor(WorktreeEntity $worktreeEntity): DiffViewEnum
+	{
+		$picked = DiffViewEnum::tryFrom((string) $this->diffView);
+
+		if ($picked !== null) {
+			return $picked;
+		}
+
+		$counts = $this->diffViewCounts($worktreeEntity);
+
+		return match (true) {
+			$counts[DiffViewEnum::UNCOMMITTED->value] > 0 => DiffViewEnum::UNCOMMITTED,
+			$counts[DiffViewEnum::UNPUSHED->value] > 0 => DiffViewEnum::UNPUSHED,
+			default => DiffViewEnum::BRANCH,
+		};
+	}
+
+	/**
+	 * How many files each view holds, by the view.
+	 *
+	 * @return array<string, int>
+	 */
+	protected function diffViewCounts(WorktreeEntity $worktreeEntity): array
+	{
+		$counts = [];
+
+		foreach (DiffViewEnum::cases() as $diffView) {
+			$counts[$diffView->value] = count(resolve(WorktreeRepositoryContract::class)->getChangesFor($worktreeEntity->path, $diffView));
+		}
+
+		return $counts;
 	}
 
 	private function projectPathFor(CardObject $cardObject): ?string

@@ -167,8 +167,8 @@ class Drawer extends Component
 
 	public ?string $openDiffFile = null;
 
-	/** Which changes the code reader shows; a DiffViewEnum value. */
-	public string $diffView = 'branch';
+	/** Which changes the Werkkopie tab and the code reader show; a DiffViewEnum value, or null for the default. */
+	public ?string $diffView = null;
 
 	public bool $confirmingDeleteTask = false;
 
@@ -232,6 +232,7 @@ class Drawer extends Component
 		$this->commitMessage = $this->suggestedCommitMessage($card);
 		$this->commitBody = '';
 		$this->openTab = 'Overzicht';
+		$this->diffView = null;
 
 		$cardObject = $this->cardById($this->board(), $card);
 
@@ -425,7 +426,7 @@ class Drawer extends Component
 
 		$paths = collect(resolve(WorktreeRepositoryContract::class)->getChangesFor($worktreeEntity->path, $diffView))->pluck('path');
 
-		if ($paths->isNotEmpty() && ! $paths->contains($this->openDiffFile)) {
+		if ($this->openDiffFile !== null && $paths->isNotEmpty() && ! $paths->contains($this->openDiffFile)) {
 			$this->openDiffFile = (string) $paths->first();
 		}
 	}
@@ -962,7 +963,7 @@ class Drawer extends Component
 		$isSetup = in_array($cardObject->column, [BoardColumnEnum::TO_DO, BoardColumnEnum::LATER], true)
 			|| ($cardObject->column === BoardColumnEnum::BUILDING && $cardObject->agent === null && $promptRunEntity === null);
 		$diffHunks = ReadDiffAction::execute($this->diffFor($cardObject));
-		$diffView = DiffViewEnum::tryFrom($this->diffView) ?? DiffViewEnum::BRANCH;
+		$diffView = $worktreeEntity === null ? DiffViewEnum::BRANCH : $this->diffViewFor($worktreeEntity);
 		$diffTree = $this->openDiffFile === null ? [] : $this->diffTree($cardObject, $diffView);
 		$workflowSetting = GetWorkflowSettingAction::execute($cardObject->project);
 		$promptSources = $tab === 'Agent' ? $this->promptSources($cardObject, $reviewCommentEntities) : [];
@@ -997,7 +998,7 @@ class Drawer extends Component
 			'openDiffFile' => $this->openDiffFile,
 			'diffTree' => $diffTree,
 			'diffView' => $diffView,
-			'diffViews' => $this->openDiffFile === null ? [] : $this->diffViewCounts($cardObject),
+			'diffViews' => $this->openDiffFile === null || $worktreeEntity === null ? [] : $this->diffViewCounts($worktreeEntity),
 			'unpushedCount' => $this->openDiffFile === null || $worktreeEntity === null ? 0 : resolve(WorktreeRepositoryContract::class)->getNewCommitCount($worktreeEntity->path),
 			'diffHunks' => $diffHunks,
 			'diffAdded' => $this->countLines($diffHunks, 'add'),
@@ -1313,23 +1314,6 @@ class Drawer extends Component
 	}
 
 	/**
-	 * How many files each view of the code reader holds, by the view.
-	 *
-	 * @return array<string, int>
-	 */
-	private function diffViewCounts(CardObject $cardObject): array
-	{
-		$worktreeEntity = $this->worktreeFor($cardObject);
-		$counts = [];
-
-		foreach (DiffViewEnum::cases() as $diffView) {
-			$counts[$diffView->value] = $worktreeEntity === null ? 0 : count(resolve(WorktreeRepositoryContract::class)->getChangesFor($worktreeEntity->path, $diffView));
-		}
-
-		return $counts;
-	}
-
-	/**
 	 * Hoeveel regels er bij kwamen of af gingen, over alle stukken heen.
 	 */
 	private function countLines(DiffHunkObjectCollection $diffHunks, string $kind): int
@@ -1354,7 +1338,7 @@ class Drawer extends Component
 
 		return $this->openDiffFile === null || $worktreeEntity === null
 			? null
-			: resolve(WorktreeRepositoryContract::class)->getDiff($worktreeEntity->path, $this->openDiffFile, DiffViewEnum::tryFrom($this->diffView) ?? DiffViewEnum::BRANCH);
+			: resolve(WorktreeRepositoryContract::class)->getDiff($worktreeEntity->path, $this->openDiffFile, $this->diffViewFor($worktreeEntity));
 	}
 
 	private function branchSuggestion(?CardObject $cardObject): string

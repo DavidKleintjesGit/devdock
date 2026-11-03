@@ -248,7 +248,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		$rows = Cache::remember(
 			$this->branchChangesKey($path),
 			(int) config('devdock.worktree.status_seconds'),
-			fn () => $this->readBranchChanges($path),
+			fn () => $this->readChangesSince($path, $this->branchBase($path)),
 		);
 
 		return ChangeObjectCollection::fromArray(array_map(
@@ -258,15 +258,13 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	}
 
 	/**
-	 * Against the commit where the branch left the main line, and including
-	 * what is not committed yet: what the pull request will show.
+	 * Every file changed since the given commit, including what is not
+	 * committed yet and files git never saw.
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function readBranchChanges(string $path): array
+	private function readChangesSince(string $path, ?string $base): array
 	{
-		$base = $this->branchBase($path);
-
 		if ($base === null) {
 			return [];
 		}
@@ -368,10 +366,15 @@ class WorktreeRepository implements WorktreeRepositoryContract
 				continue;
 			}
 
+			// git counts no lines for a file it never saw; then all of its lines are new
+			$contents = $status === '??' && ! isset($counts[$file]) ? @file_get_contents($path . '/' . $file) : false;
+
 			$rows[] = [
 				'path' => $file,
 				'status' => $status,
-				'added' => $counts[$file]['added'] ?? 0,
+				'added' => $contents === false
+					? ($counts[$file]['added'] ?? 0)
+					: substr_count($contents, "\n") + (str_ends_with($contents, "\n") || $contents === '' ? 0 : 1),
 				'removed' => $counts[$file]['removed'] ?? 0,
 			];
 		}
@@ -392,7 +395,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		$rows = Cache::remember(
 			'worktree.unpushed-changes.' . md5($path),
 			(int) config('devdock.worktree.status_seconds'),
-			fn () => $this->readCommittedChanges($path, $this->pushedBase($path)),
+			fn () => $this->readChangesSince($path, $this->pushedBase($path)),
 		);
 
 		return ChangeObjectCollection::fromArray(array_map(
@@ -410,8 +413,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		$range = match ($view) {
 			// what changed since the last commit
 			DiffViewEnum::UNCOMMITTED => ['HEAD'],
-			// the commits origin does not have yet, without what is not committed
-			DiffViewEnum::UNPUSHED => [$this->pushedBase($path) ?? 'HEAD', 'HEAD'],
+			// everything origin does not have yet, committed or not
+			DiffViewEnum::UNPUSHED => [$this->pushedBase($path) ?? 'HEAD'],
 			// against the main line: what this branch did to the file, committed or not
 			DiffViewEnum::BRANCH => [$this->branchBase($path) ?? 'origin/' . $this->mainBranch($path)],
 		};
@@ -422,8 +425,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 		$patch = trim($result->output());
 
-		if ($patch !== '' || $view === DiffViewEnum::UNPUSHED) {
-			return $patch === '' ? null : $patch;
+		if ($patch !== '') {
+			return $patch;
 		}
 
 		// git kent dit bestand nog niet, dus er is niets om tegen af te zetten
@@ -457,19 +460,14 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	}
 
 	/**
-	 * What to set HEAD against to see what a push would change: the branch as
-	 * origin holds it, laid on the same main line as HEAD, so neither a rebase
-	 * nor the main line moving on shows up as a change. Null when there is
-	 * nothing to push.
+	 * The commit to set the working files against to see what a push would
+	 * change: the branch as origin holds it, laid on the same main line as
+	 * HEAD, so neither a rebase nor the main line moving on shows up. With no
+	 * new commits that is HEAD itself, and only what is not committed remains.
 	 */
 	private function pushedBase(string $path): ?string
 	{
 		$newCommits = $this->newCommits($path);
-
-		if ($newCommits === []) {
-			return null;
-		}
-
 		$upstream = $this->pushedRef($path);
 		$fork = $this->branchBase($path);
 
@@ -477,11 +475,15 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return $fork;
 		}
 
+		if ($newCommits === []) {
+			return 'HEAD';
+		}
+
 		$merged = $fork === null ? null : Process::path($path)->run(['git', 'merge-tree', '--write-tree', '--no-messages', $fork, $upstream]);
 
 		// exit code 1 is a clash: the tree still holds everything that merged, and the clashing files differ for real
 		if ($merged !== null && in_array($merged->exitCode(), [0, 1], true)) {
-			return strtok(trim($merged->output()), "\n") ?: null;
+			return $this->commitOfTree($path, (string) strtok(trim($merged->output()), "\n"), (string) $fork);
 		}
 
 		// no tree at all; fall back to the commit before the oldest new one
@@ -508,45 +510,22 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	}
 
 	/**
-	 * The files the commits after the given commit changed, without what is
-	 * not committed.
-	 *
-	 * @return array<int, array<string, mixed>>
+	 * A commit holding the tree, on top of the given parent: git sets the working
+	 * files against a commit, not against a bare tree. Kept per tree, so asking
+	 * again does not make another.
 	 */
-	private function readCommittedChanges(string $path, ?string $base): array
+	private function commitOfTree(string $path, string $tree, string $parent): ?string
 	{
-		if ($base === null) {
-			return [];
+		if ($tree === '' || $parent === '') {
+			return null;
 		}
 
-		$kinds = [];
+		return Cache::rememberForever('worktree.laid-commit.' . $tree . '.' . $parent, function () use ($path, $tree, $parent): ?string {
+			// the commit hangs on no branch; git clears such loose objects away by itself
+			$commit = Process::path($path)->run(['git', 'commit-tree', $tree, '-p', $parent, '-m', 'devdock: origin laid on the main line']);
 
-		foreach ($this->lines($path, ['git', 'diff', '--name-status', '--find-renames', $base, 'HEAD']) as $line) {
-			$parts = explode("\t", $line);
-			$kinds[end($parts)] = $parts[0];
-		}
-
-		$rows = [];
-
-		foreach ($this->lines($path, ['git', 'diff', '--numstat', '--find-renames', $base, 'HEAD']) as $line) {
-			$parts = explode("\t", $line);
-
-			if (count($parts) < 3) {
-				continue;
-			}
-
-			$file = (string) preg_replace('/\{[^{}]* => ([^{}]*)\}/', '$1', $parts[2]);
-			$file = str_contains($file, ' => ') ? trim(explode(' => ', $file)[1]) : $file;
-
-			$rows[] = [
-				'path' => str_replace('//', '/', $file),
-				'status' => $kinds[$file] ?? 'M',
-				'added' => (int) $parts[0],
-				'removed' => (int) $parts[1],
-			];
-		}
-
-		return $rows;
+			return $commit->successful() ? (trim($commit->output()) ?: null) : null;
+		});
 	}
 
 	/**
