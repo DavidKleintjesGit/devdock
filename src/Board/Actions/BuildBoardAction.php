@@ -427,6 +427,13 @@ class BuildBoardAction extends Command
 		?WorktreeEntity $worktreeEntity,
 		?int $staleDays,
 	): array {
+		// work under way outweighs every other line, in whichever column the task stands
+		$busy = $column->canStall() ? $this->busyStatus($column, $latestRound, $promptRunEntity, $project) : null;
+
+		if ($busy !== null) {
+			return $busy;
+		}
+
 		return match ($column) {
 			BoardColumnEnum::LATER => [CardStatusEnum::QUIET, __('In de backlog, nog niet gepland')],
 			BoardColumnEnum::TO_DO => $hasAgent
@@ -435,10 +442,34 @@ class BuildBoardAction extends Command
 			BoardColumnEnum::BUILDING => $this->buildingStatus($promptRunEntity, $hasAgent, $staleDays, $worktreeEntity),
 			BoardColumnEnum::REVIEW => $latestRound?->isExpiredBy($worktreeEntity === null ? null : resolve(WorktreeRepositoryContract::class)->getFingerprint($worktreeEntity->path))
 				? [CardStatusEnum::YOURS, __('Gewijzigd na de ronde · opnieuw naar de lenzen')]
-				: $this->reviewStatus($latestRound, $promptRunEntity, $staleDays, $this->maxRoundsFor($project)),
+				: $this->reviewStatus($latestRound, $staleDays, $this->maxRoundsFor($project)),
 			BoardColumnEnum::PULL_REQUEST => $this->pullRequestStatus($pullRequestEntities, $staleDays),
 			BoardColumnEnum::DONE => [CardStatusEnum::QUIET, $ticketEntity !== null || $pullRequestEntities->isNotEmpty() ? __('Gemerged') : __('Afgevinkt')],
 		};
+	}
+
+	/**
+	 * The lenses of a round or the agent at work on the task; null when
+	 * nothing is running.
+	 *
+	 * @return array{0: CardStatusEnum, 1: string}|null
+	 */
+	private function busyStatus(BoardColumnEnum $column, ?ReviewRoundEntity $latestRound, ?PromptRunEntity $promptRunEntity, ?string $project): ?array
+	{
+		if ($latestRound?->isRunning()) {
+			return [CardStatusEnum::BUSY, __('Ronde :number van :max · lenzen bezig', [
+				'number' => $latestRound->positionInSeries(),
+				'max' => $this->maxRoundsFor($project),
+			])];
+		}
+
+		if (! $promptRunEntity?->isRunning()) {
+			return null;
+		}
+
+		return [CardStatusEnum::BUSY, $column === BoardColumnEnum::REVIEW
+			? __('De agent werkt de bevindingen bij')
+			: __('Agent bezig · :count min', ['count' => max(1, intdiv((int) $promptRunEntity->seconds(), 60))])];
 	}
 
 	/**
@@ -478,20 +509,8 @@ class BuildBoardAction extends Command
 	/**
 	 * @return array{0: CardStatusEnum, 1: string}
 	 */
-	private function reviewStatus(?ReviewRoundEntity $latestRound, ?PromptRunEntity $promptRunEntity, ?int $staleDays, int $maxRounds): array
+	private function reviewStatus(?ReviewRoundEntity $latestRound, ?int $staleDays, int $maxRounds): array
 	{
-
-		if ($latestRound?->isRunning()) {
-			return [CardStatusEnum::BUSY, __('Ronde :number van :max · lenzen bezig', [
-				'number' => $latestRound->positionInSeries(),
-				'max' => $maxRounds,
-			])];
-		}
-
-		if ($promptRunEntity?->isRunning()) {
-			return [CardStatusEnum::BUSY, __('De agent werkt de bevindingen bij')];
-		}
-
 		if ($staleDays !== null) {
 			return [CardStatusEnum::QUIET, $this->quietFor($staleDays)];
 		}
