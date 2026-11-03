@@ -903,6 +903,7 @@ body.is-working .working{opacity:1}
 .dfile-chev{display:inline-grid;transition:transform .15s}
 .dfile-chev.shut{transform:rotate(-90deg)}
 .dfile .diff{border:0;border-radius:0 0 10px 10px}
+.diff-loading{background:repeating-linear-gradient(var(--surface) 0 20px,var(--surface-2) 20px 21px)}
 .dfile-large{display:block;width:100%;padding:12px 16px;border:0;border-radius:0 0 10px 10px;background:var(--surface-2);font:inherit;font-size:13px;color:var(--accent);text-align:left;cursor:pointer}
 .diff .hunk.expand{display:flex;align-items:center;gap:12px;width:100%;padding:4px 12px 4px 0;border:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font:inherit;text-align:left;cursor:pointer}
 .diff .hunk.expand:hover{color:var(--fg);background:var(--line)}

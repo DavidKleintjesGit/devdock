@@ -85,6 +85,20 @@ return [
 		// wat DevDock zelf verandert haalt de regel meteen weg, dus hij mag lang
 		'status_seconds' => (int) env('DEVDOCK_WORKTREE_STATUS_SECONDS', 60),
 
+		// files a tool writes rather than a person; the code reader keeps them
+		// closed and loads them only on request, like a pull request does. A
+		// project marks more with linguist-generated in its .gitattributes
+		'generated' => [
+			'*.lock',
+			'package-lock.json',
+			'*.min.js',
+			'*.min.css',
+			'*.map',
+			'mix-manifest.json',
+			'public/build/*',
+			'public/vendor/*',
+		],
+
 		'share' => [
 			'vendor' => 'composer.lock',
 			'node_modules' => 'package-lock.json',

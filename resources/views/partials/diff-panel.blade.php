@@ -35,7 +35,7 @@
 		<div class="resize-bar" data-resize="--diff-files" data-edge="end" data-min="140" data-max="520" aria-hidden="true" title="{{ __('Sleep om breder of smaller te maken') }}"></div>
 		<div class="diffpatch stacked">
 			@forelse ($diffFiles as $diffFile)
-				<section id="{{ $diffFile['change']->anchor() }}" class="dfile" wire:key="dfile-{{ $diffFile['change']->anchor() }}-{{ $diffFile['fingerprint'] }}" x-data="{ open: @js(! $diffFile['isLarge']) && ! isViewed(@js($diffFile['change']->path)) }">
+				<section id="{{ $diffFile['change']->anchor() }}" class="dfile" wire:key="dfile-{{ $diffView->value }}-{{ $diffFile['change']->anchor() }}-{{ $diffFile['fingerprint'] }}" x-data="{ open: @js(! $diffFile['isLarge'] && ! $diffFile['isGenerated']) && ! isViewed(@js($diffFile['change']->path)) }">
 					<header class="dfile-head">
 						<button class="icon-btn" type="button" x-on:click="open = ! open" :aria-expanded="open" aria-label="{{ __('In- of uitklappen') }}"><span class="dfile-chev" :class="{ shut: ! open }"><x-icon name="down" small/></span></button>
 						<span class="tree-kind {{ $diffFile['change']->kind->tone() }}" title="{{ $diffFile['change']->kind->label() }}"><x-icon :name="$diffFile['change']->kind->icon()" small/></span>
@@ -46,9 +46,11 @@
 						<label class="dfile-viewed"><input type="checkbox" :checked="isViewed(@js($diffFile['change']->path))" x-on:change="toggle(@js($diffFile['change']->path)); open = ! isViewed(@js($diffFile['change']->path))">{{ __('Bekeken') }}</label>
 					</header>
 					<div x-show="open">
-						<x-diff :hunks="$diffFile['hunks']" :file="$diffFile['change']->path" :expandable="true" :empty="__('In dit overzicht is aan dit bestand niets veranderd.')"/>
+						<livewire:diff-file :worktree-path="$worktree->path" :file="$diffFile['change']->path" :view="$diffView->value" :lines="$diffFile['change']->added + $diffFile['change']->removed" :wire:key="'diff-file-' . $diffView->value . '-' . $diffFile['change']->anchor() . '-' . $diffFile['fingerprint']"/>
 					</div>
-					@if ($diffFile['isLarge'])
+					@if ($diffFile['isGenerated'])
+						<button class="dfile-large" type="button" x-show="! open" x-on:click="open = true">{{ __('Gegenereerd bestand, niet geladen. Tonen') }}</button>
+					@elseif ($diffFile['isLarge'])
 						<button class="dfile-large" type="button" x-show="! open" x-on:click="open = true">{{ __('Groot bestand, ingeklapt zodat de pagina snel blijft. Tonen') }}</button>
 					@endif
 				</section>

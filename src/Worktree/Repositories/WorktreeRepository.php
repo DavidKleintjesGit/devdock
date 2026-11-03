@@ -337,49 +337,14 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		$rows = Cache::remember(
 			$this->changesKey($path),
 			(int) config('devdock.worktree.status_seconds'),
-			fn () => $this->readChanges($path),
+			// by content, so a file that only changed its line endings does not count
+			fn () => $this->readChangesSince($path, 'HEAD'),
 		);
 
 		return ChangeObjectCollection::fromArray(array_map(
 			fn (array $row) => ChangeObject::from($row),
 			$rows,
 		));
-	}
-
-	/**
-	 * Elke wijziging met hoeveel er verschoof: twee git-aanroepen, en de
-	 * Worktree-tab vraagt ze bij elke klik opnieuw.
-	 */
-	/**
-	 * @return array<int, array<string, mixed>>
-	 */
-	private function readChanges(string $path): array
-	{
-		$counts = $this->lineCounts($path);
-		$rows = [];
-
-		foreach ($this->lines($path, 'git status --porcelain') as $line) {
-			$status = trim(substr($line, 0, 2));
-			$file = trim(substr($line, 2));
-
-			if ($file === '' || $file === self::PROJECT_NAME_FILE) {
-				continue;
-			}
-
-			// git counts no lines for a file it never saw; then all of its lines are new
-			$contents = $status === '??' && ! isset($counts[$file]) ? @file_get_contents($path . '/' . $file) : false;
-
-			$rows[] = [
-				'path' => $file,
-				'status' => $status,
-				'added' => $contents === false
-					? ($counts[$file]['added'] ?? 0)
-					: substr_count($contents, "\n") + (str_ends_with($contents, "\n") || $contents === '' ? 0 : 1),
-				'removed' => $counts[$file]['removed'] ?? 0,
-			];
-		}
-
-		return $rows;
 	}
 
 	public function getChangesFor(string $path, DiffViewEnum $view): ChangeObjectCollection
@@ -420,44 +385,30 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return $patch;
 		}
 
-		// git kent dit bestand nog niet, dus er is niets om tegen af te zetten
-		return $this->newFile($path, $file);
+		// a file git never saw is new in full; one it knows without a patch only changed its line endings
+		return $this->lines($path, ['git', 'ls-files', '--others', '--exclude-standard', '--', $file]) === [] ? null : $this->newFile($path, $file);
 	}
 
-	public function getDiffs(string $path, DiffViewEnum $view): array
+	public function getGeneratedFiles(string $path, array $files): array
 	{
-		if (! is_dir($path)) {
+		if (! is_dir($path) || $files === []) {
 			return [];
 		}
 
-		$base = $this->diffBase($path, $view);
-		$patches = [];
+		$patterns = (array) config('devdock.worktree.generated');
+		$marked = [];
 
-		// one git call for the whole view, cut per file at its "diff --git" line
-		$whole = Process::path($path)->timeout(self::TIMEOUT)->run(['git', 'diff', '--no-color', $base]);
-		$current = null;
+		// one call for every file: "path: linguist-generated: set"
+		$result = Process::path($path)->input(implode("\n", $files) . "\n")->run(['git', 'check-attr', '--stdin', 'linguist-generated']);
 
-		foreach (preg_split('/\R/', $whole->output()) ?: [] as $line) {
-			if (preg_match('#^diff --git a/.+ b/(.+)$#', $line, $found) === 1) {
-				$current = $found[1];
-				$patches[$current] = '';
-			}
-
-			if ($current !== null) {
-				$patches[$current] .= $line . "\n";
+		foreach (preg_split('/\R/', trim($result->output())) ?: [] as $line) {
+			if (preg_match('/^(.+): linguist-generated: (set|true)$/', $line, $found) === 1) {
+				$marked[] = $found[1];
 			}
 		}
 
-		foreach ($this->getChangesFor($path, $view) as $changeObject) {
-			$patches[$changeObject->path] ??= null;
-
-			// git diff leaves out a file it never saw
-			if ($patches[$changeObject->path] === null) {
-				$patches[$changeObject->path] = $this->newFile($path, $changeObject->path);
-			}
-		}
-
-		return array_map(fn (?string $patch) => $patch === null ? null : trim($patch), $patches);
+		return array_values(array_filter($files, fn (string $file): bool => in_array($file, $marked, true)
+			|| collect($patterns)->contains(fn (string $pattern): bool => fnmatch($pattern, $file))));
 	}
 
 	/**
@@ -465,14 +416,24 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 */
 	private function diffBase(string $path, DiffViewEnum $view): string
 	{
-		return match ($view) {
-			// what changed since the last commit
-			DiffViewEnum::UNCOMMITTED => 'HEAD',
-			// everything origin does not have yet, committed or not
-			DiffViewEnum::UNPUSHED => $this->pushedBase($path) ?? 'HEAD',
-			// against the main line: what this branch did to the file, committed or not
-			DiffViewEnum::BRANCH => $this->branchBase($path) ?? 'origin/' . $this->mainBranch($path),
-		};
+		// the code reader reads every file on its own; working out the base takes up to five git calls
+		return Cache::remember(
+			$this->diffBaseKey($path, $view),
+			(int) config('devdock.worktree.status_seconds'),
+			fn (): string => match ($view) {
+				// what changed since the last commit
+				DiffViewEnum::UNCOMMITTED => 'HEAD',
+				// everything origin does not have yet, committed or not
+				DiffViewEnum::UNPUSHED => $this->pushedBase($path) ?? 'HEAD',
+				// against the main line: what this branch did to the file, committed or not
+				DiffViewEnum::BRANCH => $this->branchBase($path) ?? 'origin/' . $this->mainBranch($path),
+			},
+		);
+	}
+
+	private function diffBaseKey(string $path, DiffViewEnum $view): string
+	{
+		return 'worktree.diff-base.' . $view->value . '.' . md5($path);
 	}
 
 	public function getNewCommitCount(string $path): int
@@ -963,29 +924,6 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	}
 
 	/**
-	 * How many lines moved per file. A file git has not seen before is not in
-	 * a diff at all, so it has no counts.
-	 *
-	 * @return array<string, array{added: int, removed: int}>
-	 */
-	private function lineCounts(string $path): array
-	{
-		$counts = [];
-
-		foreach ($this->lines($path, 'git diff --numstat HEAD') as $line) {
-			$parts = preg_split('/	/', $line);
-
-			if ($parts === false || count($parts) < 3) {
-				continue;
-			}
-
-			$counts[$parts[2]] = ['added' => (int) $parts[0], 'removed' => (int) $parts[1]];
-		}
-
-		return $counts;
-	}
-
-	/**
 	 * @return list<string>
 	 */
 	private function lines(string $path, string|array $command): array
@@ -1249,6 +1187,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		Cache::forget($this->unpushedKey($path));
 		Cache::forget('worktree.unpushed-changes.' . md5($path));
 		Cache::forget('worktree.fingerprint.' . md5($path));
+		Cache::forget($this->diffBaseKey($path, DiffViewEnum::UNPUSHED));
+		Cache::forget($this->diffBaseKey($path, DiffViewEnum::BRANCH));
 	}
 
 	private function unpushedKey(string $path): string

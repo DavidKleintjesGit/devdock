@@ -184,6 +184,8 @@
     "Gecommit en niet gecommit samen, tegenover :main": "Committed and not committed together, against :main",
     "Gerebased op :main.": "Rebased on :main.",
     "Groot bestand, ingeklapt zodat de pagina snel blijft. Tonen": "Large file, collapsed to keep the page quick. Show",
+    "Gegenereerd bestand, niet geladen. Tonen": "Generated file, not loaded. Show",
+    "Deze diff is te groot of bevat regels die te lang zijn om snel te tonen. Toch laden": "This diff is too large or has lines too long to show quickly. Load anyway",
     "Hele PR": "Whole PR",
     "Het werk in het project kon niet opzij gezet worden.": "The work in the project could not be set aside.",
     "Het werk uit het project kwam niet terug in de werkkopie; het staat nog in git stash.": "The work from the project did not come back in the working copy; it is still in git stash.",

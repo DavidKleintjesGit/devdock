@@ -28,6 +28,11 @@ class ReadDiffAction extends Command
 	 */
 	private const HUNK = '/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,\d+)? @@/';
 
+	/**
+	 * Lines longer than this get no mark on the part that changed.
+	 */
+	private const MAX_MARKED_CHARACTERS = 1_000;
+
 	public function __construct(
 		public readonly ?string $patch,
 	) {}
@@ -166,6 +171,11 @@ class ReadDiffAction extends Command
 			foreach (array_map(null, $removed, $added) as [$removedIndex, $addedIndex]) {
 				if ($removedIndex === null || $addedIndex === null) {
 					break;
+				}
+
+				// comparing a minified line character by character costs more than the mark is worth
+				if (strlen($rows[$removedIndex]['text']) > self::MAX_MARKED_CHARACTERS || strlen($rows[$addedIndex]['text']) > self::MAX_MARKED_CHARACTERS) {
+					continue;
 				}
 
 				[$removedMark, $addedMark] = $this->changedParts($rows[$removedIndex]['text'], $rows[$addedIndex]['text']);

@@ -115,15 +115,6 @@ class Drawer extends Component
 	 */
 	private const LARGE_DIFF_LINES = 600;
 
-	/**
-	 * How many lines one click on an expander shows more.
-	 */
-	private const EXPAND_LINES = 20;
-
-	/**
-	 * Enough lines around a change to show any file whole.
-	 */
-	private const WHOLE_FILE_LINES = 100000;
 
 	/**
 	 * A finished round of fetching brings the panel up to date.
@@ -185,8 +176,6 @@ class Drawer extends Component
 	/** Which changes the Werkkopie tab and the code reader show; a DiffViewEnum value, or null for the default. */
 	public ?string $diffView = null;
 
-	/** @var array<string, int> the lines around the changes per file the reader was opened up to */
-	public array $diffContext = [];
 
 	public bool $confirmingDeleteTask = false;
 
@@ -441,7 +430,6 @@ class Drawer extends Component
 		}
 
 		$this->diffView = $diffView->value;
-		$this->diffContext = [];
 
 		$paths = collect(resolve(WorktreeRepositoryContract::class)->getChangesFor($worktreeEntity->path, $diffView))->pluck('path');
 
@@ -453,15 +441,6 @@ class Drawer extends Component
 	public function closeDiff(): void
 	{
 		$this->openDiffFile = null;
-		$this->diffContext = [];
-	}
-
-	/**
-	 * Shows more lines around the changes of one file, or the whole file.
-	 */
-	public function expandDiff(string $file, bool $whole = false): void
-	{
-		$this->diffContext[$file] = $whole ? self::WHOLE_FILE_LINES : ($this->diffContext[$file] ?? 3) + self::EXPAND_LINES;
 	}
 
 	/**
@@ -1344,17 +1323,18 @@ class Drawer extends Component
 	}
 
 	/**
-	 * Every changed file of one view with its pieces, in the order of the
-	 * tree, for the page that shows them under each other.
+	 * Every changed file of one view, in the order of the tree, for the page
+	 * that shows them under each other. Each file reads its own changes once
+	 * it comes into view.
 	 *
 	 * @param  array<int, FileTreeNodeObject>  $diffTree
-	 * @return array<int, array{change: ChangeObject, hunks: DiffHunkObjectCollection, fingerprint: string, isLarge: bool}>
+	 * @return array<int, array{change: ChangeObject, fingerprint: string, isLarge: bool, isGenerated: bool}>
 	 */
 	private function stackedDiffs(WorktreeEntity $worktreeEntity, DiffViewEnum $diffView, array $diffTree): array
 	{
 		$worktreeRepository = resolve(WorktreeRepositoryContract::class);
 		$changes = collect($worktreeRepository->getChangesFor($worktreeEntity->path, $diffView))->keyBy('path');
-		$patches = $worktreeRepository->getDiffs($worktreeEntity->path, $diffView);
+		$generatedFiles = $worktreeRepository->getGeneratedFiles($worktreeEntity->path, $changes->keys()->all());
 		$files = [];
 
 		foreach (array_merge([], ...array_map(fn (FileTreeNodeObject $node) => $node->filePaths(), $diffTree)) as $path) {
@@ -1364,16 +1344,15 @@ class Drawer extends Component
 				continue;
 			}
 
+			$wholePath = $worktreeEntity->path . '/' . $path;
+
 			$files[] = [
 				'change' => $changeObject,
-					// a file opened up further is read again with more lines around each change
-				'hunks' => ReadDiffAction::execute(isset($this->diffContext[$path])
-					? $worktreeRepository->getDiff($worktreeEntity->path, $path, $diffView, $this->diffContext[$path])
-					: ($patches[$path] ?? null)),
-				// taken from the plain patch, so opening the file up further keeps it viewed
-				'fingerprint' => md5((string) ($patches[$path] ?? '')),
+				// read without git, so the page asks for no patch until a file is in view; a new save of the file un-views it
+				'fingerprint' => md5(implode(':', [$changeObject->added, $changeObject->removed, @filemtime($wholePath) ?: 0, @filesize($wholePath) ?: 0])),
 				// a file this large opens closed, so the page stays quick; opening it shows it in full
-				'isLarge' => $changeObject->added + $changeObject->removed > self::LARGE_DIFF_LINES && ! isset($this->diffContext[$path]),
+				'isLarge' => $changeObject->added + $changeObject->removed > self::LARGE_DIFF_LINES,
+				'isGenerated' => in_array($path, $generatedFiles, true),
 			];
 		}
 

@@ -47,6 +47,9 @@ const LANGUAGES = [
 // commentaar te herkennen; dit vangt de gewone vormen op
 const COMMENT_LINE = /^\s*(\/\/|#(?!\[)|\/\*|\*|\*\/)/;
 
+// colouring a minified line takes longer than the page can wait; it stays plain
+const MAX_LIT_CHARACTERS = 1000;
+
 function languageOf(file) {
 	return LANGUAGES.find(([pattern]) => pattern.test(file))?.[1] ?? null;
 }
@@ -61,11 +64,15 @@ function highlightDiffs(root = document) {
 
 		for (const code of diff.querySelectorAll('.dl .code:not([data-lit])')) {
 			const text = code.textContent;
+			code.dataset.lit = '';
+
+			if (text.length > MAX_LIT_CHARACTERS) {
+				continue;
+			}
 
 			code.innerHTML = language !== 'markdown' && language !== 'xml' && COMMENT_LINE.test(text)
 				? `<span class="hljs-comment">${hljs.highlight(text, { language: 'plaintext' }).value}</span>`
 				: hljs.highlight(text, { language, ignoreIllegals: true }).value;
-			code.dataset.lit = '';
 		}
 	}
 
