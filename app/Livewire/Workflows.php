@@ -13,6 +13,7 @@ use Livewire\Component;
 use Src\Project\Actions\GetProjectsAction;
 use Src\Project\Objects\ProjectEntity;
 use Src\Review\Actions\CheckWorkflowAction;
+use Src\Review\Actions\CountProjectFilesAction;
 use Src\Review\Actions\CreateLensAction;
 use Src\Review\Actions\CustomizeLensAction;
 use Src\Review\Actions\GetAgentContextBlocksAction;
