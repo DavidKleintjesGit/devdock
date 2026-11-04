@@ -6,7 +6,6 @@ namespace Src\Prompt\Actions;
 
 use Src\Packages\Cqrs\Command;
 use Src\Prompt\Enums\ReportStatusEnum;
-use Src\Prompt\Objects\CommitMessageObject;
 use Src\Prompt\Objects\ReportObject;
 
 /**
@@ -19,8 +18,6 @@ use Src\Prompt\Objects\ReportObject;
 class ReadReportAction extends Command
 {
 	private const FENCE = 'report';
-
-	private const COMMIT_FENCE = 'commit';
 
 	public function __construct(
 		public readonly ?string $text,
@@ -49,7 +46,7 @@ class ReadReportAction extends Command
 			done: $fields['done'] ?? [],
 			open: $fields['open'] ?? [],
 			question: trim($fields['question'][0] ?? '') ?: null,
-			commitMessage: $this->commitMessage(),
+			commitMessage: ReadCommitMessageAction::execute($this->text),
 		);
 	}
 
@@ -96,18 +93,4 @@ class ReadReportAction extends Command
 		return $fields;
 	}
 
-	private function commitMessage(): ?CommitMessageObject
-	{
-		if (preg_match('/```' . self::COMMIT_FENCE . '\s*\n(.*?)```/s', (string) $this->text, $found) !== 1) {
-			return null;
-		}
-
-		$lines = explode("\n", trim($found[1]));
-		$title = trim((string) array_shift($lines));
-
-		return $title === '' ? null : CommitMessageObject::from([
-			'title' => $title,
-			'body' => trim(implode("\n", $lines)),
-		]);
-	}
 }

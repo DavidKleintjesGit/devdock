@@ -748,7 +748,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		return array_values(array_unique(array_filter($files)));
 	}
 
-	public function commit(string $path, string $title, string $body, ?array $files = null): bool
+	public function commit(string $path, string $title, string $body, ?array $files = null): ?string
 	{
 		// the files DevDock writes into a copy have no business in the history of
 		// the project, chosen or not; with a choice of files only those go along
@@ -765,16 +765,15 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		));
 
 		if ($chosen === []) {
-			return false;
+			return __('Alleen bestanden van DevDock zelf waren gekozen; die gaan nooit mee in een commit.');
 		}
 
 		$staged = Process::path($path)
 			->timeout(self::TIMEOUT)
-			->run(['git', 'add', '-A', '--', ...$chosen, ...$ownFiles])
-			->successful();
+			->run(['git', 'add', '-A', '--', ...$chosen, ...$ownFiles]);
 
-		if (! $staged) {
-			return false;
+		if (! $staged->successful()) {
+			return $this->reasonOf($staged);
 		}
 
 		$command = ['git', 'commit', '-m', $title];
@@ -786,12 +785,21 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 		$committed = Process::path($path)
 			->timeout(self::TIMEOUT)
-			->run($command)
-			->successful();
+			->run($command);
 
 		$this->forgetStatus($path);
 
-		return $committed;
+		return $committed->successful() ? null : $this->reasonOf($committed);
+	}
+
+	/**
+	 * What git said when a step failed: its error output, else what it wrote out, such as a hook that refused.
+	 */
+	private function reasonOf(ProcessResult $processResult): string
+	{
+		$said = trim($processResult->errorOutput()) ?: trim($processResult->output());
+
+		return $said === '' ? __('Git gaf geen reden.') : mb_substr($said, -1500);
 	}
 
 	public function push(string $path): bool

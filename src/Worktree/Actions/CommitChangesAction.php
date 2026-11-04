@@ -11,7 +11,9 @@ use Src\Worktree\Contracts\WorktreeRepositoryContract;
  * Writes what a round left behind down as one commit. It stays on the machine
  * until someone pushes it.
  *
- * @method static bool execute(string $directory, string $title, string $body = '', ?array $files = null)
+ * Returns why it did not work, or null when it did.
+ *
+ * @method static ?string execute(string $directory, string $title, string $body = '', ?array $files = null)
  */
 class CommitChangesAction extends Command
 {
@@ -22,7 +24,7 @@ class CommitChangesAction extends Command
 		public readonly ?array $files = null,
 	) {}
 
-	public function handle(WorktreeRepositoryContract $worktreeRepository): bool
+	public function handle(WorktreeRepositoryContract $worktreeRepository): ?string
 	{
 		return $worktreeRepository->commit($this->directory, $this->title, $this->body, $this->files);
 	}

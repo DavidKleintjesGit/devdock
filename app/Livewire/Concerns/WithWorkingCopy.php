@@ -189,11 +189,7 @@ trait WithWorkingCopy
 			return;
 		}
 
-		$files = collect(resolve(WorktreeRepositoryContract::class)->getChanges($worktreeEntity->path))
-			->map(fn (ChangeObject $changeObject) => $changeObject->path)
-			->reject(fn (string $path) => in_array($path, $this->skippedFiles, true))
-			->values()
-			->all();
+		$files = $this->filesToCommit($worktreeEntity);
 
 		if ($files === []) {
 			$this->failure = __('Er is niets aangevinkt om te committen.');
@@ -201,8 +197,10 @@ trait WithWorkingCopy
 			return;
 		}
 
-		if (! CommitChangesAction::execute($worktreeEntity->path, $this->commitMessage, $this->commitBody, $files)) {
-			$this->failure = __('Committen lukte niet.');
+		$failure = CommitChangesAction::execute($worktreeEntity->path, $this->commitMessage, $this->commitBody, $files);
+
+		if ($failure !== null) {
+			$this->failure = __('Committen lukte niet: :reason', ['reason' => $failure]);
 
 			return;
 		}
@@ -564,6 +562,20 @@ trait WithWorkingCopy
 		$promptRunEntity = $this->diffRun === null ? null : resolve(PromptRunRepositoryContract::class)->getById(new PromptRunId(id: $this->diffRun));
 
 		return $promptRunEntity?->hasSnapshots() === true ? $promptRunEntity : null;
+	}
+
+	/**
+	 * The changed files that are ticked to go along in the next commit.
+	 *
+	 * @return list<string>
+	 */
+	protected function filesToCommit(WorktreeEntity $worktreeEntity): array
+	{
+		return collect(resolve(WorktreeRepositoryContract::class)->getChanges($worktreeEntity->path))
+			->map(fn (ChangeObject $changeObject): string => $changeObject->path)
+			->reject(fn (string $path): bool => in_array($path, $this->skippedFiles, true))
+			->values()
+			->all();
 	}
 
 	private function openWorktree(): ?WorktreeEntity

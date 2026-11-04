@@ -184,9 +184,11 @@ interface WorktreeRepositoryContract
 	 * Writes the standing changes down as one commit, or only the files that
 	 * were picked. Nothing leaves the machine; pushing is a step of its own.
 	 *
+	 * Returns why it did not work, in git's own words, or null when it did.
+	 *
 	 * @param  array<int, string>|null  $files
 	 */
-	public function commit(string $path, string $title, string $body, ?array $files = null): bool;
+	public function commit(string $path, string $title, string $body, ?array $files = null): ?string;
 
 	/**
 	 * Sends the commits to the upstream, or creates the branch of the same

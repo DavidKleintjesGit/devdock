@@ -1006,14 +1006,26 @@ class Drawer extends Component
 		$this->newBranch = $branch;
 	}
 
+	/**
+	 * Writes the title and message from the changes of the files that are ticked to go along.
+	 */
 	public function suggestCommitMessage(): void
 	{
 		$this->failure = null;
+		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
+		$worktreeEntity = $cardObject === null ? null : $this->worktreeFor($cardObject);
+		$files = $worktreeEntity === null ? [] : $this->filesToCommit($worktreeEntity);
 
-		$commitMessageObject = GenerateCommitMessageAction::execute((string) $this->openCard);
+		if ($files === []) {
+			$this->failure = __('Er is niets aangevinkt om een bericht over te schrijven.');
+
+			return;
+		}
+
+		$commitMessageObject = GenerateCommitMessageAction::execute($worktreeEntity->path, $files, $cardObject->ticketKey);
 
 		if ($commitMessageObject === null) {
-			$this->committed = __('De sessie kon geen bericht schrijven.');
+			$this->committed = __('Er kwam geen bericht terug. Probeer het nog eens of schrijf het zelf.');
 
 			return;
 		}

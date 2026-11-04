@@ -62,9 +62,9 @@ class WorktreeRepositoryCommitTest extends TestCase
 		$this->repository->write('.wakatime-project', 'shop');
 		$head = $this->repository->git('rev-parse', 'HEAD');
 
-		$isCommitted = resolve(WorktreeRepositoryContract::class)->commit($this->repository->path, 'Nothing', '', ['.wakatime-project']);
+		$failure = resolve(WorktreeRepositoryContract::class)->commit($this->repository->path, 'Nothing', '', ['.wakatime-project']);
 
-		$this->assertFalse($isCommitted);
+		$this->assertNotNull($failure);
 		$this->assertSame($head, $this->repository->git('rev-parse', 'HEAD'));
 	}
 }

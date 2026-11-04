@@ -1570,5 +1570,15 @@
     "De lens gaf binnen de tijd geen oordeel en is gestopt.": "The lens gave no verdict in time and was stopped.",
     "De agent meldde dat hij klaar is, maar de lenzen gingen er niet vanzelf weer over, bijvoorbeeld omdat de werkkopie nog bezig was of er niets veranderde.": "The agent reported it is done, but the lenses did not go over the work again by themselves, for instance because the working copy was still busy or nothing changed.",
     "Volgende ronde starten": "Start the next round",
-    "De agent is klaar met ronde :position · de volgende ronde startte niet vanzelf": "The agent finished round :position · the next round did not start by itself"
+    "De agent is klaar met ronde :position · de volgende ronde startte niet vanzelf": "The agent finished round :position · the next round did not start by itself",
+    "Te groot om mee te sturen, alleen de namen: :files": "Too large to send along, only the names: :files",
+    "Schrijf een commitbericht voor precies de wijzigingen hieronder; dit is wat nu gecommit wordt.": "Write a commit message for exactly the changes below; this is what is being committed now.",
+    "Beschrijf alleen wat in deze wijzigingen staat, niets van eerder werk of van wat je verder weet. Verander niets, draai niets en commit niet. Antwoord alleen met het blok onderaan.": "Describe only what is in these changes, nothing of earlier work or of what else you know. Change nothing, run nothing and do not commit. Answer only with the block at the bottom.",
+    "De eerste regel is de titel: één zin, gebiedende wijs, over het belangrijkste dat verandert, en zonder het ticketnummer maximaal :max tekens.": "The first line is the title: one sentence, imperative mood, about the most important change, and at most :max characters without the ticket number.",
+    "Bestanden die meegaan: :files": "Files that go along: :files",
+    "Er is niets aangevinkt om een bericht over te schrijven.": "Nothing is ticked to write a message about.",
+    "Er kwam geen bericht terug. Probeer het nog eens of schrijf het zelf.": "No message came back. Try again or write it yourself.",
+    "Committen lukte niet: :reason": "Committing did not work: :reason",
+    "Alleen bestanden van DevDock zelf waren gekozen; die gaan nooit mee in een commit.": "Only files of DevDock itself were chosen; those never go along in a commit.",
+    "Git gaf geen reden.": "Git gave no reason."
 }
