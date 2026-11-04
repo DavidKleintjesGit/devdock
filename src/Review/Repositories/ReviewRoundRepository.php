@@ -271,6 +271,25 @@ class ReviewRoundRepository implements ReviewRoundRepositoryContract
 			->values();
 	}
 
+	public function rejudge(ReviewRoundId $reviewRoundId, LensId $lensId, VerdictEnum $verdict, int $findings): ReviewRoundEntity
+	{
+		ReviewResultEloquent::query()
+			->where('review_round_id', $reviewRoundId->id)
+			->where('lens_id', $lensId->id)
+			->update([
+				'verdict' => $verdict->value,
+				'findings' => $findings,
+			]);
+
+		$reviewRoundEntity = $this->byId($reviewRoundId);
+
+		ReviewRoundEloquent::query()->whereKey($reviewRoundId->id)->update([
+			'status' => $reviewRoundEntity->isClean() ? RoundStatusEnum::PASSED->value : RoundStatusEnum::FAILED->value,
+		]);
+
+		return $this->byId($reviewRoundId);
+	}
+
 	private function byId(ReviewRoundId $reviewRoundId): ReviewRoundEntity
 	{
 		return $this->mapToEntity(

@@ -39,7 +39,7 @@
 				<section class="round-part">
 					<h4 class="eyebrow">{{ __('Wat de lenzen vonden') }}</h4>
 					@foreach ($roundRow['round']->results as $result)
-						@if ($result->report && $result->verdict->hasFinding())
+						@if ($result->report)
 							<button class="row" type="button" wire:click="openFinding({{ $roundRow['round']->reviewRoundId->id }}, {{ $result->lensId->id }})" wire:key="result-{{ $roundRow['round']->reviewRoundId->id }}-{{ $result->lensId->id }}">
 								<span class="ldot {{ $result->verdict->dotTone() }}"></span>
 								<b class="lens-name">{{ $result->lensName }}</b>

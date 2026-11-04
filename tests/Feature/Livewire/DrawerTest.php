@@ -9,6 +9,8 @@ use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Src\Board\Models\Todo;
+use Src\Review\Enums\FindingStatusEnum;
+use Src\Review\Models\ReviewFinding;
 use Tests\TestCase;
 
 /**
@@ -49,5 +51,50 @@ class DrawerTest extends TestCase
 		$component->call('startRound');
 
 		$component->assertSet('failure', __('Zonder werkkopie is er niets om de lenzen over te laten gaan.'));
+	}
+
+	#[Test]
+	public function ignore_finding_without_a_reason_leaves_the_finding_open(): void
+	{
+		$reviewFinding = ReviewFinding::factory()->create(['status' => FindingStatusEnum::OPEN->value]);
+		$component = Livewire::test(Drawer::class);
+
+		$component->call('startIgnoringFinding', $reviewFinding->id)->call('ignoreFinding');
+
+		$component->assertHasErrors(['ignoreReason' => 'required']);
+		$this->assertDatabaseHas('review_findings', ['id' => $reviewFinding->id, 'status' => FindingStatusEnum::OPEN->value]);
+	}
+
+	#[Test]
+	public function ignore_finding_sets_the_finding_aside_with_your_reason(): void
+	{
+		$reviewFinding = ReviewFinding::factory()->create(['status' => FindingStatusEnum::OPEN->value]);
+		$reason = fake()->sentence();
+		$component = Livewire::test(Drawer::class);
+
+		$component->call('startIgnoringFinding', $reviewFinding->id)->set('ignoreReason', $reason)->call('ignoreFinding');
+
+		$component->assertSet('ignoringFinding', null);
+		$this->assertDatabaseHas('review_findings', ['id' => $reviewFinding->id, 'status' => FindingStatusEnum::IGNORED->value, 'reason' => $reason]);
+	}
+
+	#[Test]
+	public function resolve_finding_marks_it_resolved_by_you(): void
+	{
+		$reviewFinding = ReviewFinding::factory()->create(['status' => FindingStatusEnum::OPEN->value]);
+
+		Livewire::test(Drawer::class)->call('resolveFinding', $reviewFinding->id);
+
+		$this->assertDatabaseHas('review_findings', ['id' => $reviewFinding->id, 'status' => FindingStatusEnum::RESOLVED->value, 'resolved_review_round_id' => null]);
+	}
+
+	#[Test]
+	public function reopen_finding_puts_an_ignored_finding_back_without_its_reason(): void
+	{
+		$reviewFinding = ReviewFinding::factory()->create(['status' => FindingStatusEnum::IGNORED->value, 'reason' => fake()->sentence()]);
+
+		Livewire::test(Drawer::class)->call('reopenFinding', $reviewFinding->id);
+
+		$this->assertDatabaseHas('review_findings', ['id' => $reviewFinding->id, 'status' => FindingStatusEnum::OPEN->value, 'reason' => null]);
 	}
 }

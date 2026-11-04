@@ -55,14 +55,19 @@ use Src\Review\Actions\GetRoundTurnsAction;
 use Src\Review\Actions\GetWorkflowSettingAction;
 use Src\Review\Actions\ResolveWorkflowStepAction;
 use Src\Review\Actions\RetryLensAction;
+use Src\Review\Actions\SetFindingStatusAction;
 use Src\Review\Actions\StartRoundAction;
 use Src\Review\Actions\StopRoundAction;
 use Src\Review\Contracts\AgentContextRepositoryContract;
+use Src\Review\Contracts\ReviewFindingRepositoryContract;
 use Src\Review\Contracts\ReviewRoundRepositoryContract;
+use Src\Review\Enums\FindingStatusEnum;
 use Src\Review\Enums\RoundStatusEnum;
 use Src\Review\Enums\WorkflowStepEnum;
 use Src\Review\Exceptions\RoundNotStartedException;
 use Src\Review\Objects\LensId;
+use Src\Review\Objects\ReviewFindingEntity;
+use Src\Review\Objects\ReviewFindingId;
 use Src\Review\Objects\ReviewResultEntity;
 use Src\Review\Objects\ReviewRoundEntity;
 use Src\Review\Objects\ReviewRoundId;
@@ -195,6 +200,11 @@ class Drawer extends Component
 	public bool $linking = false;
 
 	public ?string $committed = null;
+
+	/** The finding whose reason for ignoring is being written. */
+	public ?int $ignoringFinding = null;
+
+	public string $ignoreReason = '';
 
 	public string $newDatabaseMode = 'own';
 
@@ -510,6 +520,53 @@ class Drawer extends Component
 		}
 
 		RetryLensAction::execute($reviewRoundEntity->reviewRoundId, new LensId(id: $lens));
+	}
+
+	/**
+	 * Marks a finding as fixed; the lens no longer looks at it.
+	 */
+	public function resolveFinding(int $finding): void
+	{
+		SetFindingStatusAction::execute(new ReviewFindingId(id: $finding), FindingStatusEnum::RESOLVED);
+	}
+
+	/**
+	 * Opens the reason field under one finding.
+	 */
+	public function startIgnoringFinding(int $finding): void
+	{
+		$this->resetValidation('ignoreReason');
+		$this->ignoringFinding = $finding;
+		$this->ignoreReason = '';
+	}
+
+	public function cancelIgnoringFinding(): void
+	{
+		$this->ignoringFinding = null;
+		$this->ignoreReason = '';
+	}
+
+	/**
+	 * Sets the finding aside with your reason; the lens no longer reports it.
+	 */
+	public function ignoreFinding(): void
+	{
+		$this->validate(['ignoreReason' => ['required', 'string', 'max:500']], [], ['ignoreReason' => __('reden')]);
+
+		if ($this->ignoringFinding === null) {
+			return;
+		}
+
+		SetFindingStatusAction::execute(new ReviewFindingId(id: $this->ignoringFinding), FindingStatusEnum::IGNORED, trim($this->ignoreReason));
+		$this->cancelIgnoringFinding();
+	}
+
+	/**
+	 * Puts a resolved or ignored finding back among the open ones.
+	 */
+	public function reopenFinding(int $finding): void
+	{
+		SetFindingStatusAction::execute(new ReviewFindingId(id: $finding), FindingStatusEnum::OPEN);
 	}
 
 	/**
@@ -1119,10 +1176,23 @@ class Drawer extends Component
 		$resultEntity = collect($reviewRoundEntity?->results ?? [])
 			->first(fn (ReviewResultEntity $resultEntity) => $resultEntity->lensId->id === $lensId);
 
-		return $resultEntity === null ? null : [
+		if ($resultEntity === null) {
+			return null;
+		}
+
+		$statusOrder = [FindingStatusEnum::OPEN, FindingStatusEnum::IGNORED, FindingStatusEnum::RESOLVED];
+		$findings = collect(resolve(ReviewFindingRepositoryContract::class)->getForLens($reviewRoundEntity->card, $resultEntity->lensId))
+			// a finding a later round found is not part of what this round saw
+			->filter(fn (ReviewFindingEntity $reviewFindingEntity): bool => $reviewFindingEntity->firstRoundNumber <= $reviewRoundEntity->number)
+			->sortBy(fn (ReviewFindingEntity $reviewFindingEntity): int => (int) array_search($reviewFindingEntity->status, $statusOrder, true))
+			->values()
+			->all();
+
+		return [
 			'type' => 'finding',
 			'round' => $reviewRoundEntity,
 			'result' => $resultEntity,
+			'findings' => $findings,
 			'report' => $resultEntity->report === null ? null : resolve(RenderMarkdown::class)->toHtml($resultEntity->report),
 			'previous' => $previousLabel,
 		];

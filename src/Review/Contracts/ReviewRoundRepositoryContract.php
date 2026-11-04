@@ -83,6 +83,13 @@ interface ReviewRoundRepositoryContract
 	public function settle(ReviewRoundId $reviewRoundId): ReviewRoundEntity;
 
 	/**
+	 * Gives one lens of a finished round a new verdict and count, and the
+	 * round the status that goes with all its verdicts. The report and the
+	 * moment the round finished stay as they were.
+	 */
+	public function rejudge(ReviewRoundId $reviewRoundId, LensId $lensId, VerdictEnum $verdict, int $findings): ReviewRoundEntity;
+
+	/**
 	 * Puts a round back on running, for a lens that is being sent out again.
 	 */
 	public function reopen(ReviewRoundId $reviewRoundId): ReviewRoundEntity;

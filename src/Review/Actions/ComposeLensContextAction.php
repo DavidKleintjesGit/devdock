@@ -60,11 +60,11 @@ class ComposeLensContextAction extends Command
 		}
 
 		return implode("\n", [
-			__('Dit vond je in de vorige ronde, en de agent heeft er sindsdien aan gewerkt:'),
+			__('Dit vond je eerder op deze taak, en de agent heeft er sindsdien aan gewerkt:'),
 			'',
 			$this->previousReport,
 			'',
-			__('Kijk eerst of deze bevindingen zijn opgelost, en zoek pas daarna naar nieuwe. Neem alleen mee wat toen OPEN of nieuw was; wat al RESOLVED stond laat je weg.'),
+			__('Kijk eerst per nummer of een open bevinding is opgelost, en zoek pas daarna naar nieuwe. Een genegeerde bevinding meld je niet, ook niet in andere woorden.'),
 			'',
 		]);
 	}
@@ -112,9 +112,9 @@ class ComposeLensContextAction extends Command
 	}
 
 	/**
-	 * How a lens with a previous round writes down what became of its earlier
-	 * findings. RESOLVED and OPEN are read by ReadVerdictAction and stay as
-	 * written here.
+	 * How a lens with earlier findings writes down what became of them, by
+	 * number. "- #12 RESOLVED" and "- #12 OPEN" are read by ReadVerdictAction
+	 * and stay as written here.
 	 *
 	 * @return array<int, string>
 	 */
@@ -126,14 +126,14 @@ class ComposeLensContextAction extends Command
 
 		return [
 			'',
-			__('Omdat je een vorige ronde hebt, begint je blok met wat er van je eerdere bevindingen werd, één regel per bevinding. Daaronder volgen de nieuwe, genummerd. PASS alleen als niets meer OPEN staat en je niets nieuws vond:'),
+			__('Omdat je eerdere bevindingen hebt, begint je blok met wat er van elke open bevinding werd, één regel per nummer. Daaronder volgen de nieuwe, genummerd vanaf 1. PASS alleen als niets meer OPEN staat en je niets nieuws vond:'),
 			'',
 			'```verdict',
 			'FAIL',
 			'',
 			__('Eerder gevonden:'),
-			__('- RESOLVED <bestand>:<regel> <wat er was, in een paar woorden>'),
-			__('- OPEN <bestand>:<regel> <wat er nog mis is>'),
+			__('- #<nummer> RESOLVED'),
+			__('- #<nummer> OPEN <wat er nog mis is>'),
 			'',
 			__('Nieuw:'),
 			'1. <bestand>:<regel>',

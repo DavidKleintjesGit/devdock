@@ -5,19 +5,18 @@ declare(strict_types=1);
 namespace Src\Review\Actions;
 
 use Src\Packages\Cqrs\Command;
-use Src\Review\Contracts\AgentContextRepositoryContract;
+use Src\Review\Contracts\ReviewFindingRepositoryContract;
 use Src\Review\Enums\VerdictEnum;
+use Src\Review\Objects\ReviewFindingEntity;
 use Src\Review\Objects\ReviewResultEntity;
 use Src\Review\Objects\ReviewRoundEntity;
 
 /**
- * Every lens that found something, gathered into one prompt. The agent gets
- * the whole round at once instead of one report at a time, so it can weigh
- * the findings against each other before it changes anything.
- *
- * The findings stand in the report files of the round and the prompt points
- * at them, so the chat stays readable and there is one source. Only a report
- * that could not be written goes into the prompt itself.
+ * Every finding still open on the card, gathered into one prompt per lens.
+ * The agent gets the whole round at once instead of one report at a time, so
+ * it can weigh the findings against each other before it changes anything. A
+ * finding you ignored or a lens saw fixed is left out; only a lens whose
+ * answer could not be read has its report pasted in as it stands.
  *
  * @method static ?string execute(ReviewRoundEntity $reviewRoundEntity)
  */
@@ -27,7 +26,7 @@ class BuildRoundPromptAction extends Command
 		public readonly ReviewRoundEntity $reviewRoundEntity,
 	) {}
 
-	public function handle(AgentContextRepositoryContract $agentContextRepository): ?string
+	public function handle(ReviewFindingRepositoryContract $reviewFindingRepository): ?string
 	{
 		$reviewRoundEntity = $this->reviewRoundEntity;
 
@@ -44,78 +43,63 @@ class BuildRoundPromptAction extends Command
 			return null;
 		}
 
-		return implode("\n\n", [
-			$this->opening($reviewRoundEntity, $failed),
-			$this->findings($agentContextRepository, $failed),
-			$this->howToGoAbout(),
-		]);
-	}
-
-	/**
-	 * @param  array<int, ReviewResultEntity>  $failed
-	 */
-	private function opening(ReviewRoundEntity $reviewRoundEntity, array $failed): string
-	{
-		$names = implode(', ', array_map(
-			fn (ReviewResultEntity $resultEntity) => $resultEntity->lensName,
-			$failed,
+		$open = array_values(array_filter(
+			$reviewFindingRepository->getForCard($reviewRoundEntity->card),
+			fn (ReviewFindingEntity $reviewFindingEntity): bool => $reviewFindingEntity->isOpen(),
 		));
-
-		$findingCount = array_sum(array_map(
-			fn (ReviewResultEntity $resultEntity) => $resultEntity->findings,
-			$failed,
-		));
-
-		return __('Ronde :number kwam niet schoon terug. :names vonden samen :count bevindingen op commit :commit.', [
-			'number' => $reviewRoundEntity->number,
-			'names' => $names,
-			'count' => $findingCount,
-			'commit' => $reviewRoundEntity->commitSha ?? '-',
-		]);
-	}
-
-	/**
-	 * @param  array<int, ReviewResultEntity>  $failed
-	 */
-	private function findings(AgentContextRepositoryContract $agentContextRepository, array $failed): string
-	{
-		$reviewRoundEntity = $this->reviewRoundEntity;
-		$lines = [__('De bevindingen staan per lens in een rapport; lees die eerst:')];
-		$pasted = [];
-
-		foreach ($failed as $resultEntity) {
-			$path = $agentContextRepository->reportPath($reviewRoundEntity->card, $reviewRoundEntity->number, $resultEntity->lensName);
-
-			if ($reviewRoundEntity->directory !== null && is_file($reviewRoundEntity->directory . '/' . $path)) {
-				$lines[] = '- ' . trans_choice(':lens: :count bevinding in :path|:lens: :count bevindingen in :path', $resultEntity->findings, [
-					'lens' => $resultEntity->lensName,
-					'count' => $resultEntity->findings,
-					'path' => $path,
-				]);
-
-				continue;
-			}
-
-			// the file is missing, so what it would have said goes in here
-			$pasted[] = $resultEntity->lensName . "\n\n" . trim((string) $resultEntity->report);
-		}
 
 		return implode("\n\n", array_filter([
-			count($lines) > 1 ? implode("\n", $lines) : null,
-			...$pasted,
+			__('Ronde :number kwam niet schoon terug. Deze :count bevindingen staan nog open, op commit :commit:', [
+				'number' => $reviewRoundEntity->number,
+				'count' => count($open),
+				'commit' => $reviewRoundEntity->commitSha ?? '-',
+			]),
+			$this->openFindings($open),
+			$this->unreadableReports($failed, $open),
+			$this->howToGoAbout(),
 		]));
+	}
+
+	/**
+	 * @param  list<ReviewFindingEntity>  $open
+	 */
+	private function openFindings(array $open): ?string
+	{
+		if ($open === []) {
+			return null;
+		}
+
+		return collect($open)
+			->groupBy(fn (ReviewFindingEntity $reviewFindingEntity): string => $reviewFindingEntity->lensName)
+			->map(fn ($findings, string $lens): string => $lens . "\n" . $findings
+				->map(fn (ReviewFindingEntity $reviewFindingEntity): string => '- ' . $reviewFindingEntity->line())
+				->implode("\n"))
+			->implode("\n\n");
+	}
+
+	/**
+	 * What a lens said that could not be read into findings, pasted in whole.
+	 *
+	 * @param  array<int, ReviewResultEntity>  $failed
+	 * @param  list<ReviewFindingEntity>  $open
+	 */
+	private function unreadableReports(array $failed, array $open): ?string
+	{
+		$lensesWithFindings = collect($open)->map(fn (ReviewFindingEntity $reviewFindingEntity): int => (int) $reviewFindingEntity->lensId->id)->all();
+
+		$pasted = array_map(
+			fn (ReviewResultEntity $resultEntity): string => $resultEntity->lensName . "\n\n" . trim((string) $resultEntity->report),
+			array_filter($failed, fn (ReviewResultEntity $resultEntity): bool => ! in_array((int) $resultEntity->lensId->id, $lensesWithFindings, true)),
+		);
+
+		return $pasted === [] ? null : implode("\n\n", $pasted);
 	}
 
 	private function howToGoAbout(): string
 	{
 		return implode("\n", [
-			__('Hoe een rapport is opgebouwd:'),
-			__('- Een lens die al eerder keek, begint met "Eerder gevonden". RESOLVED: de lens keurde je vorige oplossing goed, daar doe je niets meer mee. OPEN: je vorige oplossing was niet genoeg, kijk er opnieuw naar.'),
-			__('- Daaronder staan de nieuwe bevindingen, genummerd.'),
-			__('- Wat je de ronde ervoor kreeg staat in de map van die ronde, naast deze; lees die alleen als je wilt weten wat je eerder deed.'),
-			'',
 			__('Werkwijze:'),
-			__('- Werk alleen de bevindingen die OPEN of nieuw zijn bij, één voor één, en zeg per bevinding wat je ermee doet.'),
+			__('- Werk de open bevindingen bij, één voor één, en zeg per nummer wat je ermee doet.'),
 			__('- Is iets al opgelost, zeg dan welk commit dat deed. Vink zelf niets af.'),
 			__('- Ben je het ergens niet mee eens, schrijf dan een voorstel en laat het aan mij zien.'),
 			__('- Verbreed de scope niet: alleen deze bevindingen.'),

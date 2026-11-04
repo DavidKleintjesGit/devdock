@@ -57,14 +57,6 @@ enum VerdictEnum: string
 		};
 	}
 
-	/**
-	 * Whether this lens left something to open: points, or why it fell over.
-	 */
-	public function hasFinding(): bool
-	{
-		return $this === self::FAIL || $this === self::ERROR;
-	}
-
 	public function chipTone(): string
 	{
 		return match ($this) {

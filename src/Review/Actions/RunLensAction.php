@@ -13,12 +13,17 @@ use Src\Access\Enums\AgentRoleEnum;
 use Src\Packages\Cqrs\Command;
 use Src\Prompt\Contracts\ClaudeProcessRepositoryContract;
 use Src\Review\Contracts\LensRepositoryContract;
+use Src\Review\Contracts\ReviewFindingRepositoryContract;
 use Src\Review\Contracts\ReviewRoundRepositoryContract;
+use Src\Review\Enums\FindingStatusEnum;
 use Src\Review\Enums\VerdictEnum;
 use Src\Review\Objects\LensEntity;
+use Src\Review\Objects\LensFindingsFactsObject;
 use Src\Review\Objects\LensId;
+use Src\Review\Objects\ReviewFindingEntity;
 use Src\Review\Objects\ReviewRoundEntity;
 use Src\Review\Objects\ReviewRoundId;
+use Src\Review\Policies\LensVerdictPolicy;
 use Src\Task\Actions\GetReadableDirectoriesAction;
 use Src\Worktree\Actions\EnsureReadyAction;
 use Src\Worktree\Actions\GetWorktreesAction;
@@ -103,7 +108,7 @@ class RunLensAction extends Command implements ShouldQueue
 				$directory,
 				$lensEntity,
 				$lensEntity->touches($worktreeRepository->getChangedFiles($directory)),
-				$this->previousReport($reviewRoundRepository, $reviewRoundEntity),
+				$this->earlierFindings($reviewRoundEntity->card),
 				$project === null ? [] : $this->rulesFor($project, $lensEntity),
 			),
 			$this->logPath($lensEntity),
@@ -117,11 +122,16 @@ class RunLensAction extends Command implements ShouldQueue
 			str_contains((string) $answer, '```verdict') ? $answer : ($this->verdictMessage ?? $answer),
 		);
 
+		// the findings are kept per number; what still counts is what is open on the card after this round
+		$openFindings = $verdictObject->isReadable
+			? RecordFindingsAction::execute($reviewRoundEntity->card, $this->reviewRoundId, $this->lensId, $verdictObject)
+			: $verdictObject->findings;
+
 		$reviewRoundEntity = $reviewRoundRepository->writeResult(
 			$this->reviewRoundId,
 			$this->lensId,
-			$verdictObject->verdict,
-			$verdictObject->findings,
+			resolve(LensVerdictPolicy::class)->decide(new LensFindingsFactsObject(isReadable: $verdictObject->isReadable, openFindings: $openFindings)),
+			$openFindings,
 			$verdictObject->report,
 		);
 
@@ -245,25 +255,26 @@ class RunLensAction extends Command implements ShouldQueue
 	}
 
 	/**
-	 * What this lens left open in the round before, so it can tick its own
-	 * points off instead of starting over.
+	 * The findings this lens made on the card before, by number: the open ones
+	 * to check again, and the ones you set aside, which it does not report
+	 * again. Null when it has none.
 	 */
-	private function previousReport(
-		ReviewRoundRepositoryContract $reviewRoundRepository,
-		ReviewRoundEntity $reviewRoundEntity,
-	): ?string {
-		foreach ($reviewRoundRepository->getForCard($reviewRoundEntity->card) as $earlier) {
-			if ($earlier->number !== $reviewRoundEntity->number - 1) {
-				continue;
-			}
+	private function earlierFindings(string $card): ?string
+	{
+		$reviewFindingEntities = resolve(ReviewFindingRepositoryContract::class)->getForLens($card, $this->lensId);
 
-			foreach ($earlier->results as $resultEntity) {
-				if ($resultEntity->lensId->id === $this->lensId->id && $resultEntity->verdict === VerdictEnum::FAIL) {
-					return $resultEntity->report;
-				}
-			}
+		$open = array_filter($reviewFindingEntities, fn (ReviewFindingEntity $reviewFindingEntity): bool => $reviewFindingEntity->isOpen());
+		$ignored = array_filter($reviewFindingEntities, fn (ReviewFindingEntity $reviewFindingEntity): bool => $reviewFindingEntity->status === FindingStatusEnum::IGNORED);
+
+		if ($open === [] && $ignored === []) {
+			return null;
 		}
 
-		return null;
+		return implode("\n", array_filter([
+			$open === [] ? null : __('Nog open:'),
+			...array_map(fn (ReviewFindingEntity $reviewFindingEntity): string => '- ' . $reviewFindingEntity->line(), $open),
+			$ignored === [] ? null : "\n" . __('Bewust genegeerd door David; meld deze niet opnieuw, ook niet als nieuwe bevinding:'),
+			...array_map(fn (ReviewFindingEntity $reviewFindingEntity): string => '- ' . $reviewFindingEntity->line() . ' (' . __('reden: :reason', ['reason' => $reviewFindingEntity->reason ?? '-']) . ')', $ignored),
+		]));
 	}
 }
