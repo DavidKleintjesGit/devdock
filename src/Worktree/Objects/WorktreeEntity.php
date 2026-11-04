@@ -33,6 +33,8 @@ class WorktreeEntity extends ValueObject
 		public readonly string $mainBranch,
 		// the branch the pull request merges into, or the main line
 		public readonly string $targetBranch,
+		// a rebase DevDock began stands open on conflicts
+		public readonly bool $isRebasing,
 		public readonly ?CarbonImmutable $lastCommitAt,
 		public readonly bool $dependenciesMissing,
 		public readonly bool $hasCommits,

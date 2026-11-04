@@ -7,6 +7,7 @@ namespace Tests\Unit\Access\Policies;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Src\Access\Enums\GitGrantEnum;
 use Src\Access\Enums\ShellCommandEnum;
 use Src\Access\Objects\ShellCommandObject;
 use Src\Access\Policies\ShellCommandPolicy;
@@ -99,5 +100,58 @@ class ShellCommandPolicyTest extends TestCase
 		$shellCommandDecisionObject = (new ShellCommandPolicy())->decide(new ShellCommandObject(command: 'git push origin main'));
 
 		$this->assertSame('push', $shellCommandDecisionObject->gitCommand);
+	}
+
+	/**
+	 * @return array<string, array{string}>
+	 */
+	public static function commandsTheRebaseGrantAllows(): array
+	{
+		return [
+			'continuing' => ['git rebase --continue'],
+			'aborting' => ['git rebase --abort'],
+			'marking a file solved' => ['git add app/Order.php && git rebase --continue'],
+			'taking a deleted file out' => ['git rm tests/OrderTest.php'],
+			'taking their side' => ['git restore --theirs app/Order.php'],
+		];
+	}
+
+	#[Test]
+	#[DataProvider('commandsTheRebaseGrantAllows')]
+	public function decide_lets_the_rebase_grant_finish_a_rebase(string $command): void
+	{
+		$shellCommandDecisionObject = (new ShellCommandPolicy())->decide(new ShellCommandObject(command: $command, grants: [GitGrantEnum::REBASE]));
+
+		$this->assertSame(ShellCommandEnum::ALLOWED, $shellCommandDecisionObject->outcome);
+	}
+
+	/**
+	 * @return array<string, array{string, string}>
+	 */
+	public static function commandsTheRebaseGrantStillRefuses(): array
+	{
+		return [
+			'pushing' => ['git push --force-with-lease', 'push'],
+			'committing' => ['git commit -am wip', 'commit'],
+			'resetting' => ['git reset --hard origin/main', 'reset'],
+			'switching branch' => ['git checkout main', 'checkout'],
+		];
+	}
+
+	#[Test]
+	#[DataProvider('commandsTheRebaseGrantStillRefuses')]
+	public function decide_keeps_refusing_what_the_rebase_grant_does_not_cover(string $command, string $gitCommand): void
+	{
+		$shellCommandDecisionObject = (new ShellCommandPolicy())->decide(new ShellCommandObject(command: $command, grants: [GitGrantEnum::REBASE]));
+
+		$this->assertSame($gitCommand, $shellCommandDecisionObject->gitCommand);
+	}
+
+	#[Test]
+	public function decide_refuses_a_rebase_without_the_grant(): void
+	{
+		$shellCommandDecisionObject = (new ShellCommandPolicy())->decide(new ShellCommandObject(command: 'git rebase --continue'));
+
+		$this->assertSame('rebase', $shellCommandDecisionObject->gitCommand);
 	}
 }

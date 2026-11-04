@@ -41,7 +41,7 @@ class EnsureReadyAction extends Command
 		ReviewRoundRepositoryContract $reviewRoundRepository,
 	): ReadinessObject {
 		// a lens follows the round that just read the list thoroughly, and keeps the migration count it found
-		$readinessObject = CheckReadinessAction::execute($this->directory, $this->workKind !== WorkKindEnum::LENS);
+		$readinessObject = CheckReadinessAction::execute($this->directory, $this->workKind !== WorkKindEnum::LENS, $this->workKind === WorkKindEnum::CONFLICT_TURN);
 		GetReadinessAction::forget($this->directory);
 
 		if (! $readinessObject->isReady()) {

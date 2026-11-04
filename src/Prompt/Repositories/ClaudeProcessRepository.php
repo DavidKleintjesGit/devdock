@@ -9,6 +9,7 @@ use Dotenv\Dotenv;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
+use Src\Access\Enums\GitGrantEnum;
 use Src\Access\Objects\RoleAccessObject;
 use Src\Packages\Process\DetachedCommand;
 use Src\Packages\Process\LocalCommand;
@@ -117,7 +118,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 		// which cuts it off past 8191 characters, and a long prompt then arrives empty
 		$arguments = [
 			...$this->alsoReads($alsoReads),
-			...$this->accessArguments($roleAccessObject),
+			...$this->accessArguments($roleAccessObject, $promptRunEntity->gitGrant),
 			'-p',
 			'--output-format',
 			'stream-json',
@@ -141,7 +142,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 		$rest = '';
 
 		$result = Process::path($directory)
-			->env([...$this->environment(), ...$this->gitGuard($directory)])
+			->env([...$this->environment(), ...$this->gitGuard($directory, $promptRunEntity->gitGrant)])
 			->input($promptRunEntity->prompt)
 			->timeout((int) config('devdock.prompt_timeout'))
 			->run(
@@ -307,13 +308,13 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 *
 	 * @return list<string>
 	 */
-	private function accessArguments(RoleAccessObject $roleAccessObject): array
+	private function accessArguments(RoleAccessObject $roleAccessObject, ?GitGrantEnum $gitGrant = null): array
 	{
 		$arguments = $roleAccessObject->deniedTools === []
 			? []
 			: ['--disallowedTools', implode(',', $roleAccessObject->deniedTools)];
 
-		return [...$arguments, '--settings', $this->guardSettings($roleAccessObject)];
+		return [...$arguments, '--settings', $this->guardSettings($roleAccessObject, $gitGrant)];
 	}
 
 	/**
@@ -321,13 +322,14 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 * devdock:guard-git in front of every shell command, and devdock:guard-write
 	 * in front of every executeWrite when the role may still write through it.
 	 */
-	private function guardSettings(RoleAccessObject $roleAccessObject): string
+	private function guardSettings(RoleAccessObject $roleAccessObject, ?GitGrantEnum $gitGrant): string
 	{
-		$path = storage_path('app/claude/' . $roleAccessObject->agentRole->value . '-settings.json');
+		// a turn with a grant reads a settings file of its own, so every other turn keeps git read only
+		$path = storage_path('app/claude/' . $roleAccessObject->agentRole->value . ($gitGrant === null ? '' : '-' . $gitGrant->value) . '-settings.json');
 
 		$guards = [[
 			'matcher' => 'Bash|PowerShell',
-			'hooks' => [['type' => 'command', 'command' => $this->artisanCommand('devdock:guard-git'), 'timeout' => 30]],
+			'hooks' => [['type' => 'command', 'command' => $this->artisanCommand('devdock:guard-git' . ($gitGrant === null ? '' : ' --grant=' . $gitGrant->value)), 'timeout' => 30]],
 		]];
 
 		if ($roleAccessObject->guardsAtlassianWrites()) {
@@ -362,7 +364,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 *
 	 * @return array<string, string>
 	 */
-	private function gitGuard(string $directory): array
+	private function gitGuard(string $directory, ?GitGrantEnum $gitGrant = null): array
 	{
 		$commonDirectory = LocalCommand::run($directory, ['git', 'rev-parse', '--path-format=absolute', '--git-common-dir']);
 
@@ -373,6 +375,8 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 			'GIT_CONFIG_KEY_1' => 'url.devdock-pushes-with-the-button://.pushInsteadOf',
 			'GIT_CONFIG_VALUE_1' => '',
 			'DEVDOCK_GUARDED_GIT_DIR' => $commonDirectory->successful() ? trim($commonDirectory->output()) : '',
+			// the hook lets a granted rebase move the branch while that rebase stands open, and nothing else
+			'DEVDOCK_GIT_GRANT' => $gitGrant?->value ?? '',
 		];
 	}
 

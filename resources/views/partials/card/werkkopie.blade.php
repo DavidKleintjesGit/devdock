@@ -54,28 +54,48 @@
 		<section class="dsec">
 			<h3 class="eyebrow">{{ __('Stand van de branch') }}</h3>
 			<div class="list">
-				@if ($card->conflictedFiles !== [])
+				@if ($worktree->isRebasing)
 					<div class="kv">
 						<div class="v">
 							<span class="sdot conflict"></span>
-							<span class="grow" style="font-family:inherit;display:flex;flex-direction:column;gap:2px"><b>{{ trans_choice('Conflict met :main in :count bestand|Conflict met :main in :count bestanden', count($card->conflictedFiles), ['main' => $worktree->targetBranch, 'count' => count($card->conflictedFiles)]) }}</b><span class="hint">{{ $card->pullRequests->isNotEmpty() ? __('Bitbucket kan de pull request zo niet mergen.') : __('Samenvoegen met :main botst nu.', ['main' => $worktree->targetBranch]) }}</span></span>
-							<x-busy-button action="resolveConflictsWithAgent" class="btn sm" :busy="__('Versturen...')">{{ __('Laat de agent oplossen') }}</x-busy-button>
+							<span class="grow" style="font-family:inherit;display:flex;flex-direction:column;gap:2px"><b>{{ __('Rebase op :main staat open', ['main' => $worktree->targetBranch]) }}</b><span class="hint">{{ $openConflicts !== [] ? trans_choice('Nog :count conflict op te lossen.|Nog :count conflicten op te lossen.', count($openConflicts), ['count' => count($openConflicts)]) : __('Alle conflicten zijn opgelost; de rebase moet nog verder.') }}</span></span>
+							<x-busy-button action="resolveConflictsWithAgent" class="btn sm primary" :busy="__('Versturen...')">{{ __('Agent laten afmaken') }}</x-busy-button>
+							<x-busy-button action="abortRebase" class="btn sm" :busy="__('Afbreken...')">{{ __('Rebase afbreken') }}</x-busy-button>
+						</div>
+						<ul style="margin:0 0 0 21px;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px">
+							@foreach ($openConflicts as $conflictedFile)
+								<li class="mono" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $conflictedFile }}</li>
+							@endforeach
+						</ul>
+					</div>
+				@elseif ($card->conflictedFiles !== [])
+					<div class="kv">
+						<div class="v">
+							<span class="sdot conflict"></span>
+							<span class="grow" style="font-family:inherit;display:flex;flex-direction:column;gap:2px"><b>{{ trans_choice('Conflict met :main in :count bestand|Conflict met :main in :count bestanden', count($card->conflictedFiles), ['main' => $worktree->targetBranch, 'count' => count($card->conflictedFiles)]) }}</b><span class="hint">{{ trans_choice(':count commit achter.|:count commits achter.', $worktree->behind, ['count' => $worktree->behind]) }} {{ $card->pullRequests->isNotEmpty() ? __('Bitbucket kan de pull request zo niet mergen.') : __('Samenvoegen met :main botst nu.', ['main' => $worktree->targetBranch]) }}</span></span>
+							<x-busy-button action="resolveConflictsWithAgent" class="btn sm primary" :busy="__('Rebase beginnen...')" :disabled="$worktree->changedFiles > 0">{{ __('Conflicten oplossen') }}</x-busy-button>
 						</div>
 						<ul style="margin:0 0 0 21px;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px">
 							@foreach ($card->conflictedFiles as $conflictedFile)
 								<li class="mono" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $conflictedFile }}</li>
 							@endforeach
 						</ul>
+						@if ($worktree->changedFiles > 0)
+							<p class="alert" style="margin:0 0 0 21px">{{ trans_choice(':count bestand is nog niet gecommit. Commit eerst, dan kan dit.|:count bestanden zijn nog niet gecommit. Commit eerst, dan kan dit.', $worktree->changedFiles, ['count' => $worktree->changedFiles]) }}</p>
+						@else
+							<p class="hint" style="margin:0 0 0 21px">{{ __('De agent mag voor één beurt rebasen op :main en deze bestanden oplossen. Daarna vervalt dat weer. Pushen blijft jouw knop.', ['main' => $worktree->targetBranch]) }}</p>
+						@endif
 					</div>
-				@endif
-
-				@if ($worktree->behind > 0)
+				@elseif ($worktree->behind > 0)
 					<div class="kv">
 						<div class="v">
 							<span class="sdot busy" style="animation:none"></span>
-							<span class="grow" style="font-family:inherit;display:flex;flex-direction:column;gap:2px"><b>{{ trans_choice(':count commit achter op :main|:count commits achter op :main', $worktree->behind, ['count' => $worktree->behind, 'main' => $worktree->targetBranch]) }}</b><span class="hint">{{ __('Tests kunnen hier slagen en op de pull request alsnog vallen.') }}</span></span>
-							<x-busy-button action="rebaseOnMain" class="btn sm" :busy="__('Rebasen...')">{{ __('Rebase op :main', ['main' => $worktree->targetBranch]) }}</x-busy-button>
+							<span class="grow" style="font-family:inherit;display:flex;flex-direction:column;gap:2px"><b>{{ trans_choice(':count commit achter op :main|:count commits achter op :main', $worktree->behind, ['count' => $worktree->behind, 'main' => $worktree->targetBranch]) }}</b><span class="hint">{{ __('Geen conflicten. Tests kunnen hier slagen en op de pull request alsnog vallen.') }}</span></span>
+							<x-busy-button action="rebaseOnMain" class="btn sm" :busy="__('Rebasen...')" :disabled="$worktree->changedFiles > 0">{{ __('Rebase') }}</x-busy-button>
 						</div>
+						@if ($worktree->changedFiles > 0)
+							<p class="alert" style="margin:0 0 0 21px">{{ trans_choice(':count bestand is nog niet gecommit. Commit eerst, dan kan de rebase.|:count bestanden zijn nog niet gecommit. Commit eerst, dan kan de rebase.', $worktree->changedFiles, ['count' => $worktree->changedFiles]) }}</p>
+						@endif
 					</div>
 				@endif
 
@@ -105,7 +125,7 @@
 					</div>
 				@endforeach
 
-				@if ($worktree->behind === 0 && $worktree->ahead === 0 && $outdatedRules === [] && $card->conflictedFiles === [])
+				@if ($worktree->behind === 0 && $worktree->ahead === 0 && $outdatedRules === [] && $card->conflictedFiles === [] && ! $worktree->isRebasing)
 					<div class="kv"><div class="v"><span class="sdot quiet"></span><span class="grow" style="font-family:inherit">{{ __('Bij met :main, alles gepusht.', ['main' => $worktree->targetBranch]) }}</span></div></div>
 				@endif
 

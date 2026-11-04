@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Prompt\Objects;
 
+use Src\Access\Enums\GitGrantEnum;
 use Src\Packages\ValueObject\ValueObject;
 
 /**
@@ -21,6 +22,8 @@ class PromptRunObject extends ValueObject
 		public readonly ?string $sessionUuid,
 		public readonly bool $claimsSession,
 		public readonly string $prompt,
+		// git work you handed this turn with a button
+		public readonly ?GitGrantEnum $gitGrant = null,
 	) {
 		parent::__construct();
 	}
@@ -37,6 +40,7 @@ class PromptRunObject extends ValueObject
 			sessionUuid: $data['session_uuid'] ?? null,
 			claimsSession: (bool) ($data['claims_session'] ?? false),
 			prompt: (string) $data['prompt'],
+			gitGrant: GitGrantEnum::tryFrom((string) ($data['git_grant'] ?? '')),
 		);
 	}
 }

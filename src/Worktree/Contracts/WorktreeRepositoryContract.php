@@ -9,6 +9,7 @@ use Src\Worktree\Enums\DiffViewEnum;
 use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Src\Worktree\Objects\ChangeObjectCollection;
 use Src\Worktree\Objects\RebaseObject;
+use Src\Worktree\Objects\RebaseOutcomeObject;
 use Src\Worktree\Objects\WorktreeEntity;
 use Src\Worktree\Objects\WorktreeEntityCollection;
 use Src\Worktree\Objects\WorktreeId;
@@ -178,10 +179,31 @@ interface WorktreeRepositoryContract
 	public function push(string $path): bool;
 
 	/**
-	 * Rebases the branch on the main line of origin. Returns why it did not
-	 * work, or null when it did; a conflict leaves everything as it was.
+	 * Rebases the branch on the branch it merges into on origin. Returns why it
+	 * did not work, or null when it did; a conflict leaves everything as it was.
 	 */
 	public function rebase(string $path): ?string;
+
+	/**
+	 * Begins a rebase on the branch it merges into, on a working copy with
+	 * everything committed. A conflict leaves the rebase open for the agent to
+	 * finish; any other failure puts the branch back as it was.
+	 */
+	public function beginRebase(string $path): RebaseOutcomeObject;
+
+	/**
+	 * Breaks off a rebase that stands open, so the branch is as it was before.
+	 */
+	public function abortRebase(string $path): bool;
+
+	public function isRebasing(string $path): bool;
+
+	/**
+	 * The files that are still unmerged in a working copy.
+	 *
+	 * @return list<string>
+	 */
+	public function getConflictedFiles(string $path): array;
 
 	/**
 	 * The last rebase DevDock did here; null when there was none.

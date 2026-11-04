@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Access\Policies;
 
+use Src\Access\Enums\GitGrantEnum;
 use Src\Access\Enums\ShellCommandEnum;
 use Src\Access\Objects\ShellCommandDecisionObject;
 use Src\Access\Objects\ShellCommandObject;
@@ -12,7 +13,8 @@ use Src\Access\Objects\ShellCommandObject;
  * The rule for a shell command an agent, lens or helper is about to run: git
  * is read only. Every git command outside the reading ones is refused,
  * wherever it stands in the line, so committing, pushing and rebasing stay
- * with the buttons. Anything else passes.
+ * with the buttons; a grant you gave with a button lets its own commands
+ * through for that turn. Anything else passes.
  */
 class ShellCommandPolicy
 {
@@ -69,7 +71,7 @@ class ShellCommandPolicy
 	public function decide(ShellCommandObject $shellCommandObject): ShellCommandDecisionObject
 	{
 		foreach ($this->segments($shellCommandObject->command) as $segment) {
-			$gitCommand = $this->writingGitCommandIn($segment);
+			$gitCommand = $this->writingGitCommandIn($segment, $shellCommandObject->grants);
 
 			if ($gitCommand !== null) {
 				return new ShellCommandDecisionObject(ShellCommandEnum::WRITES_GIT, $gitCommand);
@@ -97,7 +99,10 @@ class ShellCommandPolicy
 	 * The git command in this part of the line that writes, or null when it
 	 * holds none.
 	 */
-	private function writingGitCommandIn(string $segment): ?string
+	/**
+	 * @param  list<GitGrantEnum>  $grants
+	 */
+	private function writingGitCommandIn(string $segment, array $grants): ?string
 	{
 		preg_match_all('/"((?:[^"\\\\]|\\\\.)*)"|\'([^\']*)\'|(\S+)/', $segment, $found, PREG_SET_ORDER);
 
@@ -109,7 +114,7 @@ class ShellCommandPolicy
 
 			// a command handed to another shell is judged as a command of its own
 			if ($quoted !== '' && $words !== [] && $this->handsToShell($words)) {
-				$gitCommand = $this->decide(new ShellCommandObject(command: $quoted))->gitCommand;
+				$gitCommand = $this->decide(new ShellCommandObject(command: $quoted, grants: $grants))->gitCommand;
 
 				if ($gitCommand !== null) {
 					return $gitCommand;
@@ -121,7 +126,7 @@ class ShellCommandPolicy
 
 		foreach ($words as $position => $word) {
 			if ($this->isGit($word)) {
-				$gitCommand = $this->writingGitCommand(array_slice($words, $position + 1));
+				$gitCommand = $this->writingGitCommand(array_slice($words, $position + 1), $grants);
 
 				if ($gitCommand !== null) {
 					return $gitCommand;
@@ -157,8 +162,9 @@ class ShellCommandPolicy
 	 * The git command these words run when it writes, or null when it only reads.
 	 *
 	 * @param  list<string>  $arguments  what follows the word git
+	 * @param  list<GitGrantEnum>  $grants
 	 */
-	private function writingGitCommand(array $arguments): ?string
+	private function writingGitCommand(array $arguments, array $grants): ?string
 	{
 		while ($arguments !== [] && str_starts_with($arguments[0], '-')) {
 			$option = array_shift($arguments);
@@ -172,6 +178,12 @@ class ShellCommandPolicy
 
 		if ($subcommand === null || in_array($subcommand, self::READING, true)) {
 			return null;
+		}
+
+		foreach ($grants as $gitGrant) {
+			if (in_array($subcommand, $gitGrant->commands(), true)) {
+				return null;
+			}
 		}
 
 		if (in_array($subcommand, self::LISTING, true) && $this->onlyLists($subcommand, $arguments)) {

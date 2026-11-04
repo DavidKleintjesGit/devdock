@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Src\Prompt\Objects;
 
 use Carbon\CarbonImmutable;
+use Src\Access\Enums\GitGrantEnum;
 use Src\Packages\ValueObject\ValueObject;
 use Src\Prompt\Enums\PromptStatusEnum;
 
@@ -24,6 +25,7 @@ class PromptRunEntity extends ValueObject
 		public readonly ?string $sessionUuid,
 		public readonly bool $claimsSession,
 		public readonly string $prompt,
+		public readonly ?GitGrantEnum $gitGrant,
 		public readonly PromptStatusEnum $status,
 		public readonly ?string $output,
 		public readonly ?string $message,

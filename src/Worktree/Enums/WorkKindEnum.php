@@ -11,6 +11,8 @@ namespace Src\Worktree\Enums;
 enum WorkKindEnum: string
 {
 	case AGENT_TURN = 'agent_turn';
+	// a turn of the agent that finishes the rebase DevDock began on "Conflicten oplossen"
+	case CONFLICT_TURN = 'conflict_turn';
 	case ROUND = 'round';
 	case LENS = 'lens';
 	case TERMINAL = 'terminal';
@@ -20,7 +22,7 @@ enum WorkKindEnum: string
 	 */
 	public function waitsForAgent(): bool
 	{
-		return $this === self::AGENT_TURN || $this === self::ROUND;
+		return in_array($this, [self::AGENT_TURN, self::CONFLICT_TURN, self::ROUND], true);
 	}
 
 	/**
@@ -28,6 +30,6 @@ enum WorkKindEnum: string
 	 */
 	public function waitsForLenses(): bool
 	{
-		return $this === self::AGENT_TURN;
+		return $this === self::AGENT_TURN || $this === self::CONFLICT_TURN;
 	}
 }

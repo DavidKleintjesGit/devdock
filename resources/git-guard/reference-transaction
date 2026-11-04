@@ -3,12 +3,26 @@
 # DevDock works in. Only a process DevDock started for an agent, lens or helper
 # reads its hooks from here; committing, pushing and rebasing by hand or with
 # the buttons in DevDock never pass this hook.
+#
+# One exception: a turn you started with "Conflicten oplossen" carries the
+# rebase grant, and may move refs while the rebase DevDock began stands open
+# in this working copy. Once that rebase is finished or aborted, the grant
+# lets nothing through any more.
 
 [ "$1" = "prepared" ] || exit 0
 
 common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
 
 [ "$common" = "$DEVDOCK_GUARDED_GIT_DIR" ] || exit 0
+
+if [ "$DEVDOCK_GIT_GRANT" = "rebase" ]; then
+	merge=$(git rev-parse --path-format=absolute --git-path rebase-merge 2>/dev/null)
+	apply=$(git rev-parse --path-format=absolute --git-path rebase-apply 2>/dev/null)
+
+	if [ -d "$merge" ] || [ -d "$apply" ]; then
+		exit 0
+	fi
+fi
 
 echo "DevDock: an agent only reads git. Committing, pushing and rebasing are done with the buttons in DevDock." >&2
 exit 1

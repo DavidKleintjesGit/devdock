@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Prompt\Actions;
 
+use Src\Access\Enums\GitGrantEnum;
 use Src\Packages\Cqrs\Command;
 use Src\Prompt\Contracts\ClaudeProcessRepositoryContract;
 use Src\Prompt\Contracts\PromptRunRepositoryContract;
@@ -48,7 +49,8 @@ class StartPromptAction extends Command
 	): PromptRunEntity {
 		try {
 			$directory = $this->directory();
-			EnsureReadyAction::execute($directory, WorkKindEnum::AGENT_TURN);
+			// a turn that finishes a rebase DevDock began may start while that rebase stands open
+			EnsureReadyAction::execute($directory, $this->promptRunObject->gitGrant === GitGrantEnum::REBASE ? WorkKindEnum::CONFLICT_TURN : WorkKindEnum::AGENT_TURN);
 		} catch (WorktreeNotPossibleException|SetupIncompleteException|WorkingCopyBusyException $failure) {
 			$promptRunEntity = $promptRunRepository->create($this->promptRunObject);
 
@@ -71,6 +73,7 @@ class StartPromptAction extends Command
 			sessionUuid: $taskAgentEntity->sessionUuid,
 			claimsSession: ! $taskAgentEntity->hasStarted(),
 			prompt: $this->promptRunObject->prompt,
+			gitGrant: $this->promptRunObject->gitGrant,
 		));
 
 		$claudeProcessRepository->startDetached($promptRunEntity->promptRunId);

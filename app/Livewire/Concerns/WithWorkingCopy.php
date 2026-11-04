@@ -21,6 +21,7 @@ use Src\Worktree\Actions\EnsureWorktreeAction;
 use Src\Worktree\Actions\ForgetWorkingCopyTaskAction;
 use Src\Worktree\Actions\PushBranchAction;
 use Src\Worktree\Actions\RebaseWorktreeAction;
+use Src\Worktree\Actions\ResolveConflictsAction;
 use Src\Worktree\Actions\SetUpstreamAction;
 use Src\Worktree\Actions\StartWorkingCopyTaskAction;
 use Src\Worktree\Actions\UseWorktreeDatabaseAction;
@@ -30,6 +31,7 @@ use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Enums\DatabaseFillEnum;
 use Src\Worktree\Enums\DiffViewEnum;
+use Src\Worktree\Enums\RebaseOutcomeEnum;
 use Src\Worktree\Enums\WorkingCopyTaskEnum;
 use Src\Worktree\Enums\WorktreeOriginEnum;
 use Src\Worktree\Objects\ChangeObject;
@@ -74,19 +76,38 @@ trait WithWorkingCopy
 			return;
 		}
 
+		// the button is grey then; a request that still comes in is refused the same way
+		if ($worktreeEntity->changedFiles > 0) {
+			$this->failure = __('Er staat werk dat niet gecommit is. Commit eerst, dan kan de rebase.');
+
+			return;
+		}
+
 		$failure = RebaseWorktreeAction::execute($worktreeEntity->path);
 
 		$this->failure = $failure;
 		$this->committed = $failure === null ? __('Gerebased op :main.', ['main' => $worktreeEntity->targetBranch]) : null;
 
-		$projectPath = GetProjectsAction::execute()
-			->first(fn (ProjectEntity $projectEntity) => $projectEntity->name === $worktreeEntity->project)
-			?->path;
+		$this->refreshStanding($worktreeEntity);
+	}
 
-		// the card shows the new standing right away instead of after the next fetch round
-		if ($projectPath !== null) {
-			resolve(BranchStandingRepositoryContract::class)->warm($projectPath, [$worktreeEntity->branch], again: true);
+	/**
+	 * Breaks off the rebase that stands open, so the branch is as it was before.
+	 */
+	public function abortRebase(): void
+	{
+		$worktreeEntity = $this->openWorktree();
+
+		if ($worktreeEntity === null) {
+			return;
 		}
+
+		$isAborted = resolve(WorktreeRepositoryContract::class)->abortRebase($worktreeEntity->path);
+
+		$this->failure = $isAborted ? null : __('De rebase kon niet afgebroken worden. Doe het zelf met git rebase --abort.');
+		$this->committed = $isAborted ? __('Rebase afgebroken; de branch staat weer zoals hij was.') : null;
+
+		$this->refreshStanding($worktreeEntity);
 	}
 
 	/**
@@ -109,23 +130,28 @@ trait WithWorkingCopy
 	}
 
 	/**
-	 * Asks the agent of this task to rebase and settle the clashing files.
+	 * Begins the rebase on the branch the work merges into and, when it stops
+	 * on conflicts, gives the agent one turn in which it may finish it.
 	 */
 	public function resolveConflictsWithAgent(): void
 	{
+		$this->failure = null;
 		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
+		$worktreeEntity = $this->openWorktree();
 
-		if ($cardObject === null || ! $cardObject->hasConflict()) {
+		if ($cardObject === null || $worktreeEntity === null || $cardObject->project === null || $cardObject->branch === null) {
 			return;
 		}
 
-		$this->prompt = __('Rebase deze branch op origin/:main en los de conflicten op in :files. Draai daarna de tests van wat je aanraakte. Push niet, zeg wanneer het klaar is.', [
-			'main' => $cardObject->targetBranch ?? 'master',
-			'files' => implode(', ', $cardObject->conflictedFiles),
-		]);
+		$rebaseOutcomeObject = ResolveConflictsAction::execute($cardObject->id, $cardObject->project, $cardObject->branch, $cardObject->ticketKey, $worktreeEntity->path);
 
-		$this->send();
-		$this->setDrawerTab('Agent');
+		$this->refreshStanding($worktreeEntity);
+
+		match ($rebaseOutcomeObject->outcome) {
+			RebaseOutcomeEnum::CONFLICTED => $this->setDrawerTab('Agent'),
+			RebaseOutcomeEnum::DONE => $this->committed = __('Gerebased op :main zonder conflicten.', ['main' => $rebaseOutcomeObject->targetBranch]),
+			RebaseOutcomeEnum::FAILED => $this->failure = $rebaseOutcomeObject->failure,
+		};
 	}
 
 	public function toggleCommitFile(string $path): void
@@ -358,6 +384,7 @@ trait WithWorkingCopy
 			'worktree' => $worktreeEntity,
 			'unpushed' => $worktreeRepository->getUnpushedCommits($worktreeEntity->path),
 			'lastRebase' => $worktreeRepository->getLastRebase($worktreeEntity->path),
+			'openConflicts' => $worktreeEntity->isRebasing ? $worktreeRepository->getConflictedFiles($worktreeEntity->path) : [],
 			'mainCheckout' => $worktreeEntity->origin === WorktreeOriginEnum::PROJECT ? $this->mainCheckout($cardObject) : null,
 			'outdatedRules' => $this->outdatedRules($cardObject, $worktreeEntity),
 			'changeCount' => $changes->count(),
@@ -490,6 +517,21 @@ trait WithWorkingCopy
 			?->path;
 
 		return $projectPath === null ? null : resolve(WorktreeDatabaseRepositoryContract::class)->describe($projectPath, $worktreeEntity->path);
+	}
+
+	/**
+	 * Reads how the branch stands against its target again, so the card shows
+	 * it right away instead of after the next fetch round.
+	 */
+	private function refreshStanding(WorktreeEntity $worktreeEntity): void
+	{
+		$projectPath = GetProjectsAction::execute()
+			->first(fn (ProjectEntity $projectEntity) => $projectEntity->name === $worktreeEntity->project)
+			?->path;
+
+		if ($projectPath !== null) {
+			resolve(BranchStandingRepositoryContract::class)->warm($projectPath, [$worktreeEntity->branch], again: true);
+		}
 	}
 
 	private function openWorktree(): ?WorktreeEntity

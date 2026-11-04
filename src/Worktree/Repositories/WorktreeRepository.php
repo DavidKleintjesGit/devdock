@@ -13,12 +13,14 @@ use Illuminate\Support\Facades\Process;
 use Src\Packages\Process\LocalCommand;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Enums\DiffViewEnum;
+use Src\Worktree\Enums\RebaseOutcomeEnum;
 use Src\Worktree\Enums\WorktreeOriginEnum;
 use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Src\Worktree\Models\Worktree as WorktreeEloquent;
 use Src\Worktree\Objects\ChangeObject;
 use Src\Worktree\Objects\ChangeObjectCollection;
 use Src\Worktree\Objects\RebaseObject;
+use Src\Worktree\Objects\RebaseOutcomeObject;
 use Src\Worktree\Objects\WorktreeEntity;
 use Src\Worktree\Objects\WorktreeEntityCollection;
 use Src\Worktree\Objects\WorktreeId;
@@ -743,14 +745,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		}
 
 		if ($before->successful()) {
-			if (! is_dir($path . '/' . self::DEVDOCK_FOLDER)) {
-				@mkdir($path . '/' . self::DEVDOCK_FOLDER, 0775, true);
-			}
-
-			file_put_contents($path . '/' . self::REBASE_FILE, (string) json_encode([
-				'sha_before' => trim($before->output()),
-				'at' => CarbonImmutable::now()->toIso8601String(),
-			]));
+			$this->rememberRebase($path, trim($before->output()));
 		}
 
 		return null;
@@ -762,6 +757,113 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		$data = is_file($file) ? json_decode((string) file_get_contents($file), true) : null;
 
 		return is_array($data) && isset($data['sha_before'], $data['at']) ? RebaseObject::from($data) : null;
+	}
+
+	public function beginRebase(string $path): RebaseOutcomeObject
+	{
+		$target = $this->targetBranch($path);
+
+		// new files count too: what is not committed would have to be set aside for the rebase
+		if ($this->lines($path, ['git', 'status', '--porcelain']) !== []) {
+			return new RebaseOutcomeObject(RebaseOutcomeEnum::FAILED, $target, failure: __('Er staat werk dat niet gecommit is. Commit eerst, dan kan de rebase.'));
+		}
+
+		$fetched = Process::path($path)->timeout(self::TIMEOUT)->run(['git', 'fetch', 'origin', $target]);
+
+		if (! $fetched->successful()) {
+			return new RebaseOutcomeObject(RebaseOutcomeEnum::FAILED, $target, failure: trim($fetched->errorOutput()) ?: __('Ophalen van origin lukte niet.'));
+		}
+
+		$before = LocalCommand::run($path, ['git', 'rev-parse', 'HEAD']);
+		$rebased = Process::path($path)->timeout(self::TIMEOUT)->run(['git', 'rebase', 'origin/' . $target]);
+
+		$this->forgetStatus($path);
+
+		if ($before->successful()) {
+			$this->rememberRebase($path, trim($before->output()));
+		}
+
+		if ($rebased->successful()) {
+			return new RebaseOutcomeObject(RebaseOutcomeEnum::DONE, $target);
+		}
+
+		$conflictedFiles = $this->conflictedFilesIn($path);
+
+		if ($conflictedFiles !== [] && $this->isRebasing($path)) {
+			return new RebaseOutcomeObject(RebaseOutcomeEnum::CONFLICTED, $target, $conflictedFiles);
+		}
+
+		// anything but a conflict is not the agent's to solve: the branch goes back as it was
+		Process::path($path)->run(['git', 'rebase', '--abort']);
+
+		return new RebaseOutcomeObject(RebaseOutcomeEnum::FAILED, $target, failure: trim($rebased->errorOutput()) ?: __('Rebasen lukte niet.'));
+	}
+
+	public function abortRebase(string $path): bool
+	{
+		$aborted = Process::path($path)->timeout(self::TIMEOUT)->run(['git', 'rebase', '--abort']);
+
+		$this->forgetStatus($path);
+
+		return $aborted->successful();
+	}
+
+	public function isRebasing(string $path): bool
+	{
+		$gitDirectory = $this->gitDirectoryOf($path);
+
+		return $gitDirectory !== null && (is_dir($gitDirectory . '/rebase-merge') || is_dir($gitDirectory . '/rebase-apply'));
+	}
+
+	public function getConflictedFiles(string $path): array
+	{
+		return is_dir($path) ? $this->conflictedFilesIn($path) : [];
+	}
+
+	/**
+	 * The files git holds as unmerged in a working copy.
+	 *
+	 * @return list<string>
+	 */
+	private function conflictedFilesIn(string $path): array
+	{
+		return $this->lines($path, ['git', 'diff', '--name-only', '--diff-filter=U']);
+	}
+
+	/**
+	 * The own git folder of a working copy, read from the .git file that points at it.
+	 */
+	private function gitDirectoryOf(string $path): ?string
+	{
+		$pointer = $path . '/.git';
+
+		if (is_dir($pointer)) {
+			return $pointer;
+		}
+
+		if (! is_file($pointer) || preg_match('/^gitdir:\s*(.+)$/m', (string) file_get_contents($pointer), $found) !== 1) {
+			return null;
+		}
+
+		$gitDirectory = trim($found[1]);
+
+		// a relative pointer counts from the working copy
+		return preg_match('#^([A-Za-z]:)?[\\\\/]#', $gitDirectory) === 1 ? $gitDirectory : $path . '/' . $gitDirectory;
+	}
+
+	/**
+	 * Writes down the commit the branch stood on before a rebase, so that state can always be found back.
+	 */
+	private function rememberRebase(string $path, string $shaBefore): void
+	{
+		if (! is_dir($path . '/' . self::DEVDOCK_FOLDER)) {
+			@mkdir($path . '/' . self::DEVDOCK_FOLDER, 0775, true);
+		}
+
+		file_put_contents($path . '/' . self::REBASE_FILE, (string) json_encode([
+			'sha_before' => $shaBefore,
+			'at' => CarbonImmutable::now()->toIso8601String(),
+		]));
 	}
 
 	public function switchToMain(string $repositoryPath, bool $carryChanges = false): ?string
@@ -1190,6 +1292,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			upstream: $status['upstream'],
 			mainBranch: $status['main_branch'],
 			targetBranch: $status['target_branch'],
+			isRebasing: $this->isRebasing($path),
 			lastCommitAt: $status['last_commit_at'] === null ? null : CarbonImmutable::parse($status['last_commit_at']),
 			dependenciesMissing: is_dir($borrowedFrom . '/vendor') && ! is_dir($path . '/vendor'),
 			hasCommits: $status['has_commits'],

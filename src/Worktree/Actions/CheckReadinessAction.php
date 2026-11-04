@@ -29,7 +29,7 @@ use Src\Worktree\Objects\WorktreeEntity;
  * artisan in the copy; otherwise the count of the last thorough check holds
  * while the migration files and the database stay the same.
  *
- * @method static ReadinessObject execute(?string $directory, bool $isThorough = false)
+ * @method static ReadinessObject execute(?string $directory, bool $isThorough = false, bool $acceptsRebase = false)
  */
 class CheckReadinessAction extends Command
 {
@@ -38,6 +38,8 @@ class CheckReadinessAction extends Command
 	public function __construct(
 		public readonly ?string $directory,
 		public readonly bool $isThorough = false,
+		// a rebase standing open is the work itself, for the turn that finishes it
+		public readonly bool $acceptsRebase = false,
 	) {}
 
 	public static function forget(string $directory): void
@@ -136,6 +138,11 @@ class CheckReadinessAction extends Command
 		$followsMain = $workingCopyStateObject->upstream === 'origin/' . $workingCopyStateObject->mainBranch;
 
 		return match (true) {
+			$this->acceptsRebase && $workingCopyStateObject->operationInProgress === 'rebase' => new SetupCheckObject(
+				SetupCheckEnum::BRANCH,
+				CheckStateEnum::READY,
+				__('Een rebase van :branch staat open; de agent maakt hem af.', ['branch' => $worktreeEntity->branch]),
+			),
 			$workingCopyStateObject->currentBranch !== $worktreeEntity->branch => new SetupCheckObject(
 				SetupCheckEnum::BRANCH,
 				CheckStateEnum::OPEN,

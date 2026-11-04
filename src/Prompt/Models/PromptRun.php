@@ -24,6 +24,7 @@ class PromptRun extends Model
 		'ticket_key',
 		'session_uuid',
 		'claims_session',
+		'git_grant',
 		'prompt',
 		'status',
 		'output',

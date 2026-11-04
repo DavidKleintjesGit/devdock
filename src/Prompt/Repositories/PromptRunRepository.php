@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
+use Src\Access\Enums\GitGrantEnum;
 use Src\Prompt\Contracts\PromptRunRepositoryContract;
 use Src\Prompt\Enums\PromptStatusEnum;
 use Src\Prompt\Models\PromptRun as PromptRunEloquent;
@@ -31,6 +32,7 @@ class PromptRunRepository implements PromptRunRepositoryContract
 			'session_uuid' => $promptRunObject->sessionUuid,
 			'claims_session' => $promptRunObject->claimsSession,
 			'prompt' => $promptRunObject->prompt,
+			'git_grant' => $promptRunObject->gitGrant?->value,
 			'status' => PromptStatusEnum::RUNNING->value,
 			'started_at' => CarbonImmutable::now(),
 		]);
@@ -236,6 +238,7 @@ class PromptRunRepository implements PromptRunRepositoryContract
 			sessionUuid: $promptRunEloquent->session_uuid,
 			claimsSession: (bool) $promptRunEloquent->claims_session,
 			prompt: (string) $promptRunEloquent->prompt,
+			gitGrant: GitGrantEnum::tryFrom((string) $promptRunEloquent->git_grant),
 			status: PromptStatusEnum::from((string) $promptRunEloquent->status),
 			output: $promptRunEloquent->output,
 			message: $promptRunEloquent->message,
