@@ -57,6 +57,34 @@ class WorktreeRepositoryCommitTest extends TestCase
 	}
 
 	#[Test]
+	public function commit_works_in_a_checkout_whose_exclude_keeps_devdocks_files_out(): void
+	{
+		// the exclude as DevDock writes it into every project it prepares
+		file_put_contents($this->repository->path . '/.git/info/exclude', "/.devdock/\n/.wakatime-project\n");
+		$this->repository->write('.devdock/rebase.json', '{}');
+		$this->repository->write('.wakatime-project', 'shop');
+		$this->repository->write('billing/Invoice.php', '<?php');
+
+		$failure = resolve(WorktreeRepositoryContract::class)->commit($this->repository->path, 'Add an invoice', '', ['billing/Invoice.php']);
+
+		$this->assertNull($failure);
+		$this->assertSame('billing/Invoice.php', $this->repository->git('show', '--name-only', '--format=', 'HEAD'));
+	}
+
+	#[Test]
+	public function commit_of_everything_works_in_a_checkout_whose_exclude_keeps_devdocks_files_out(): void
+	{
+		file_put_contents($this->repository->path . '/.git/info/exclude', "/.devdock/\n/.wakatime-project\n");
+		$this->repository->write('.devdock/rebase.json', '{}');
+		$this->repository->write('billing/Invoice.php', '<?php');
+
+		$failure = resolve(WorktreeRepositoryContract::class)->commit($this->repository->path, 'Add an invoice', '');
+
+		$this->assertNull($failure);
+		$this->assertSame('billing/Invoice.php', $this->repository->git('show', '--name-only', '--format=', 'HEAD'));
+	}
+
+	#[Test]
 	public function commit_refuses_when_only_files_devdock_writes_were_chosen(): void
 	{
 		$this->repository->write('.wakatime-project', 'shop');

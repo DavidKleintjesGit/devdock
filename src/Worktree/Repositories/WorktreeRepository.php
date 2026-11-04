@@ -751,14 +751,11 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	public function commit(string $path, string $title, string $body, ?array $files = null): ?string
 	{
 		// the files DevDock writes into a copy have no business in the history of
-		// the project, chosen or not; with a choice of files only those go along
+		// the project, chosen or not. They are left out by name rather than by an
+		// exclude pathspec: git add refuses one for a file its exclude already ignores
 		$ownPatterns = [...(array) config('devdock.worktree.own_files'), self::PROJECT_NAME_FILE];
-		$ownFiles = array_map(
-			fn (string $pattern): string => ':(exclude,glob)' . rtrim($pattern, '/') . (str_ends_with($pattern, '/') ? '/**' : ''),
-			$ownPatterns,
-		);
-		$chosen = $files === null ? ['.'] : array_values(array_filter(
-			$files,
+		$chosen = array_values(array_filter(
+			$files ?? $this->lines($path, ['git', 'ls-files', '--modified', '--deleted', '--others', '--exclude-standard']),
 			fn (string $file): bool => ! collect($ownPatterns)->contains(fn (string $pattern): bool => str_ends_with($pattern, '/')
 				? str_starts_with(str_replace('\\', '/', $file), $pattern)
 				: fnmatch($pattern, str_replace('\\', '/', $file))),
@@ -770,7 +767,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 		$staged = Process::path($path)
 			->timeout(self::TIMEOUT)
-			->run(['git', 'add', '-A', '--', ...$chosen, ...$ownFiles]);
+			->run(['git', 'add', '-A', '--', ...array_unique($chosen)]);
 
 		if (! $staged->successful()) {
 			return $this->reasonOf($staged);
