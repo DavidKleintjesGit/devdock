@@ -149,12 +149,12 @@ class SessionRepository implements SessionRepositoryContract
 			return SessionStatusEnum::ABANDONED;
 		}
 
-		return $lastActiveAt?->isToday() ? SessionStatusEnum::ACTIVE : SessionStatusEnum::QUIET;
+		return $lastActiveAt?->toDisplayZone()->isToday() ? SessionStatusEnum::ACTIVE : SessionStatusEnum::QUIET;
 	}
 
 	private function groupOf(?CarbonImmutable $lastActiveAt): SessionGroupEnum
 	{
-		if ($lastActiveAt?->isToday()) {
+		if ($lastActiveAt?->toDisplayZone()->isToday()) {
 			return SessionGroupEnum::TODAY;
 		}
 

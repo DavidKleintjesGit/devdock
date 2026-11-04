@@ -68,7 +68,7 @@ class ReviewResultEntity extends ValueObject
 			return null;
 		}
 
-		$parts = [__(':count seconden bezig', ['count' => $this->startedAt->diffInSeconds(CarbonImmutable::now())])];
+		$parts = [__(':count seconden bezig', ['count' => (int) $this->startedAt->diffInSeconds(CarbonImmutable::now(), absolute: true)])];
 
 		if ($this->toolCalls > 0) {
 			$parts[] = trans_choice(':count tool call|:count tool calls', $this->toolCalls, ['count' => $this->toolCalls]);
@@ -76,7 +76,7 @@ class ReviewResultEntity extends ValueObject
 
 		if ($this->lastSeenAt !== null) {
 			$parts[] = __('laatste teken :count s geleden', [
-				'count' => $this->lastSeenAt->diffInSeconds(CarbonImmutable::now()),
+				'count' => (int) $this->lastSeenAt->diffInSeconds(CarbonImmutable::now(), absolute: true),
 			]);
 		}
 

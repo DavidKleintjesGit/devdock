@@ -74,7 +74,7 @@
 				@if ($run?->isRunning())
 					<small><span class="dot amber pulse"></span> {{ $run->source ?? '…' }} · {{ $run->seconds() }} s</small>
 				@elseif ($run)
-					<small>{{ __('Laatst om :time, in :seconds seconden.', ['time' => $run->finishedAt?->format('H:i'), 'seconds' => $run->seconds()]) }} {{ $run->resultLine() }}</small>
+					<small>{{ __('Laatst om :time, in :seconds seconden.', ['time' => $run->finishedAt?->toDisplayZone()->format('H:i'), 'seconds' => $run->seconds()]) }} {{ $run->resultLine() }}</small>
 					@if ($run->message)<small style="color:var(--red)">{{ $run->message }}</small>@endif
 				@endif
 			</span>

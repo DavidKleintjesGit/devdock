@@ -125,7 +125,7 @@ class SessionFileRepository implements SessionFileRepositoryContract
 			$transcriptTurnObjects[] = TranscriptTurnObject::from([
 				'who' => 'jij',
 				'text' => Str::of($text)->squish()->limit(400)->value(),
-				'at' => isset($record['timestamp']) ? CarbonImmutable::parse($record['timestamp'])->format('H:i') : '',
+				'at' => isset($record['timestamp']) ? CarbonImmutable::parse($record['timestamp'])->toDisplayZone()->format('H:i') : '',
 			]);
 		}
 
@@ -240,7 +240,7 @@ class SessionFileRepository implements SessionFileRepositoryContract
 			if (isset($record['timestamp'])) {
 				$moment = CarbonImmutable::parse($record['timestamp']);
 				$firstAt ??= $moment;
-				$days[$moment->toDateString()] = true;
+				$days[$moment->toDisplayZone()->toDateString()] = true;
 			}
 
 			$cwd ??= $record['cwd'] ?? null;

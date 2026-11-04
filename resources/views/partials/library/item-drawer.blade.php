@@ -6,7 +6,7 @@
 	</div>
 
 	<div class="dhead">
-		<span class="meta"><span class="label teal">{{ $latest?->label() }} · {{ __('nieuwste') }}</span><span class="hint">{{ $latest?->createdAt?->translatedFormat('j F') }} · {{ $latest?->source->label($library->name, $latest?->project) }}</span></span>
+		<span class="meta"><span class="label teal">{{ $latest?->label() }} · {{ __('nieuwste') }}</span><span class="hint">{{ $latest?->createdAt?->toDisplayZone()->translatedFormat('j F') }} · {{ $latest?->source->label($library->name, $latest?->project) }}</span></span>
 		<h2 id="item-title" class="mono" style="font-size:18px">{{ $item->name }}</h2>
 		<span class="sub">{{ trans_choice(':count regel|:count regels', $latest?->lines() ?? 0, ['count' => $latest?->lines() ?? 0]) }} · {{ trans_choice(':count project volgt :library|:count projecten volgen :library', count($library->followers), ['count' => count($library->followers), 'library' => $library->name]) }}</span>
 	</div>
@@ -25,7 +25,7 @@
 						<div class="row" style="align-items:flex-start;padding:14px 16px" wire:key="v-{{ $version->id }}">
 							<label class="tick" style="margin-top:2px"><input type="checkbox" @checked(in_array($version->number, $pickedVersions, true)) wire:click="togglePickedVersion({{ $version->number }})" aria-label="{{ __(':version kiezen', ['version' => $version->label()]) }}"><span class="mark"></span></label>
 							<span class="grow" style="display:flex;flex-direction:column;gap:3px">
-								<span style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><b>{{ $version->label() }}</b><span class="hint">{{ $version->createdAt?->translatedFormat('j F Y') }} · {{ $version->source->label($library->name, $version->project) }}</span></span>
+								<span style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><b>{{ $version->label() }}</b><span class="hint">{{ $version->createdAt?->toDisplayZone()->translatedFormat('j F Y') }} · {{ $version->source->label($library->name, $version->project) }}</span></span>
 								@if ($version->note)<span style="color:var(--fg-2)">{{ $version->note }}</span>@endif
 								<span class="hint">{{ trans_choice(':count regel|:count regels', $version->lines(), ['count' => $version->lines()]) }}@if (isset($onVersion[$version->number])) · {{ trans_choice(':count project staat hierop: :projects|:count projecten staan hierop: :projects', count($onVersion[$version->number]), ['count' => count($onVersion[$version->number]), 'projects' => implode(', ', array_slice($onVersion[$version->number], 0, 4))]) }}@endif</span>
 							</span>
@@ -39,7 +39,7 @@
 					<h3 class="eyebrow" style="margin-top:10px">{{ __('Uitgerold') }}</h3>
 					<div class="list">
 						@foreach (array_slice($rollouts, 0, 8) as $rollout)
-							<div class="row hint" style="min-height:40px">{{ $rollout['at']?->translatedFormat('j F H:i') }} · v{{ $rollout['version'] }} → {{ $rollout['project'] }} <span class="mono">{{ $rollout['path'] }}</span></div>
+							<div class="row hint" style="min-height:40px">{{ $rollout['at']?->toDisplayZone()->translatedFormat('j F H:i') }} · v{{ $rollout['version'] }} → {{ $rollout['project'] }} <span class="mono">{{ $rollout['path'] }}</span></div>
 						@endforeach
 					</div>
 				@endif

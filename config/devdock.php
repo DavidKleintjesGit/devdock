@@ -201,6 +201,9 @@ return [
 		'workers' => (int) env('DEVDOCK_LENS_WORKERS', 5),
 	],
 
+	// the zone a page shows times in; DevDock keeps them in UTC
+	'timezone' => env('DEVDOCK_TIMEZONE', 'Europe/Amsterdam'),
+
 	'claude_binary' => env('DEVDOCK_CLAUDE_BINARY'),
 	'claude_token' => env('DEVDOCK_CLAUDE_TOKEN'),
 

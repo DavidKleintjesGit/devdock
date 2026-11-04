@@ -11,7 +11,7 @@
 	<div class="dhead">
 		<span class="meta"><span class="mono">{{ $result->lensName }}</span><span class="label {{ $result->verdict->chipTone() }}">{{ $result->verdict->label() }}</span></span>
 		<h2 id="finding-title">{{ $result->summary() }}</h2>
-		<span class="sub">{{ __('Ronde :number', ['number' => $round->number]) }} · {{ $result->finishedAt?->calendar() }}@if ($result->startedAt && $result->finishedAt) · {{ $result->startedAt->diffForHumans($result->finishedAt, true) }}@endif</span>
+		<span class="sub">{{ __('Ronde :number', ['number' => $round->number]) }} · {{ $result->finishedAt?->toDisplayZone()->calendar() }}@if ($result->startedAt && $result->finishedAt) · {{ $result->startedAt->diffForHumans($result->finishedAt, true) }}@endif</span>
 	</div>
 
 	<div class="dbody">

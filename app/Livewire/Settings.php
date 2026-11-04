@@ -147,7 +147,7 @@ class Settings extends Component
 		$this->bitbucketToken = '';
 		$this->claudeToken = '';
 		$this->saved = true;
-		$this->savedAt = now()->format('H:i');
+		$this->savedAt = now()->toDisplayZone()->format('H:i');
 	}
 
 	public function editLibrary(int $library): void

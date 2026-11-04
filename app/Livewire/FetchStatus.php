@@ -85,7 +85,7 @@ class FetchStatus extends Component
 			'run' => $fetchRunEntity,
 			'running' => $fetchRunEntity?->isRunning() ?? false,
 			'connected' => CountConnectedSourcesAction::execute(),
-			'updated' => $fetchRunEntity?->finishedAt?->format('H:i'),
+			'updated' => $fetchRunEntity?->finishedAt?->toDisplayZone()->format('H:i'),
 			'failed' => $this->failedSource($fetchRunEntity),
 			'lookEvery' => (int) config('devdock.refresh_seconds') > 0 ? self::LOOK_EVERY_SECONDS : 0,
 		]);

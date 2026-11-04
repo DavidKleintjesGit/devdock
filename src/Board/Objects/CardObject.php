@@ -94,7 +94,7 @@ class CardObject extends ValueObject
 
 	public function dateLabel(): ?string
 	{
-		return $this->changedAt?->translatedFormat('j M');
+		return $this->changedAt?->toDisplayZone()->translatedFormat('j M');
 	}
 
 	/**
@@ -111,7 +111,7 @@ class CardObject extends ValueObject
 		return match (true) {
 			$minutes < 60 => __(':count min', ['count' => max(1, $minutes)]),
 			$minutes < 60 * 24 => __(':count u', ['count' => intdiv($minutes, 60)]),
-			$this->changedAt->isYesterday() => __('gisteren'),
+			$this->changedAt->toDisplayZone()->isYesterday() => __('gisteren'),
 			$minutes < 60 * 24 * 14 => __(':count d', ['count' => intdiv($minutes, 60 * 24)]),
 			default => __(':count w', ['count' => intdiv($minutes, 60 * 24 * 7)]),
 		};
@@ -189,7 +189,7 @@ class CardObject extends ValueObject
 	public function hasClashingSessions(): bool
 	{
 		return $this->sessions
-			->filter(fn (SessionEntity $sessionEntity) => $sessionEntity->lastActiveAt?->isToday())
+			->filter(fn (SessionEntity $sessionEntity) => $sessionEntity->lastActiveAt?->toDisplayZone()->isToday())
 			->count() > 1;
 	}
 }

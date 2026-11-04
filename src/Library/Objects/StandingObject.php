@@ -50,7 +50,7 @@ class StandingObject extends ValueObject
 			StandingEnum::EQUAL => __(':version · de nieuwste', ['version' => $latest?->label()]),
 			StandingEnum::BEHIND => __('op :version van :date · de nieuwste is :latest', [
 				'version' => $this->onVersion?->label(),
-				'date' => $this->onVersion?->createdAt?->translatedFormat('j F'),
+				'date' => $this->onVersion?->createdAt?->toDisplayZone()->translatedFormat('j F'),
 				'latest' => $latest?->label(),
 			]),
 			StandingEnum::MODIFIED => __('past bij geen enkele versie: hier zelf veranderd'),

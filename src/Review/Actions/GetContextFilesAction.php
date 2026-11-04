@@ -68,7 +68,7 @@ class GetContextFilesAction extends Command
 			new ContextFileObject(
 				key: 'last-turn',
 				name: __('Opdracht van de laatste beurt'),
-				description: $latestRun?->startedAt === null ? __('nog geen beurt') : __('beurt van :moment', ['moment' => $latestRun->startedAt->format('d-m H:i')]),
+				description: $latestRun?->startedAt === null ? __('nog geen beurt') : __('beurt van :moment', ['moment' => $latestRun->startedAt->toDisplayZone()->format('d-m H:i')]),
 				contents: $latestRun?->prompt,
 			),
 			new ContextFileObject(

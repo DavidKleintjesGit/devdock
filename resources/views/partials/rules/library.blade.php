@@ -45,7 +45,7 @@
 						<tbody>
 							@foreach ($rows as $row)
 								<tr class="click" wire:click="showRule({{ $library->id }}, '{{ $row['item']->name }}')" wire:key="lr-{{ $row['item']->id }}">
-									<td><span class="mono" style="font-weight:500">{{ $row['item']->name }}</span><br><span class="hint">{{ $row['latest']?->label() }} · {{ trans_choice(':count regel|:count regels', $row['latest']?->lines() ?? 0, ['count' => $row['latest']?->lines() ?? 0]) }} · {{ $row['latest']?->createdAt?->translatedFormat('j M') }}</span></td>
+									<td><span class="mono" style="font-weight:500">{{ $row['item']->name }}</span><br><span class="hint">{{ $row['latest']?->label() }} · {{ trans_choice(':count regel|:count regels', $row['latest']?->lines() ?? 0, ['count' => $row['latest']?->lines() ?? 0]) }} · {{ $row['latest']?->createdAt?->toDisplayZone()->translatedFormat('j M') }}</span></td>
 									<td>
 										<span class="hint">{{ trans_choice(':count volger|:count volgers', $row['followers'], ['count' => $row['followers']]) }}</span>
 										<span class="chips" style="margin-top:4px">

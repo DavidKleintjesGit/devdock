@@ -33,7 +33,7 @@
 					@if ($roundRow['round']->number === $roundRow['round']->seriesStart && $roundRow['round']->seriesStart > 1)<span class="label blue">{{ __('nieuwe loop') }}</span>@endif
 					<span class="label {{ $roundRow['round']->status->tone() }}">{{ $roundRow['round']->findingsSummary() ?: $roundRow['round']->status->label() }}</span>
 					@if ($roundRow['round']->commitSha)<span class="mono hint">{{ substr($roundRow['round']->commitSha, 0, 7) }}</span>@endif
-					<span class="hint push-end">{{ $roundRow['round']->startedAt?->calendar() }}</span>
+					<span class="hint push-end">{{ $roundRow['round']->startedAt?->toDisplayZone()->calendar() }}</span>
 				</summary>
 
 				<section class="round-part">
@@ -64,7 +64,7 @@
 						<span class="hint">
 							{{ $card->agent?->name ?? __('agent') }} ·
 							@if ($roundRow['turn']->run->isRunning())
-								{{ __('bezig sinds :time', ['time' => $roundRow['turn']->run->startedAt?->format('H:i')]) }}
+								{{ __('bezig sinds :time', ['time' => $roundRow['turn']->run->startedAt?->toDisplayZone()->format('H:i')]) }}
 							@else
 								{{ __(':count s', ['count' => $roundRow['turn']->run->seconds()]) }}{{ $roundRow['turn']->run->costLabel() ? ' · ' . $roundRow['turn']->run->costLabel() : '' }}
 							@endif

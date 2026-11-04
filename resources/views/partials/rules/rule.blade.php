@@ -4,7 +4,7 @@
 			<a class="back-link" href="{{ route('rules') }}"><x-icon name="back" small/>{{ __('Regels') }}</a>
 			<span class="eyebrow"><a href="#" wire:click.prevent="showLibrary({{ $library->id }})" style="text-decoration:none">{{ __('Bibliotheek :library', ['library' => $library->name]) }}</a></span>
 			<h1 class="mono" style="font-size:24px">{{ $item->name }}</h1>
-			<span class="lede">{{ $latest?->label() }} · {{ trans_choice(':count regel|:count regels', $latest?->lines() ?? 0, ['count' => $latest?->lines() ?? 0]) }} · {{ $latest?->createdAt?->translatedFormat('j F') }} · {{ trans_choice(':count project volgt :library|:count projecten volgen :library', count($library->followers), ['count' => count($library->followers), 'library' => $library->name]) }}</span>
+			<span class="lede">{{ $latest?->label() }} · {{ trans_choice(':count regel|:count regels', $latest?->lines() ?? 0, ['count' => $latest?->lines() ?? 0]) }} · {{ $latest?->createdAt?->toDisplayZone()->translatedFormat('j F') }} · {{ trans_choice(':count project volgt :library|:count projecten volgen :library', count($library->followers), ['count' => count($library->followers), 'library' => $library->name]) }}</span>
 		</div>
 		<button class="btn" type="button" wire:click="openLibraryItem({{ $library->id }}, '{{ $item->name }}')">{{ __('Inhoud en geschiedenis') }}</button>
 	</div>
@@ -19,7 +19,7 @@
 					@foreach ($behind as $standing)
 						<div class="row" wire:key="behind-{{ $standing->project }}">
 							<label class="tick cell"><input type="checkbox" @checked(in_array($standing->project, $pickedProjects, true)) wire:click="togglePicked('{{ $standing->project }}')"><span class="mark"></span></label>
-							<span class="title grow"><b>{{ $standing->project }}</b><small>{{ __('op :version van :date', ['version' => $standing->onVersion?->label(), 'date' => $standing->onVersion?->createdAt?->translatedFormat('j F')]) }} · {{ trans_choice(':count regel|:count regels', $standing->lines ?? 0, ['count' => $standing->lines ?? 0]) }}</small></span>
+							<span class="title grow"><b>{{ $standing->project }}</b><small>{{ __('op :version van :date', ['version' => $standing->onVersion?->label(), 'date' => $standing->onVersion?->createdAt?->toDisplayZone()->translatedFormat('j F')]) }} · {{ trans_choice(':count regel|:count regels', $standing->lines ?? 0, ['count' => $standing->lines ?? 0]) }}</small></span>
 							<button class="btn xs" type="button" wire:click="openFavorite('{{ $standing->project }}', '{{ $standing->path }}')">{{ __('Vergelijken') }}</button>
 						</div>
 					@endforeach

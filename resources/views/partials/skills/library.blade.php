@@ -23,7 +23,7 @@
 				<div class="list">
 					@foreach ($library->skills() as $itemEntity)
 						<button class="frow" type="button" wire:click="openLibraryItem({{ $library->id }}, '{{ $itemEntity->name }}')" wire:key="lsk-{{ $itemEntity->id }}">
-							<span class="fname"><span class="mono">{{ $itemEntity->name }}</span><small>{{ $itemEntity->latest()?->label() }} · {{ $itemEntity->latest()?->createdAt?->translatedFormat('j M') }}</small></span>
+							<span class="fname"><span class="mono">{{ $itemEntity->name }}</span><small>{{ $itemEntity->latest()?->label() }} · {{ $itemEntity->latest()?->createdAt?->toDisplayZone()->translatedFormat('j M') }}</small></span>
 							<span></span>
 							<span class="lines">{{ count($itemEntity->versions) }}</span>
 							<x-icon name="chev" small/>

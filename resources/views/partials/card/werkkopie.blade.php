@@ -201,7 +201,7 @@
 					<div class="kv">
 						<span class="k">{{ __('Map') }}</span>
 						<span class="v"><span class="grow">{{ $worktree->path }}</span><button class="btn xs" type="button" wire:click="openInClaude">{{ __('Openen') }}</button></span>
-						<span class="hint">{{ __('Gemaakt op :date.', ['date' => $worktree->createdAt?->translatedFormat('j F')]) }}@if ($worktree->site) · <a href="{{ $worktree->url() }}" target="_blank" rel="noopener">{{ $worktree->site }}</a>@endif</span>
+						<span class="hint">{{ __('Gemaakt op :date.', ['date' => $worktree->createdAt?->toDisplayZone()->translatedFormat('j F')]) }}@if ($worktree->site) · <a href="{{ $worktree->url() }}" target="_blank" rel="noopener">{{ $worktree->site }}</a>@endif</span>
 					</div>
 
 					@if ($database)

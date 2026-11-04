@@ -1099,7 +1099,7 @@ class Drawer extends Component
 			'changesRequestedBy' => $cardObject->pullRequests->first(
 				fn (PullRequestEntity $pullRequestEntity) => $pullRequestEntity->hasChangesRequested(),
 			)?->changesRequestedBy,
-			'fetchedAt' => GetLatestFetchRunAction::execute()?->finishedAt?->format('H:i'),
+			'fetchedAt' => GetLatestFetchRunAction::execute()?->finishedAt?->toDisplayZone()->format('H:i'),
 			'report' => $promptRunEntity?->output === null
 				? null
 				: resolve(RenderMarkdown::class)->toHtml($promptRunEntity->output),
