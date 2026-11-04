@@ -13,7 +13,7 @@ use Src\Review\Objects\LensEntity;
  * line that sends it there. The assignment is a file rather than a prompt, so
  * it can be read back afterwards exactly as the lens got it.
  *
- * @method static string execute(string $worktreePath, LensEntity $lensEntity, array $files, ?string $previousReport)
+ * @method static string execute(string $worktreePath, LensEntity $lensEntity, array $files, ?string $previousReport, array $rules = [], ?string $base = null, array $newFiles = [])
  */
 class WriteLensContextAction extends Command
 {
@@ -26,6 +26,8 @@ class WriteLensContextAction extends Command
 		public readonly array $files,
 		public readonly ?string $previousReport = null,
 		public readonly array $rules = [],
+		public readonly ?string $base = null,
+		public readonly array $newFiles = [],
 	) {}
 
 	public function handle(AgentContextRepositoryContract $agentContextRepository): string
@@ -33,7 +35,7 @@ class WriteLensContextAction extends Command
 		$agentContextRepository->writeLensContext(
 			$this->worktreePath,
 			$this->lensEntity->name,
-			ComposeLensContextAction::execute($this->lensEntity, $this->files, $this->previousReport, $this->rules),
+			ComposeLensContextAction::execute($this->lensEntity, $this->files, $this->previousReport, $this->rules, $this->base, $this->newFiles),
 		);
 
 		return self::assignmentFor($agentContextRepository->lensPath($this->lensEntity->name));

@@ -101,6 +101,7 @@ class RunLensAction extends Command implements ShouldQueue
 		}
 
 		$reviewRoundRepository->markResultRunning($this->reviewRoundId, $this->lensId, null);
+		$touched = $lensEntity->touches($worktreeRepository->getChangedFiles($directory));
 
 		try {
 			$answer = $claudeProcessRepository->watch(
@@ -109,9 +110,11 @@ class RunLensAction extends Command implements ShouldQueue
 				WriteLensContextAction::execute(
 					$directory,
 					$lensEntity,
-					$lensEntity->touches($worktreeRepository->getChangedFiles($directory)),
+					$touched,
 					$this->earlierFindings($reviewRoundEntity->card),
 					$project === null ? [] : $this->rulesFor($project, $lensEntity),
+					$worktreeRepository->getBranchBase($directory),
+					array_values(array_intersect($touched, $worktreeRepository->getUntrackedFiles($directory))),
 				),
 				$this->logPath($lensEntity),
 				fn (array $event) => $this->note($reviewRoundRepository, $event),

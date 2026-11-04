@@ -222,6 +222,19 @@ interface WorktreeRepositoryContract
 	public function getRebasingBranch(string $path): ?string;
 
 	/**
+	 * The commit where the own work of the branch in a working copy begins; what
+	 * the whole pull request is measured from.
+	 */
+	public function getBranchBase(string $path): ?string;
+
+	/**
+	 * The files in a working copy git does not know yet, DevDock's own left out.
+	 *
+	 * @return list<string>
+	 */
+	public function getUntrackedFiles(string $path): array;
+
+	/**
 	 * The files that are still unmerged in a working copy.
 	 *
 	 * @return list<string>

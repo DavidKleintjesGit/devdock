@@ -1584,5 +1584,8 @@
     "Aftakking van :ticket": "Variant of :ticket",
     "aftakking": "variant",
     "Werk eerst :branch bij: die loopt :count commit achter op :target. Daarna kan deze branch erop.|Werk eerst :branch bij: die loopt :count commits achter op :target. Daarna kan deze branch erop.": "Bring :branch level first: it is :count commit behind :target. After that this branch can go on top.|Bring :branch level first: it is :count commits behind :target. After that this branch can go on top.",
-    "Open de kaart van :branch": "Open the card of :branch"
+    "Open de kaart van :branch": "Open the card of :branch",
+    "Bekijk de wijziging met precies dit commando: git diff :base -- <bestand>. Zonder HEAD erachter, want het werk dat nog niet gecommit is hoort erbij: de agent commit nooit, dus zijn laatste werk staat alleen in de bestanden zelf. Kijk niet alleen naar commits (git diff ...HEAD, git log of git show), dan zie je wat de agent net deed niet.": "Read the change with exactly this command: git diff :base -- <file>. Without HEAD after it, because the work that is not committed belongs to it: the agent never commits, so its latest work stands only in the files themselves. Do not look at commits alone (git diff ...HEAD, git log or git show), or you miss what the agent just did.",
+    "Nieuw en nog niet bij git bekend, dus niet in git diff; lees ze in zijn geheel:": "New and not known to git yet, so not in git diff; read them in full:",
+    "<begin van de branch>": "<start of the branch>"
 }

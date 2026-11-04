@@ -999,6 +999,21 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		return null;
 	}
 
+	public function getBranchBase(string $path): ?string
+	{
+		return is_dir($path) ? $this->branchBase($path) : null;
+	}
+
+	public function getUntrackedFiles(string $path): array
+	{
+		return is_dir($path)
+			? array_values(array_filter(
+				$this->lines($path, ['git', 'ls-files', '--others', '--exclude-standard']),
+				fn (string $file): bool => $file !== self::PROJECT_NAME_FILE,
+			))
+			: [];
+	}
+
 	public function getConflictedFiles(string $path): array
 	{
 		return is_dir($path) ? $this->conflictedFilesIn($path) : [];

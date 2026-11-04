@@ -21,12 +21,15 @@ class ComposeLensContextAction extends Command
 {
 	/**
 	 * @param  array<int, string>  $files
+	 * @param  array<int, string>  $newFiles  the touched files git does not know yet
 	 */
 	public function __construct(
 		public readonly LensEntity $lensEntity,
 		public readonly array $files,
 		public readonly ?string $previousReport = null,
 		public readonly array $rules = [],
+		public readonly ?string $base = null,
+		public readonly array $newFiles = [],
 	) {}
 
 	public function handle(): string
@@ -48,6 +51,20 @@ class ComposeLensContextAction extends Command
 
 		foreach ($this->files as $file) {
 			$lines[] = '- ' . $file;
+		}
+
+		// the agent never commits, so its latest work stands only in the working files
+		if ($this->base !== null) {
+			$lines[] = '';
+			$lines[] = __('Bekijk de wijziging met precies dit commando: git diff :base -- <bestand>. Zonder HEAD erachter, want het werk dat nog niet gecommit is hoort erbij: de agent commit nooit, dus zijn laatste werk staat alleen in de bestanden zelf. Kijk niet alleen naar commits (git diff ...HEAD, git log of git show), dan zie je wat de agent net deed niet.', ['base' => $this->base]);
+		}
+
+		if ($this->newFiles !== []) {
+			$lines[] = __('Nieuw en nog niet bij git bekend, dus niet in git diff; lees ze in zijn geheel:');
+
+			foreach ($this->newFiles as $newFile) {
+				$lines[] = '- ' . $newFile;
+			}
 		}
 
 		return implode("\n", $lines) . "\n";
