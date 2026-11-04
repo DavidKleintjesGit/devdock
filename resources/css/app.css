@@ -634,15 +634,20 @@ button.filerow:hover{background:var(--surface-2)}
 .md .code{margin:0 0 10px;padding:12px 14px;border-radius:10px;background:var(--sunken);font-family:var(--mono);font-size:12px;white-space:pre;overflow-x:auto}
 .diff{border:1px solid var(--line);border-radius:10px;overflow-x:auto;background:var(--surface);font-family:var(--mono);font-size:12px;line-height:1.7}
 .diff .hunk{padding:4px 12px;background:var(--sunken);color:var(--muted)}
-/* lange regels lopen door op de volgende regel, zodat de regelnummers in beeld blijven */
-.diff .dl{display:grid;grid-template-columns:44px 44px 18px minmax(0,1fr);white-space:pre-wrap;overflow-wrap:anywhere}
+/* een regel staat zoals hij in het bestand staat: lange regels scrollen opzij, de regelnummers blijven staan */
+.diff-rows{min-width:100%;width:max-content}
+.diff .dl{display:grid;grid-template-columns:44px 44px 18px minmax(0,1fr);white-space:pre}
+.diff .dl .no,.diff .dl .sign{position:sticky;z-index:1;background:var(--surface)}
+.diff .dl .no:first-child{left:0}
+.diff .dl .no+.no{left:44px}
+.diff .dl .sign{left:88px}
 .diff .dl .no{padding-right:8px;text-align:right;color:var(--muted);user-select:none}
 .diff .dl .sign{color:var(--muted);user-select:none}
 .diff .dl .code{color:var(--fg)}
 .diff .add{background:var(--diff-add-row)}
-.diff .add .no,.diff .add .sign{background:var(--diff-add-gutter);color:var(--fg-2)}
+.diff .add .no,.diff .add .sign{background:linear-gradient(var(--diff-add-gutter),var(--diff-add-gutter)) var(--surface);color:var(--fg-2)}
 .diff .del{background:var(--diff-del-row)}
-.diff .del .no,.diff .del .sign{background:var(--diff-del-gutter);color:var(--fg-2)}
+.diff .del .no,.diff .del .sign{background:linear-gradient(var(--diff-del-gutter),var(--diff-del-gutter)) var(--surface);color:var(--fg-2)}
 .diff .ctx .code{color:var(--fg)}
 .diff .hljs-keyword,.diff .hljs-built_in,.diff .hljs-literal,.diff .hljs-selector-tag{color:var(--syn-keyword)}
 .diff .hljs-string,.diff .hljs-regexp,.diff .hljs-template-variable{color:var(--syn-string)}

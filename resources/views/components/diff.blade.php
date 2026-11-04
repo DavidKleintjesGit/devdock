@@ -1,6 +1,7 @@
 @props(['hunks', 'empty' => null, 'file' => null, 'expandable' => false])
 
 <div class="diff" @if ($file) data-highlight="{{ $file }}" @endif>
+	<div class="diff-rows">
 	@forelse ($hunks as $hunk)
 		@if ($expandable && $hunk->hiddenBefore > 0)
 			<button class="hunk expand" type="button" wire:click="expand($event.shiftKey)" title="{{ __('Shift + klik toont het hele bestand') }}">
@@ -20,4 +21,5 @@
 	@empty
 		<div class="hunk">{{ $empty ?? __('Geen verschil.') }}</div>
 	@endforelse
+	</div>
 </div>
