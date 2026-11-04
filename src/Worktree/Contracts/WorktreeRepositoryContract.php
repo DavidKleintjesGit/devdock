@@ -209,6 +209,12 @@ interface WorktreeRepositoryContract
 	public function setUpstream(string $path, ?string $upstream): bool;
 
 	/**
+	 * Names the branch a branch merges into, so every comparison is made against
+	 * it; null or the main line takes the mark away. Returns whether it changed.
+	 */
+	public function setTargetBranch(string $repositoryPath, string $branch, ?string $target): bool;
+
+	/**
 	 * Throws the standing state of a working copy away, for when something
 	 * outside this repository changed what is in it. The next look reads it
 	 * from git again.

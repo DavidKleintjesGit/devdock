@@ -45,6 +45,11 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	private const REBASE_FILE = '.devdock/rebase.json';
 
 	/**
+	 * The key under a branch in git's config that names the branch its pull request merges into.
+	 */
+	private const TARGET_KEY = 'devdock-target';
+
+	/**
 	 * How long what the fetch round read ahead stays. A copy that moves is
 	 * read again in the next round, so this only bounds a copy left alone.
 	 */
@@ -227,7 +232,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function isMerged(string $repositoryPath, string $branch): bool
 	{
-		return LocalCommand::run($repositoryPath, ['git', 'merge-base', '--is-ancestor', 'refs/heads/' . $branch, 'origin/' . $this->mainBranch($repositoryPath)])
+		return LocalCommand::run($repositoryPath, ['git', 'merge-base', '--is-ancestor', 'refs/heads/' . $branch, 'origin/' . $this->targetOf($repositoryPath, $branch)])
 			->successful();
 	}
 
@@ -323,7 +328,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 */
 	private function branchBase(string $path): ?string
 	{
-		$result = LocalCommand::run($path, ['git', 'merge-base', 'origin/' . $this->mainBranch($path), 'HEAD']);
+		$result = LocalCommand::run($path, ['git', 'merge-base', 'origin/' . $this->targetBranch($path), 'HEAD']);
 
 		return $result->successful() ? (trim($result->output()) ?: null) : null;
 	}
@@ -422,8 +427,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 				DiffViewEnum::UNCOMMITTED => 'HEAD',
 				// everything origin does not have yet, committed or not
 				DiffViewEnum::UNPUSHED => $this->pushedBase($path) ?? 'HEAD',
-				// against the main line: what this branch did to the file, committed or not
-				DiffViewEnum::BRANCH => $this->branchBase($path) ?? 'origin/' . $this->mainBranch($path),
+				// against the branch it merges into: what this branch did to the file, committed or not
+				DiffViewEnum::BRANCH => $this->branchBase($path) ?? 'origin/' . $this->targetBranch($path),
 			},
 		);
 	}
@@ -455,7 +460,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 		return $this->lines($path, [
 			'git', 'rev-list', '--reverse', '--no-merges', '--right-only', '--cherry-pick',
-			$upstream . '...HEAD', '^origin/' . $this->mainBranch($path),
+			$upstream . '...HEAD', '^origin/' . $this->targetBranch($path),
 		]);
 	}
 
@@ -561,11 +566,9 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		return $this->remember(
 			'worktree.fingerprint.' . md5($path),
 			function () use ($path) {
-				$main = $this->mainBranch($path);
-
-				// against the main line, so a commit of the judged work does not
+				// against the branch it merges into, so a commit of the judged work does not
 				// count as a change; files git never saw are taken in by content
-				$diff = LocalCommand::run($path, ['git', 'diff', 'origin/' . $main]);
+				$diff = LocalCommand::run($path, ['git', 'diff', 'origin/' . $this->targetBranch($path)]);
 				$untracked = LocalCommand::run($path, ['git', 'ls-files', '--others', '--exclude-standard']);
 
 				$parts = [$diff->output()];
@@ -613,9 +616,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 */
 	private function readChangedFiles(string $path): array
 	{
-		$main = $this->mainBranch($path);
-
-		$committed = LocalCommand::run($path, ['git', 'diff', '--name-only', 'origin/' . $main . '...HEAD']);
+		$committed = LocalCommand::run($path, ['git', 'diff', '--name-only', 'origin/' . $this->targetBranch($path) . '...HEAD']);
 
 		$standing = LocalCommand::run($path, ['git', 'status', '--porcelain=v1']);
 
@@ -695,7 +696,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			? $branch
 			: (string) preg_replace('#^origin/#', '', $status['upstream']);
 
-		if (in_array($target, [$status['main_branch'], 'master', 'main'], true)) {
+		if (in_array($target, [$this->mainBranch($path), 'master', 'main'], true)) {
 			return false;
 		}
 
@@ -719,9 +720,9 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function rebase(string $path): ?string
 	{
-		$main = $this->mainBranch($path);
+		$target = $this->targetBranch($path);
 
-		$fetched = Process::path($path)->timeout(self::TIMEOUT)->run(['git', 'fetch', 'origin', $main]);
+		$fetched = Process::path($path)->timeout(self::TIMEOUT)->run(['git', 'fetch', 'origin', $target]);
 
 		if (! $fetched->successful()) {
 			return trim($fetched->errorOutput()) ?: __('Ophalen van origin lukte niet.');
@@ -730,7 +731,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		$before = LocalCommand::run($path, ['git', 'rev-parse', 'HEAD']);
 
 		// what is not committed yet is put aside for the rebase and laid back after it
-		$rebased = Process::path($path)->timeout(self::TIMEOUT)->run(['git', 'rebase', '--autostash', 'origin/' . $main]);
+		$rebased = Process::path($path)->timeout(self::TIMEOUT)->run(['git', 'rebase', '--autostash', 'origin/' . $target]);
 
 		$this->forgetStatus($path);
 
@@ -738,7 +739,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			// a conflict is left for no one: the branch goes back as it was
 			Process::path($path)->run(['git', 'rebase', '--abort']);
 
-			return __('Rebasen stuit op conflicten met :main. Er is niets veranderd; laat de agent het oplossen of doe het zelf in Claude Code.', ['main' => $main]);
+			return __('Rebasen stuit op conflicten met :main. Er is niets veranderd; laat de agent het oplossen of doe het zelf in Claude Code.', ['main' => $target]);
 		}
 
 		if ($before->successful()) {
@@ -1063,6 +1064,49 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		});
 	}
 
+	public function setTargetBranch(string $repositoryPath, string $branch, ?string $target): bool
+	{
+		$key = 'branch.' . $branch . '.' . self::TARGET_KEY;
+		// the main line is where a branch goes without a mark, so it is never written down
+		$wanted = $target === null || $target === $this->mainBranch($repositoryPath) ? null : $target;
+		$current = LocalCommand::run($repositoryPath, ['git', 'config', '--get', $key]);
+
+		if (($current->successful() ? trim($current->output()) : null) === $wanted) {
+			return false;
+		}
+
+		if ($wanted === null) {
+			return LocalCommand::run($repositoryPath, ['git', 'config', '--unset', $key])->successful();
+		}
+
+		LocalCommand::run($repositoryPath, ['git', 'config', $key, $wanted]);
+		// the comparisons read origin/<target>, which a repository that never fetched it lacks
+		Process::path($repositoryPath)->timeout(self::TIMEOUT)->run(['git', 'fetch', '--quiet', 'origin', $wanted]);
+
+		return true;
+	}
+
+	/**
+	 * The branch the work of a working copy merges into.
+	 */
+	private function targetBranch(string $path): string
+	{
+		// a copy that is gone has no branch to ask git about
+		$branch = is_dir($path) ? $this->getBranch($path) : null;
+
+		return $branch === null ? $this->mainBranch($path) : $this->targetOf($path, $branch);
+	}
+
+	/**
+	 * The branch a branch merges into: the target of its pull request, or the main line.
+	 */
+	private function targetOf(string $repositoryPath, string $branch): string
+	{
+		$result = LocalCommand::run($repositoryPath, ['git', 'config', '--get', 'branch.' . $branch . '.' . self::TARGET_KEY]);
+
+		return $result->successful() && trim($result->output()) !== '' ? trim($result->output()) : $this->mainBranch($repositoryPath);
+	}
+
 	/**
 	 * The checkout a working copy belongs to. Removing it has to be done from
 	 * there, not from inside the folder that is about to disappear.
@@ -1145,6 +1189,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			behind: $status['behind'],
 			upstream: $status['upstream'],
 			mainBranch: $status['main_branch'],
+			targetBranch: $status['target_branch'],
 			lastCommitAt: $status['last_commit_at'] === null ? null : CarbonImmutable::parse($status['last_commit_at']),
 			dependenciesMissing: is_dir($borrowedFrom . '/vendor') && ! is_dir($path . '/vendor'),
 			hasCommits: $status['has_commits'],
@@ -1153,7 +1198,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	}
 
 	/**
-	 * @return array{changed_files: int, ahead: int, only_on_upstream: int, behind: int, has_commits: bool, upstream: ?string, main_branch: string, last_commit_at: ?string}
+	 * @return array{changed_files: int, ahead: int, only_on_upstream: int, behind: int, has_commits: bool, upstream: ?string, main_branch: string, target_branch: string, last_commit_at: ?string}
 	 */
 	private function statusOf(string $path): array
 	{
@@ -1206,14 +1251,14 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	/**
 	 * Everything that changes what the readers would find: where HEAD and the
-	 * main line on origin stand, which files differ, and when those last
+	 * branch it merges into stand on origin, which files differ, and when those last
 	 * changed on disk, since a file that was already changed shows the same
 	 * status line after the next edit.
 	 */
 	private function readAheadSignature(string $path): string
 	{
 		$status = LocalCommand::run($path, ['git', 'status', '--porcelain=v2', '--branch', '--untracked-files=all']);
-		$main = LocalCommand::run($path, ['git', 'rev-parse', '--verify', '--quiet', 'origin/' . $this->mainBranch($path)]);
+		$target = LocalCommand::run($path, ['git', 'rev-parse', '--verify', '--quiet', 'origin/' . $this->targetBranch($path)]);
 		$modifiedAt = [];
 
 		foreach (preg_split('/\R/', $status->output()) ?: [] as $line) {
@@ -1224,7 +1269,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			}
 		}
 
-		return md5($status->output() . $main->output() . implode(',', $modifiedAt));
+		return md5($status->output() . $target->output() . implode(',', $modifiedAt));
 	}
 
 	private function readAheadKey(string $path): string
@@ -1289,7 +1334,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	}
 
 	/**
-	 * @return array{changed_files: int, ahead: int, only_on_upstream: int, behind: int, has_commits: bool, upstream: ?string, main_branch: string, last_commit_at: ?string}
+	 * @return array{changed_files: int, ahead: int, only_on_upstream: int, behind: int, has_commits: bool, upstream: ?string, main_branch: string, target_branch: string, last_commit_at: ?string}
 	 */
 	private function emptyStatus(): array
 	{
@@ -1301,22 +1346,23 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			'has_commits' => false,
 			'upstream' => null,
 			'main_branch' => 'master',
+			'target_branch' => 'master',
 			'last_commit_at' => null,
 		];
 	}
 
 	/**
-	 * @return array{changed_files: int, ahead: int, only_on_upstream: int, behind: int, has_commits: bool, upstream: ?string, main_branch: string, last_commit_at: ?string}
+	 * @return array{changed_files: int, ahead: int, only_on_upstream: int, behind: int, has_commits: bool, upstream: ?string, main_branch: string, target_branch: string, last_commit_at: ?string}
 	 */
 	private function readStatus(string $path): array
 	{
-		$main = $this->mainBranch($path);
+		$target = $this->targetBranch($path);
 
 		return $this->parseStatus(
 			$path,
-			$main,
+			$target,
 			LocalCommand::run($path, $this->statusCommand()),
-			LocalCommand::run($path, $this->sidesCommand($main)),
+			LocalCommand::run($path, $this->sidesCommand($target)),
 		);
 	}
 
@@ -1339,12 +1385,12 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return;
 		}
 
-		$mains = array_map(fn (string $path) => $this->mainBranch($path), $cold);
+		$targets = array_map(fn (string $path) => $this->targetBranch($path), $cold);
 
-		$results = Process::pool(function (Pool $pool) use ($cold, $mains): void {
+		$results = Process::pool(function (Pool $pool) use ($cold, $targets): void {
 			foreach ($cold as $index => $path) {
 				$pool->as('status-' . $index)->path($path)->command($this->statusCommand());
-				$pool->as('sides-' . $index)->path($path)->command($this->sidesCommand($mains[$index]));
+				$pool->as('sides-' . $index)->path($path)->command($this->sidesCommand($targets[$index]));
 				$pool->as('unpushed-' . $index)->path($path)->command(['git', 'log', '--format=%h%x09%cI%x09%s', 'HEAD', '--not', '--remotes']);
 			}
 		})->start()->wait();
@@ -1355,7 +1401,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 			Cache::put(
 				$this->statusKey($path),
-				$this->parseStatus($path, $mains[$index], $results['status-' . $index], $results['sides-' . $index]),
+				$this->parseStatus($path, $targets[$index], $results['status-' . $index], $results['sides-' . $index]),
 				$seconds,
 			);
 			Cache::put($this->unpushedKey($path), $unpushed->successful() ? trim($unpushed->output()) : '', $seconds);
@@ -1371,20 +1417,20 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	}
 
 	/**
-	 * One call for both sides against the main line: what came in there, and
-	 * what this branch has that the main line does not.
+	 * One call for both sides against the branch this one merges into: what
+	 * came in there, and what this branch has that it does not.
 	 *
 	 * @return list<string>
 	 */
-	private function sidesCommand(string $main): array
+	private function sidesCommand(string $target): array
 	{
-		return ['git', 'rev-list', '--left-right', '--count', 'origin/' . $main . '...HEAD'];
+		return ['git', 'rev-list', '--left-right', '--count', 'origin/' . $target . '...HEAD'];
 	}
 
 	/**
-	 * @return array{changed_files: int, ahead: int, only_on_upstream: int, behind: int, has_commits: bool, upstream: ?string, main_branch: string, last_commit_at: ?string}
+	 * @return array{changed_files: int, ahead: int, only_on_upstream: int, behind: int, has_commits: bool, upstream: ?string, main_branch: string, target_branch: string, last_commit_at: ?string}
 	 */
-	private function parseStatus(string $path, string $main, ProcessResult $result, ProcessResult $sides): array
+	private function parseStatus(string $path, string $target, ProcessResult $result, ProcessResult $sides): array
 	{
 		if (! $result->successful()) {
 			return $this->emptyStatus();
@@ -1438,7 +1484,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			'behind' => $sides->successful() ? $behind : 0,
 			'has_commits' => $sides->successful() && $aheadOfMain > 0,
 			'upstream' => $upstream,
-			'main_branch' => $main,
+			'main_branch' => $this->mainBranch($path),
+			'target_branch' => $target,
 			'last_commit_at' => $lastCommit === '' ? null : $lastCommit,
 		];
 	}

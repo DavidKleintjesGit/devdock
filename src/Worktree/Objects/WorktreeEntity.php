@@ -31,6 +31,8 @@ class WorktreeEntity extends ValueObject
 		public readonly int $behind,
 		public readonly ?string $upstream,
 		public readonly string $mainBranch,
+		// the branch the pull request merges into, or the main line
+		public readonly string $targetBranch,
 		public readonly ?CarbonImmutable $lastCommitAt,
 		public readonly bool $dependenciesMissing,
 		public readonly bool $hasCommits,

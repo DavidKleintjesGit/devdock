@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
 use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
+use Src\Worktree\Exceptions\NotAWorkingCopyException;
 use Src\Worktree\Objects\SiteName;
 
 class WorkingCopyRepository implements WorkingCopyRepositoryContract
@@ -22,6 +23,7 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 
 	public function prepare(string $repositoryPath, string $path, SiteName $siteName): ?string
 	{
+		$this->ensureWorkingCopy($path);
 		$this->exclude($repositoryPath);
 		$this->trust($repositoryPath);
 		$this->borrow($repositoryPath, $path);
@@ -38,6 +40,8 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 
 	public function release(string $path, ?string $site): void
 	{
+		$this->ensureWorkingCopy($path);
+
 		foreach (array_keys((array) config('devdock.worktree.share')) as $folder) {
 			$this->returnBorrowed($path, $folder);
 		}
@@ -53,7 +57,20 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 
 	public function returnBorrowed(string $path, string $folder): void
 	{
+		$this->ensureWorkingCopy($path);
 		$this->removeWithoutFollowingLinks($path . '/' . $folder);
+	}
+
+	/**
+	 * Refuses the checkout of a project itself: there .git is a folder, where
+	 * a working copy has a file pointing at it. Lending and taking back folders
+	 * there would replace or remove the project's own vendor and node_modules.
+	 */
+	private function ensureWorkingCopy(string $path): void
+	{
+		if (is_dir($path . '/.git')) {
+			throw NotAWorkingCopyException::at($path);
+		}
 	}
 
 	/**

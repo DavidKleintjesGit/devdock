@@ -44,6 +44,7 @@ class CardObject extends ValueObject
 		public readonly bool $isStale,
 		public readonly int $behind,
 		public readonly ?string $mainBranch,
+		public readonly ?string $targetBranch,
 		public readonly bool $hasWaitingWork,
 		public readonly ?string $activePullRequest,
 		public readonly ?TaskAgentEntity $agent,

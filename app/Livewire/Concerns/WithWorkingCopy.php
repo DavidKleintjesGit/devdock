@@ -77,7 +77,7 @@ trait WithWorkingCopy
 		$failure = RebaseWorktreeAction::execute($worktreeEntity->path);
 
 		$this->failure = $failure;
-		$this->committed = $failure === null ? __('Gerebased op :main.', ['main' => $worktreeEntity->mainBranch]) : null;
+		$this->committed = $failure === null ? __('Gerebased op :main.', ['main' => $worktreeEntity->targetBranch]) : null;
 
 		$projectPath = GetProjectsAction::execute()
 			->first(fn (ProjectEntity $projectEntity) => $projectEntity->name === $worktreeEntity->project)
@@ -120,7 +120,7 @@ trait WithWorkingCopy
 		}
 
 		$this->prompt = __('Rebase deze branch op origin/:main en los de conflicten op in :files. Draai daarna de tests van wat je aanraakte. Push niet, zeg wanneer het klaar is.', [
-			'main' => $cardObject->mainBranch ?? 'master',
+			'main' => $cardObject->targetBranch ?? 'master',
 			'files' => implode(', ', $cardObject->conflictedFiles),
 		]);
 

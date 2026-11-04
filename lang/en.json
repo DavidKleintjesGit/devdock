@@ -1536,5 +1536,6 @@
     "sinds ronde :number": "since round :number",
     "in ronde :number, gezien door de lens": "in round :number, seen by the lens",
     "door jou": "by you",
-    "reden": "reason"
+    "reden": "reason",
+    ":path is de checkout van een project zelf, geen werkkopie. DevDock raakt daar niets aan.": ":path is the checkout of a project itself, not a working copy. DevDock leaves it alone."
 }

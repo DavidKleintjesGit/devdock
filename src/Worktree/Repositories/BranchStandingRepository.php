@@ -27,6 +27,12 @@ class BranchStandingRepository implements BranchStandingRepositoryContract
 	 */
 	private const AT_ONCE = 6;
 
+	/**
+	 * The key under a branch in git's config that names the branch its pull
+	 * request merges into; WorktreeRepository writes it.
+	 */
+	private const TARGET_KEY = 'devdock-target';
+
 	public function getFor(string $repositoryPath, string $branch): BranchStandingObject
 	{
 		$this->warm($repositoryPath, [$branch]);
@@ -56,59 +62,63 @@ class BranchStandingRepository implements BranchStandingRepositoryContract
 			return;
 		}
 
-		$mainBranch = $this->mainBranch($repositoryPath);
+		$targets = $this->targetsOf($repositoryPath, $cold);
 		$shas = $this->shasIn($repositoryPath);
-		$mainSha = $shas['refs/remotes/origin/' . $mainBranch] ?? null;
 		$seconds = $keepSeconds ?? (int) config('devdock.worktree.status_seconds');
 
 		// the local branch holds what a working copy committed; origin is the fallback
 		$branchShas = [];
+		$targetShas = [];
 
 		foreach ($cold as $branch) {
 			$branchShas[$branch] = $shas['refs/heads/' . $branch] ?? $shas['refs/remotes/origin/' . $branch] ?? null;
+			$targetShas[$branch] = $shas['refs/remotes/origin/' . $targets[$branch]] ?? null;
 		}
 
-		// the same two commits always give the same answer, so only a moved branch or main line is read again
-		$unread = $mainSha === null ? [] : array_values(array_unique(array_filter(
-			$branchShas,
-			fn (?string $sha) => $sha !== null && ! Cache::has($this->resultKey($mainSha, $sha)),
-		)));
+		// the same two commits always give the same answer, so only a moved branch or target is read again
+		$unread = [];
 
-		foreach (array_chunk($unread, self::AT_ONCE) as $chunk) {
-			$this->read($repositoryPath, $mainSha, $chunk);
+		foreach ($cold as $branch) {
+			if ($branchShas[$branch] !== null && $targetShas[$branch] !== null && ! Cache::has($this->resultKey($targetShas[$branch], $branchShas[$branch]))) {
+				$unread[$targetShas[$branch] . '|' . $branchShas[$branch]] = ['target' => $targetShas[$branch], 'branch' => $branchShas[$branch]];
+			}
+		}
+
+		foreach (array_chunk(array_values($unread), self::AT_ONCE) as $chunk) {
+			$this->read($repositoryPath, $chunk);
 		}
 
 		foreach ($cold as $branch) {
-			$result = $mainSha === null || $branchShas[$branch] === null
+			$result = $targetShas[$branch] === null || $branchShas[$branch] === null
 				? ['behind' => 0, 'conflicted_files' => []]
-				: (array) Cache::get($this->resultKey($mainSha, $branchShas[$branch]), ['behind' => 0, 'conflicted_files' => []]);
+				: (array) Cache::get($this->resultKey($targetShas[$branch], $branchShas[$branch]), ['behind' => 0, 'conflicted_files' => []]);
 
-			Cache::put($this->key($repositoryPath, $branch), $result + ['main_branch' => $mainBranch], $seconds);
+			Cache::put($this->key($repositoryPath, $branch), $result + ['target_branch' => $targets[$branch]], $seconds);
 		}
 	}
 
 	/**
-	 * Reads a handful of branches against the main line side by side and keeps
-	 * the answer under the two commits it is about.
+	 * Reads a handful of branches against the branch each merges into, side by
+	 * side, and keeps the answer under the two commits it is about.
 	 *
-	 * @param  array<int, string>  $branchShas
+	 * @param  list<array{target: string, branch: string}>  $pairs
 	 */
-	private function read(string $repositoryPath, string $mainSha, array $branchShas): void
+	private function read(string $repositoryPath, array $pairs): void
 	{
-		$results = Process::pool(function (Pool $pool) use ($repositoryPath, $mainSha, $branchShas): void {
-			foreach ($branchShas as $index => $branchSha) {
-				$pool->as('behind-' . $index)->path($repositoryPath)->command(['git', 'rev-list', '--count', $branchSha . '..' . $mainSha]);
+		$results = Process::pool(function (Pool $pool) use ($repositoryPath, $pairs): void {
+			foreach ($pairs as $index => $pair) {
+				$pool->as('behind-' . $index)->path($repositoryPath)->command(['git', 'rev-list', '--count', $pair['branch'] . '..' . $pair['target']]);
 				// merges in memory only: nothing in the repository or a working copy changes
 				$pool->as('merge-' . $index)->path($repositoryPath)->timeout(60)
-					->command(['git', 'merge-tree', '--write-tree', '--name-only', '--no-messages', $mainSha, $branchSha]);
+					->command(['git', 'merge-tree', '--write-tree', '--name-only', '--no-messages', $pair['target'], $pair['branch']]);
 			}
 		})->start()->wait();
 
-		foreach ($branchShas as $index => $branchSha) {
+		foreach ($pairs as $index => $pair) {
 			$behind = $results['behind-' . $index];
 			$merged = $results['merge-' . $index];
 
-			Cache::put($this->resultKey($mainSha, $branchSha), [
+			Cache::put($this->resultKey($pair['target'], $pair['branch']), [
 				'behind' => $behind->successful() ? (int) trim($behind->output()) : 0,
 				// exit code 1 is a conflict: the first line is the tree, the rest the clashing files
 				'conflicted_files' => $merged->exitCode() === 1
@@ -121,7 +131,7 @@ class BranchStandingRepository implements BranchStandingRepositoryContract
 	public function refresh(int $keepSeconds): void
 	{
 		foreach ((array) Cache::get(self::KNOWN_KEY, []) as $repositoryPath => $branches) {
-			$this->fetchMain((string) $repositoryPath);
+			$this->fetchTargets((string) $repositoryPath, array_keys((array) $branches));
 			$this->warm((string) $repositoryPath, array_keys((array) $branches), $keepSeconds, again: true);
 		}
 	}
@@ -132,16 +142,47 @@ class BranchStandingRepository implements BranchStandingRepositoryContract
 	}
 
 	/**
-	 * Brings the main line of origin up to date, at most every few minutes:
-	 * how far behind a branch is means nothing against an old copy of it.
+	 * Brings the branches the given ones merge into up to date on origin, at
+	 * most every few minutes: how far behind a branch is means nothing against
+	 * an old copy of its target.
+	 *
+	 * @param  array<int, string>  $branches
 	 */
-	private function fetchMain(string $repositoryPath): void
+	private function fetchTargets(string $repositoryPath, array $branches): void
 	{
 		if (! is_dir($repositoryPath) || ! Cache::add('branch.standing.fetched.' . md5($repositoryPath), true, self::FETCH_SECONDS)) {
 			return;
 		}
 
-		Process::path($repositoryPath)->timeout(120)->run(['git', 'fetch', '--quiet', 'origin', $this->mainBranch($repositoryPath)]);
+		$targets = array_values(array_unique([$this->mainBranch($repositoryPath), ...array_values($this->targetsOf($repositoryPath, $branches))]));
+
+		Process::path($repositoryPath)->timeout(120)->run(['git', 'fetch', '--quiet', 'origin', ...$targets]);
+	}
+
+	/**
+	 * The branch each branch merges into: the target its pull request names,
+	 * kept in git's config under the branch, or the main line.
+	 *
+	 * @param  array<int, string>  $branches
+	 * @return array<string, string>
+	 */
+	private function targetsOf(string $repositoryPath, array $branches): array
+	{
+		$result = LocalCommand::run($repositoryPath, ['git', 'config', '--get-regexp', '^branch\..*\.' . self::TARGET_KEY . '$']);
+		$marked = [];
+
+		foreach (preg_split('/\R/', trim($result->output())) ?: [] as $line) {
+			// a line reads "branch.<name>.devdock-target <target>"; the name itself may hold dots
+			if (preg_match('/^branch\.(.+)\.' . preg_quote(self::TARGET_KEY, '/') . '\s+(\S+)$/', trim($line), $parts) === 1) {
+				$marked[$parts[1]] = $parts[2];
+			}
+		}
+
+		$mainBranch = $this->mainBranch($repositoryPath);
+
+		return collect($branches)
+			->mapWithKeys(fn (string $branch): array => [$branch => $marked[$branch] ?? $mainBranch])
+			->all();
 	}
 
 	/**

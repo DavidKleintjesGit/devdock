@@ -58,7 +58,7 @@
 					<div class="kv">
 						<div class="v">
 							<span class="sdot conflict"></span>
-							<span class="grow" style="font-family:inherit;display:flex;flex-direction:column;gap:2px"><b>{{ trans_choice('Conflict met :main in :count bestand|Conflict met :main in :count bestanden', count($card->conflictedFiles), ['main' => $worktree->mainBranch, 'count' => count($card->conflictedFiles)]) }}</b><span class="hint">{{ $card->pullRequests->isNotEmpty() ? __('Bitbucket kan de pull request zo niet mergen.') : __('Samenvoegen met :main botst nu.', ['main' => $worktree->mainBranch]) }}</span></span>
+							<span class="grow" style="font-family:inherit;display:flex;flex-direction:column;gap:2px"><b>{{ trans_choice('Conflict met :main in :count bestand|Conflict met :main in :count bestanden', count($card->conflictedFiles), ['main' => $worktree->targetBranch, 'count' => count($card->conflictedFiles)]) }}</b><span class="hint">{{ $card->pullRequests->isNotEmpty() ? __('Bitbucket kan de pull request zo niet mergen.') : __('Samenvoegen met :main botst nu.', ['main' => $worktree->targetBranch]) }}</span></span>
 							<x-busy-button action="resolveConflictsWithAgent" class="btn sm" :busy="__('Versturen...')">{{ __('Laat de agent oplossen') }}</x-busy-button>
 						</div>
 						<ul style="margin:0 0 0 21px;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px">
@@ -73,8 +73,8 @@
 					<div class="kv">
 						<div class="v">
 							<span class="sdot busy" style="animation:none"></span>
-							<span class="grow" style="font-family:inherit;display:flex;flex-direction:column;gap:2px"><b>{{ trans_choice(':count commit achter op :main|:count commits achter op :main', $worktree->behind, ['count' => $worktree->behind, 'main' => $worktree->mainBranch]) }}</b><span class="hint">{{ __('Tests kunnen hier slagen en op de pull request alsnog vallen.') }}</span></span>
-							<x-busy-button action="rebaseOnMain" class="btn sm" :busy="__('Rebasen...')">{{ __('Rebase op :main', ['main' => $worktree->mainBranch]) }}</x-busy-button>
+							<span class="grow" style="font-family:inherit;display:flex;flex-direction:column;gap:2px"><b>{{ trans_choice(':count commit achter op :main|:count commits achter op :main', $worktree->behind, ['count' => $worktree->behind, 'main' => $worktree->targetBranch]) }}</b><span class="hint">{{ __('Tests kunnen hier slagen en op de pull request alsnog vallen.') }}</span></span>
+							<x-busy-button action="rebaseOnMain" class="btn sm" :busy="__('Rebasen...')">{{ __('Rebase op :main', ['main' => $worktree->targetBranch]) }}</x-busy-button>
 						</div>
 					</div>
 				@endif
@@ -106,7 +106,7 @@
 				@endforeach
 
 				@if ($worktree->behind === 0 && $worktree->ahead === 0 && $outdatedRules === [] && $card->conflictedFiles === [])
-					<div class="kv"><div class="v"><span class="sdot quiet"></span><span class="grow" style="font-family:inherit">{{ __('Bij met :main, alles gepusht.', ['main' => $worktree->mainBranch]) }}</span></div></div>
+					<div class="kv"><div class="v"><span class="sdot quiet"></span><span class="grow" style="font-family:inherit">{{ __('Bij met :main, alles gepusht.', ['main' => $worktree->targetBranch]) }}</span></div></div>
 				@endif
 
 				@if ($lastRebase)
@@ -167,7 +167,7 @@
 					@endif
 				</div>
 			@else
-				<p class="hint" style="margin:0">{{ $copyView === \Src\Worktree\Enums\DiffViewEnum::UNCOMMITTED ? __('Alles wat hier stond is vastgelegd in een commit.') : ($copyView === \Src\Worktree\Enums\DiffViewEnum::UNPUSHED ? __('Alles staat op origin.') : __('Deze branch veranderde nog niets tegenover :main.', ['main' => $worktree->mainBranch])) }}</p>
+				<p class="hint" style="margin:0">{{ $copyView === \Src\Worktree\Enums\DiffViewEnum::UNCOMMITTED ? __('Alles wat hier stond is vastgelegd in een commit.') : ($copyView === \Src\Worktree\Enums\DiffViewEnum::UNPUSHED ? __('Alles staat op origin.') : __('Deze branch veranderde nog niets tegenover :main.', ['main' => $worktree->targetBranch])) }}</p>
 			@endif
 		</section>
 
@@ -234,12 +234,12 @@
 					<div class="kv">
 						<span class="k">{{ __('Upstream, hier gaat een push heen') }}</span>
 						<span class="v"><span class="grow">{{ $worktree->upstream ?? __('nog niets; de eerste push maakt origin/:branch aan', ['branch' => $worktree->branch]) }}</span><button class="btn xs" type="button" wire:click="startUpstream">{{ __('Wijzigen') }}</button></span>
-						<span class="hint">{{ __(':ahead voor, :behind achter op :main', ['ahead' => $worktree->ahead, 'behind' => $worktree->behind, 'main' => $worktree->mainBranch]) }}</span>
+						<span class="hint">{{ __(':ahead voor, :behind achter op :main', ['ahead' => $worktree->ahead, 'behind' => $worktree->behind, 'main' => $worktree->targetBranch]) }}</span>
 					</div>
 
 					<div class="kv">
 						<span class="k">{{ __('Gemaakt vanaf') }}</span>
-						<span class="v"><span class="grow">origin/{{ $worktree->mainBranch }}</span></span>
+						<span class="v"><span class="grow">origin/{{ $worktree->targetBranch }}</span></span>
 						@if ($worktree->behind > 0)<span class="hint">{{ __('Inmiddels :count commits achter. Rebasen staat bovenaan.', ['count' => $worktree->behind]) }}</span>@endif
 					</div>
 

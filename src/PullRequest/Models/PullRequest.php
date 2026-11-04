@@ -4,10 +4,17 @@ declare(strict_types=1);
 
 namespace Src\PullRequest\Models;
 
+use Database\Factories\PullRequestFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+#[UseFactory(PullRequestFactory::class)]
 class PullRequest extends Model
 {
+	/** @use HasFactory<PullRequestFactory> */
+	use HasFactory;
+
 	protected $fillable = [
 		'repository',
 		'number',

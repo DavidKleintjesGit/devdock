@@ -15,7 +15,7 @@ class BranchStandingObject extends ValueObject
 	public function __construct(
 		public readonly int $behind,
 		public readonly array $conflictedFiles,
-		public readonly string $mainBranch,
+		public readonly string $targetBranch,
 	) {
 		parent::__construct();
 	}
@@ -25,7 +25,7 @@ class BranchStandingObject extends ValueObject
 		return new self(
 			behind: (int) ($data['behind'] ?? 0),
 			conflictedFiles: array_values((array) ($data['conflicted_files'] ?? [])),
-			mainBranch: (string) ($data['main_branch'] ?? 'master'),
+			targetBranch: (string) ($data['target_branch'] ?? 'master'),
 		);
 	}
 

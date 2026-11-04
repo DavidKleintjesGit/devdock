@@ -22,6 +22,7 @@ use Src\Session\Actions\ScanSessionsAction;
 use Src\Skill\Actions\ScanSkillsAction;
 use Src\Ticket\Actions\FetchTicketsAction;
 use Src\Ticket\Contracts\TicketSourceRepositoryContract;
+use Src\Worktree\Actions\FollowPullRequestTargetsAction;
 use Src\Worktree\Actions\ForgetMovedLinksAction;
 use Src\Worktree\Contracts\BranchStandingRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
@@ -155,8 +156,19 @@ class RunFetchAction extends Command
 			FetchSourceEnum::RULES => count(ScanRulesAction::execute()),
 			FetchSourceEnum::SKILLS => count(ScanSkillsAction::execute()),
 			FetchSourceEnum::TICKETS => count(FetchTicketsAction::execute()),
-			FetchSourceEnum::PULL_REQUESTS => count(FetchPullRequestsAction::execute()),
+			FetchSourceEnum::PULL_REQUESTS => $this->fetchPullRequests(),
 		};
+	}
+
+	/**
+	 * Fetches the pull requests and points every working copy at the branch its pull request merges into.
+	 */
+	private function fetchPullRequests(): int
+	{
+		$pullRequestCount = count(FetchPullRequestsAction::execute());
+		FollowPullRequestTargetsAction::execute();
+
+		return $pullRequestCount;
 	}
 
 	/**
