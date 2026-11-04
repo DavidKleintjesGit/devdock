@@ -29,6 +29,26 @@ class GetRoleAccessActionTest extends TestCase
 	}
 
 	#[Test]
+	public function execute_lets_an_agent_read_circleci_but_not_start_stop_or_roll_back(): void
+	{
+		$roleAccessObject = GetRoleAccessAction::execute(AgentRoleEnum::AGENT);
+
+		$this->assertContains('mcp__claude_ai_CircleCI__rerun_workflow', $roleAccessObject->deniedTools);
+		$this->assertContains('mcp__claude_ai_CircleCI__cancel_workflow', $roleAccessObject->deniedTools);
+		$this->assertContains('mcp__claude_ai_CircleCI__rollback_deploy_component', $roleAccessObject->deniedTools);
+		$this->assertNotContains('mcp__claude_ai_CircleCI__get_job_logs', $roleAccessObject->deniedTools);
+	}
+
+	#[Test]
+	public function execute_denies_an_agent_writing_to_jira_through_the_atlassian_plugin(): void
+	{
+		$roleAccessObject = GetRoleAccessAction::execute(AgentRoleEnum::AGENT);
+
+		$this->assertContains('mcp__plugin_atlassian_atlassian__createJiraIssue', $roleAccessObject->deniedTools);
+		$this->assertContains('mcp__plugin_atlassian_atlassian__executeDestructive', $roleAccessObject->deniedTools);
+	}
+
+	#[Test]
 	public function execute_leaves_an_agent_execute_write_for_its_operations(): void
 	{
 		config([

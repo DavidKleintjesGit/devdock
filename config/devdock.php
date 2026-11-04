@@ -214,8 +214,10 @@ return [
 		'servers' => [
 			'claude_ai_Atlassian_MCP',
 			'claude_ai_Atlassian_Rovo',
+			'plugin_atlassian_atlassian',
 			'atlassian-rovo-apitoken',
 			'claude_ai_Claude_Docs',
+			'claude_ai_CircleCI',
 		],
 		'writing_tools' => [
 			'addGraphContext',
@@ -231,6 +233,11 @@ return [
 			'create',
 			'update',
 			'delete',
+			// CircleCI: reading pipelines, jobs and logs stays open; starting, stopping or rolling back is yours
+			'rerun_workflow',
+			'cancel_workflow',
+			'rollback_deploy_component',
+			'send_feedback',
 		],
 		// what an agent may still write through executeWrite; a lens may write nothing
 		'agent_operations' => [
