@@ -146,6 +146,7 @@
 				<h3 class="eyebrow grow">{{ __('Wijzigingen') }}</h3>
 				<div class="seg counted" role="group" aria-label="{{ __('Welke wijzigingen') }}">
 					@foreach (\Src\Worktree\Enums\DiffViewEnum::cases() as $view)
+						@continue($view === \Src\Worktree\Enums\DiffViewEnum::ROUND)
 						<button type="button" aria-pressed="{{ $copyView === $view ? 'true' : 'false' }}" wire:click="setDiffView('{{ $view->value }}')" @disabled($viewCounts[$view->value] === 0 && $copyView !== $view)>{{ $view->label() }}<span class="n">{{ $viewCounts[$view->value] }}</span></button>
 					@endforeach
 				</div>

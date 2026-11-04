@@ -332,13 +332,49 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	}
 
 	/**
-	 * The commit where this branch left the main line on origin.
+	 * The commit where this branch left the branch it merges into on origin.
 	 */
 	private function branchBase(string $path): ?string
 	{
-		$result = LocalCommand::run($path, ['git', 'merge-base', 'origin/' . $this->targetBranch($path), 'HEAD']);
+		return $this->forkPoint($path, $this->targetBranch($path));
+	}
 
-		return $result->successful() ? (trim($result->output()) ?: null) : null;
+	/**
+	 * Where HEAD left a branch on origin. When that branch was rewritten after
+	 * this one was cut from it, as a pull request lower in a stack is after a
+	 * rebase, git's reflog still knows the old tip, so only the commits of
+	 * this branch count as its own. Without that memory it is the common
+	 * ancestor.
+	 */
+	private function forkPoint(string $path, string $target): ?string
+	{
+		$forkPoint = LocalCommand::run($path, ['git', 'merge-base', '--fork-point', 'origin/' . $target, 'HEAD']);
+
+		if ($forkPoint->successful() && trim($forkPoint->output()) !== '') {
+			return trim($forkPoint->output());
+		}
+
+		$mergeBase = LocalCommand::run($path, ['git', 'merge-base', 'origin/' . $target, 'HEAD']);
+
+		return $mergeBase->successful() ? (trim($mergeBase->output()) ?: null) : null;
+	}
+
+	/**
+	 * The rebase that moves only the own commits of this branch onto its target.
+	 *
+	 * @return list<string>
+	 */
+	private function rebaseCommand(string $path, string $target, bool $setsAsideWork): array
+	{
+		$forkPoint = $this->forkPoint($path, $target);
+
+		return [
+			'git',
+			'rebase',
+			...($setsAsideWork ? ['--autostash'] : []),
+			...($forkPoint === null ? [] : ['--onto', 'origin/' . $target, $forkPoint]),
+			...($forkPoint === null ? ['origin/' . $target] : []),
+		];
 	}
 
 	public function getChanges(string $path): ChangeObjectCollection
@@ -692,7 +728,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 */
 	private function readChangedFiles(string $path): array
 	{
-		$committed = LocalCommand::run($path, ['git', 'diff', '--name-only', 'origin/' . $this->targetBranch($path) . '...HEAD']);
+		$base = $this->branchBase($path);
+		$committed = LocalCommand::run($path, ['git', 'diff', '--name-only', $base === null ? 'origin/' . $this->targetBranch($path) . '...HEAD' : $base . '..HEAD']);
 
 		$standing = LocalCommand::run($path, ['git', 'status', '--porcelain=v1']);
 
@@ -807,7 +844,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		$before = LocalCommand::run($path, ['git', 'rev-parse', 'HEAD']);
 
 		// what is not committed yet is put aside for the rebase and laid back after it
-		$rebased = Process::path($path)->timeout(self::TIMEOUT)->run(['git', 'rebase', '--autostash', 'origin/' . $target]);
+		$rebased = Process::path($path)->timeout(self::TIMEOUT)->run($this->rebaseCommand($path, $target, setsAsideWork: true));
 
 		$this->forgetStatus($path);
 
@@ -849,7 +886,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		}
 
 		$before = LocalCommand::run($path, ['git', 'rev-parse', 'HEAD']);
-		$rebased = Process::path($path)->timeout(self::TIMEOUT)->run(['git', 'rebase', 'origin/' . $target]);
+		$rebased = Process::path($path)->timeout(self::TIMEOUT)->run($this->rebaseCommand($path, $target, setsAsideWork: false));
 
 		$this->forgetStatus($path);
 

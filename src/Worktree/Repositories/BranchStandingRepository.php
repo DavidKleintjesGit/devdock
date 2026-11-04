@@ -80,7 +80,11 @@ class BranchStandingRepository implements BranchStandingRepositoryContract
 
 		foreach ($cold as $branch) {
 			if ($branchShas[$branch] !== null && $targetShas[$branch] !== null && ! Cache::has($this->resultKey($targetShas[$branch], $branchShas[$branch]))) {
-				$unread[$targetShas[$branch] . '|' . $branchShas[$branch]] = ['target' => $targetShas[$branch], 'branch' => $branchShas[$branch]];
+				$unread[$targetShas[$branch] . '|' . $branchShas[$branch]] = [
+					'target' => $targetShas[$branch],
+					'branch' => $branchShas[$branch],
+					'forkPoint' => $this->forkPoint($repositoryPath, $targets[$branch], $branchShas[$branch]),
+				];
 			}
 		}
 
@@ -101,16 +105,17 @@ class BranchStandingRepository implements BranchStandingRepositoryContract
 	 * Reads a handful of branches against the branch each merges into, side by
 	 * side, and keeps the answer under the two commits it is about.
 	 *
-	 * @param  list<array{target: string, branch: string}>  $pairs
+	 * @param  list<array{target: string, branch: string, forkPoint: ?string}>  $pairs
 	 */
 	private function read(string $repositoryPath, array $pairs): void
 	{
 		$results = Process::pool(function (Pool $pool) use ($repositoryPath, $pairs): void {
 			foreach ($pairs as $index => $pair) {
 				$pool->as('behind-' . $index)->path($repositoryPath)->command(['git', 'rev-list', '--count', $pair['branch'] . '..' . $pair['target']]);
-				// merges in memory only: nothing in the repository or a working copy changes
+				// merges in memory only: nothing in the repository or a working copy changes. From the fork point it
+				// replays only the own commits, the way the rebase does, so old copies of a rewritten target do not clash
 				$pool->as('merge-' . $index)->path($repositoryPath)->timeout(60)
-					->command(['git', 'merge-tree', '--write-tree', '--name-only', '--no-messages', $pair['target'], $pair['branch']]);
+					->command(['git', 'merge-tree', '--write-tree', '--name-only', '--no-messages', ...($pair['forkPoint'] === null ? [] : ['--merge-base=' . $pair['forkPoint']]), $pair['target'], $pair['branch']]);
 			}
 		})->start()->wait();
 
@@ -157,6 +162,18 @@ class BranchStandingRepository implements BranchStandingRepositoryContract
 		$targets = array_values(array_unique([$this->mainBranch($repositoryPath), ...array_values($this->targetsOf($repositoryPath, $branches))]));
 
 		Process::path($repositoryPath)->timeout(120)->run(['git', 'fetch', '--quiet', 'origin', ...$targets]);
+	}
+
+	/**
+	 * Where a branch left its target on origin: the old tip of that target when
+	 * it was rewritten since, as git's reflog remembers it, or null to let git
+	 * take the common ancestor.
+	 */
+	private function forkPoint(string $repositoryPath, string $target, string $branchSha): ?string
+	{
+		$result = LocalCommand::run($repositoryPath, ['git', 'merge-base', '--fork-point', 'refs/remotes/origin/' . $target, $branchSha]);
+
+		return $result->successful() && trim($result->output()) !== '' ? trim($result->output()) : null;
 	}
 
 	/**
@@ -225,9 +242,10 @@ class BranchStandingRepository implements BranchStandingRepositoryContract
 		return $shas;
 	}
 
-	private function resultKey(string $mainSha, string $branchSha): string
+	private function resultKey(string $targetSha, string $branchSha): string
 	{
-		return 'branch.standing.result.' . $mainSha . '.' . $branchSha;
+		// names how the answer was read, so an answer read another way is never taken for it
+		return 'branch.standing.result.fork.' . $targetSha . '.' . $branchSha;
 	}
 
 	/**
