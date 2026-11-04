@@ -412,6 +412,14 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		return $rebased;
 	}
 
+	public function countBehind(string $repositoryPath, string $branch, string $target, bool $asHere = false): int
+	{
+		$from = $asHere && $this->hasRef($repositoryPath, 'refs/heads/' . $branch) ? 'refs/heads/' . $branch : 'refs/remotes/origin/' . $branch;
+		$result = LocalCommand::run($repositoryPath, ['git', 'rev-list', '--count', $from . '..refs/remotes/origin/' . $target]);
+
+		return $result->successful() ? (int) trim($result->output()) : 0;
+	}
+
 	public function rememberBase(string $repositoryPath, string $branch): void
 	{
 		$target = $this->targetOf($repositoryPath, $branch);

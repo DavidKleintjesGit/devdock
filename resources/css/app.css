@@ -399,6 +399,11 @@ button.row{width:100%;border:0;background:transparent;text-align:left;cursor:poi
 .kcard .kline{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);min-width:0}
 .kcard .kkey{font-family:var(--mono);color:var(--accent-ink);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%;flex:none}
 .kcard.todo .kkey{color:var(--muted)}
+.branch-chain{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-family:inherit;font-size:12.5px}
+.branch-chain .chain-arrow{color:var(--muted)}
+.branch-chain .chain-link{padding:0;border:0;background:none;color:var(--accent-ink);cursor:pointer;font-size:12.5px}
+.branch-chain .chain-link:hover{text-decoration:underline}
+.branch-chain .kbehind{font-family:var(--mono);font-size:12px;color:var(--amber)}
 .kcard .kvariant{padding:0 6px;font-size:11px;line-height:1.5;max-width:40%;overflow:hidden;text-overflow:ellipsis}
 .kcard .kproject{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .kcard .ktitle{flex:none;margin-bottom:auto;max-height:2.7em;font-weight:600;font-size:14px;line-height:1.35;color:var(--fg);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}

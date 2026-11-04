@@ -54,6 +54,33 @@
 		<section class="dsec">
 			<h3 class="eyebrow">{{ __('Stand van de branch') }}</h3>
 			<div class="list">
+				@if ($branchChain)
+					<div class="kv">
+						<div class="v">
+							<span class="sdot {{ $blockingLink ? 'conflict' : 'quiet' }}"></span>
+							<span class="grow branch-chain">
+								<span class="mono muted">{{ $branchChain->mainBranch }}</span>
+								@foreach ($branchChain->linksFromMain() as $link)
+									<span class="chain-arrow" aria-hidden="true">→</span>
+									@if ($link->branch === $worktree->branch)
+										<b class="mono">{{ $link->branch }}</b>
+									@elseif ($link->cardKey)
+										<button class="mono chain-link" type="button" wire:click="open('{{ $link->cardKey }}')" title="{{ __('Open de kaart van :branch', ['branch' => $link->branch]) }}">{{ $link->branch }}</button>
+									@else
+										<span class="mono">{{ $link->branch }}</span>
+									@endif
+									@if ($link->behind > 0 && $link->branch !== $worktree->branch)
+										<span class="kbehind" title="{{ trans_choice(':count commit achter op :main|:count commits achter op :main', $link->behind, ['count' => $link->behind, 'main' => $link->target]) }}">↓{{ $link->behind }}</span>
+									@endif
+								@endforeach
+							</span>
+						</div>
+						@if ($levelFirst)
+							<p class="alert" style="margin:0 0 0 21px">{{ $levelFirst }}</p>
+						@endif
+					</div>
+				@endif
+
 				@if ($worktree->isRebasing)
 					<div class="kv">
 						<div class="v">
@@ -73,7 +100,7 @@
 						<div class="v">
 							<span class="sdot conflict"></span>
 							<span class="grow" style="font-family:inherit;display:flex;flex-direction:column;gap:2px"><b>{{ trans_choice('Conflict met :main in :count bestand|Conflict met :main in :count bestanden', count($card->conflictedFiles), ['main' => $worktree->targetBranch, 'count' => count($card->conflictedFiles)]) }}</b><span class="hint">{{ trans_choice(':count commit achter.|:count commits achter.', $worktree->behind, ['count' => $worktree->behind]) }} {{ $card->pullRequests->isNotEmpty() ? __('Bitbucket kan de pull request zo niet mergen.') : __('Samenvoegen met :main botst nu.', ['main' => $worktree->targetBranch]) }}</span></span>
-							<x-busy-button action="resolveConflictsWithAgent" class="btn sm primary" :busy="__('Rebase beginnen...')" :disabled="$worktree->changedFiles > 0">{{ __('Conflicten oplossen') }}</x-busy-button>
+							<x-busy-button action="resolveConflictsWithAgent" class="btn sm primary" :busy="__('Rebase beginnen...')" :disabled="$worktree->changedFiles > 0 || $blockingLink !== null">{{ __('Conflicten oplossen') }}</x-busy-button>
 						</div>
 						<ul style="margin:0 0 0 21px;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px">
 							@foreach ($card->conflictedFiles as $conflictedFile)
@@ -91,7 +118,7 @@
 						<div class="v">
 							<span class="sdot busy" style="animation:none"></span>
 							<span class="grow" style="font-family:inherit;display:flex;flex-direction:column;gap:2px"><b>{{ trans_choice(':count commit achter op :main|:count commits achter op :main', $worktree->behind, ['count' => $worktree->behind, 'main' => $worktree->targetBranch]) }}</b><span class="hint">{{ __('Geen conflicten. Tests kunnen hier slagen en op de pull request alsnog vallen.') }}</span></span>
-							<x-busy-button action="rebaseOnMain" class="btn sm" :busy="__('Rebasen...')" :disabled="$worktree->changedFiles > 0">{{ __('Rebase') }}</x-busy-button>
+							<x-busy-button action="rebaseOnMain" class="btn sm" :busy="__('Rebasen...')" :disabled="$worktree->changedFiles > 0 || $blockingLink !== null">{{ __('Rebase') }}</x-busy-button>
 						</div>
 						@if ($worktree->changedFiles > 0)
 							<p class="alert" style="margin:0 0 0 21px">{{ trans_choice(':count bestand is nog niet gecommit. Commit eerst, dan kan de rebase.|:count bestanden zijn nog niet gecommit. Commit eerst, dan kan de rebase.', $worktree->changedFiles, ['count' => $worktree->changedFiles]) }}</p>

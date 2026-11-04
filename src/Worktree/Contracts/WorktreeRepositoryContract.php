@@ -266,6 +266,12 @@ interface WorktreeRepositoryContract
 	public function rememberBase(string $repositoryPath, string $branch): void;
 
 	/**
+	 * How many commits of its target on origin a branch does not hold yet: the
+	 * branch as origin has it, or as this machine has it when asked.
+	 */
+	public function countBehind(string $repositoryPath, string $branch, string $target, bool $asHere = false): int;
+
+	/**
 	 * Throws the standing state of a working copy away, for when something
 	 * outside this repository changed what is in it. The next look reads it
 	 * from git again.

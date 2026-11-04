@@ -22,6 +22,7 @@ use Src\Worktree\Actions\CreateWorktreeDatabaseAction;
 use Src\Worktree\Actions\DescribeCleanUpAction;
 use Src\Worktree\Actions\EnsureWorktreeAction;
 use Src\Worktree\Actions\ForgetWorkingCopyTaskAction;
+use Src\Worktree\Actions\GetBranchChainAction;
 use Src\Worktree\Actions\PushBranchAction;
 use Src\Worktree\Actions\RebaseWorktreeAction;
 use Src\Worktree\Actions\ResolveConflictsAction;
@@ -37,6 +38,8 @@ use Src\Worktree\Enums\DiffViewEnum;
 use Src\Worktree\Enums\RebaseOutcomeEnum;
 use Src\Worktree\Enums\WorkingCopyTaskEnum;
 use Src\Worktree\Enums\WorktreeOriginEnum;
+use Src\Worktree\Objects\BranchChainObject;
+use Src\Worktree\Objects\BranchLinkObject;
 use Src\Worktree\Objects\ChangeObject;
 use Src\Worktree\Objects\ChangeObjectCollection;
 use Src\Worktree\Objects\DatabaseObject;
@@ -86,6 +89,14 @@ trait WithWorkingCopy
 		// the button is grey then; a request that still comes in is refused the same way
 		if ($worktreeEntity->changedFiles > 0) {
 			$this->failure = __('Er staat werk dat niet gecommit is. Commit eerst, dan kan de rebase.');
+
+			return;
+		}
+
+		$blockingLink = $this->branchChainFor($worktreeEntity)?->blockingLink();
+
+		if ($blockingLink !== null) {
+			$this->failure = $this->levelFirst($blockingLink);
 
 			return;
 		}
@@ -147,6 +158,14 @@ trait WithWorkingCopy
 		$worktreeEntity = $this->openWorktree();
 
 		if ($cardObject === null || $worktreeEntity === null || $cardObject->project === null || $cardObject->branch === null) {
+			return;
+		}
+
+		$blockingLink = $worktreeEntity->isRebasing ? null : $this->branchChainFor($worktreeEntity)?->blockingLink();
+
+		if ($blockingLink !== null) {
+			$this->failure = $this->levelFirst($blockingLink);
+
 			return;
 		}
 
@@ -380,6 +399,7 @@ trait WithWorkingCopy
 		$projectPath = GetProjectsAction::execute()
 			->first(fn (ProjectEntity $projectEntity) => $projectEntity->name === $worktreeEntity->project)
 			?->path;
+		$branchChain = $this->branchChainFor($worktreeEntity);
 
 		$view = $this->diffViewFor($worktreeEntity);
 		$viewChanges = collect($worktreeRepository->getChangesFor($worktreeEntity->path, $view));
@@ -390,6 +410,9 @@ trait WithWorkingCopy
 			'unpushed' => $worktreeRepository->getUnpushedCommits($worktreeEntity->path),
 			'lastRebase' => $worktreeRepository->getLastRebase($worktreeEntity->path),
 			'openConflicts' => $worktreeEntity->isRebasing ? $worktreeRepository->getConflictedFiles($worktreeEntity->path) : [],
+			'branchChain' => $branchChain,
+			'blockingLink' => $branchChain?->blockingLink(),
+			'levelFirst' => $branchChain?->blockingLink() === null ? null : $this->levelFirst($branchChain->blockingLink()),
 			'mainCheckout' => $worktreeEntity->origin === WorktreeOriginEnum::PROJECT ? $this->mainCheckout($cardObject) : null,
 			'outdatedRules' => $this->outdatedRules($cardObject, $worktreeEntity),
 			'changeCount' => $changes->count(),
@@ -576,6 +599,28 @@ trait WithWorkingCopy
 			->reject(fn (string $path): bool => in_array($path, $this->skippedFiles, true))
 			->values()
 			->all();
+	}
+
+	/**
+	 * The stack of pull requests the branch of a working copy stands in.
+	 */
+	private function branchChainFor(WorktreeEntity $worktreeEntity): ?BranchChainObject
+	{
+		$projectEntity = GetProjectsAction::execute()
+			->first(fn (ProjectEntity $projectEntity): bool => $projectEntity->name === $worktreeEntity->project);
+
+		return $projectEntity === null
+			? null
+			: GetBranchChainAction::execute($projectEntity->path, $projectEntity->repositorySlug(), $worktreeEntity->branch, $worktreeEntity->mainBranch);
+	}
+
+	private function levelFirst(BranchLinkObject $branchLinkObject): string
+	{
+		return trans_choice('Werk eerst :branch bij: die loopt :count commit achter op :target. Daarna kan deze branch erop.|Werk eerst :branch bij: die loopt :count commits achter op :target. Daarna kan deze branch erop.', $branchLinkObject->behind, [
+			'branch' => $branchLinkObject->branch,
+			'count' => $branchLinkObject->behind,
+			'target' => $branchLinkObject->target,
+		]);
 	}
 
 	private function openWorktree(): ?WorktreeEntity
