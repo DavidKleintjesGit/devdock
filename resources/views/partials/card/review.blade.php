@@ -17,11 +17,19 @@
 
 		@if ($loopStatus->needsYou())
 			<div class="reportbar amber">
+				@if ($loopStatus === \Src\Review\Enums\LoopStatusEnum::NEXT_ROUND)
+					<p class="question">{{ __('De agent meldde dat hij klaar is, maar de lenzen gingen er niet vanzelf weer over, bijvoorbeeld omdat de werkkopie nog bezig was of er niets veranderde.') }}</p>
+					<div class="reportbar-actions">
+						<button class="btn sm" type="button" wire:click="setDrawerTab('Agent')">{{ __('Naar de agent') }}</button>
+						<x-busy-button action="startRound" class="btn sm primary" :busy="__('Lenzen oproepen...')">{{ __('Volgende ronde starten') }}</x-busy-button>
+					</div>
+				@else
 				<p class="question">{{ $loopStatus === \Src\Review\Enums\LoopStatusEnum::AGENT_ASKS ? __('De agent stelde een vraag of liet bevindingen open. Geef antwoord bij de agent en start de loop daarna opnieuw.') : __('Kijk de rondes na, geef de agent aanwijzingen en start de loop opnieuw.') }}</p>
 				<div class="reportbar-actions">
 					<button class="btn sm" type="button" wire:click="setDrawerTab('Agent')">{{ __('Naar de agent') }}</button>
 					<x-busy-button action="restartLoop" class="btn sm primary" :busy="__('Lenzen oproepen...')">{{ trans_choice('Loop opnieuw starten · :count ronde|Loop opnieuw starten · :count rondes', $maxRounds, ['count' => $maxRounds]) }}</x-busy-button>
 				</div>
+				@endif
 			</div>
 		@endif
 

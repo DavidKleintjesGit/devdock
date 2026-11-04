@@ -65,6 +65,44 @@ class RecordFindingsActionTest extends TestCase
 	}
 
 	#[Test]
+	public function execute_resolves_the_open_findings_of_a_lens_that_passes_without_naming_them(): void
+	{
+		$reviewRound = ReviewRound::factory()->create();
+		$reviewFinding = ReviewFinding::factory()->create(['card' => $reviewRound->card, 'status' => FindingStatusEnum::OPEN->value]);
+
+		RecordFindingsAction::execute($reviewRound->card, new ReviewRoundId(id: $reviewRound->id), new LensId(id: $reviewFinding->lens_id), new VerdictObject(
+			verdict: VerdictEnum::PASS,
+			findings: 0,
+			report: 'PASS',
+		));
+
+		$this->assertDatabaseHas('review_findings', [
+			'id' => $reviewFinding->id,
+			'status' => FindingStatusEnum::RESOLVED->value,
+			'resolved_review_round_id' => $reviewRound->id,
+		]);
+	}
+
+	#[Test]
+	public function execute_keeps_open_what_a_passing_lens_still_calls_open(): void
+	{
+		$reviewRound = ReviewRound::factory()->create();
+		$reviewFinding = ReviewFinding::factory()->create(['card' => $reviewRound->card, 'status' => FindingStatusEnum::OPEN->value]);
+
+		RecordFindingsAction::execute($reviewRound->card, new ReviewRoundId(id: $reviewRound->id), new LensId(id: $reviewFinding->lens_id), new VerdictObject(
+			verdict: VerdictEnum::PASS,
+			findings: 1,
+			report: '',
+			earlierFindings: [$reviewFinding->number => FindingStatusEnum::OPEN],
+		));
+
+		$this->assertDatabaseHas('review_findings', [
+			'id' => $reviewFinding->id,
+			'status' => FindingStatusEnum::OPEN->value,
+		]);
+	}
+
+	#[Test]
 	public function execute_keeps_a_finding_you_ignored_ignored_whatever_the_lens_says(): void
 	{
 		$reviewRound = ReviewRound::factory()->create();

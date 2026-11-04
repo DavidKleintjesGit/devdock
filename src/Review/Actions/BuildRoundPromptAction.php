@@ -50,7 +50,7 @@ class BuildRoundPromptAction extends Command
 
 		return implode("\n\n", array_filter([
 			__('Ronde :number kwam niet schoon terug. Deze :count bevindingen staan nog open, op commit :commit:', [
-				'number' => $reviewRoundEntity->number,
+				'number' => $reviewRoundEntity->positionInSeries(),
 				'count' => count($open),
 				'commit' => $reviewRoundEntity->commitSha ?? '-',
 			]),

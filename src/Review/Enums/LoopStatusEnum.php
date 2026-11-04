@@ -18,6 +18,8 @@ enum LoopStatusEnum: string
 	case CLEAN = 'clean';
 	case BROKEN_OFF = 'broken_off';
 	case LENS_FELL = 'lens_fell';
+	// the agent reported done, but the next round did not start by itself
+	case NEXT_ROUND = 'next_round';
 
 	public function label(int $position, int $max, string $findings): string
 	{
@@ -31,6 +33,7 @@ enum LoopStatusEnum: string
 			self::CLEAN => __('Ronde :position schoon · klaar om te committen', ['position' => $position]),
 			self::BROKEN_OFF => __('Ronde :position afgebroken', ['position' => $position]),
 			self::LENS_FELL => __('Ronde :position · :findings · zet die lens opnieuw uit', ['position' => $position, 'findings' => $findings]),
+			self::NEXT_ROUND => __('De agent is klaar met ronde :position · de volgende ronde startte niet vanzelf', ['position' => $position]),
 		};
 	}
 
@@ -41,7 +44,7 @@ enum LoopStatusEnum: string
 	{
 		return match ($this) {
 			self::LENSES, self::AGENT, self::WAITING => 'busy',
-			self::STOPPED, self::AGENT_ASKS, self::LENS_FELL => 'red',
+			self::STOPPED, self::AGENT_ASKS, self::LENS_FELL, self::NEXT_ROUND => 'red',
 			self::CLEAN => 'green',
 			self::IDLE, self::BROKEN_OFF => 'quiet',
 		};
@@ -53,6 +56,6 @@ enum LoopStatusEnum: string
 	 */
 	public function needsYou(): bool
 	{
-		return $this === self::STOPPED || $this === self::AGENT_ASKS;
+		return in_array($this, [self::STOPPED, self::AGENT_ASKS, self::NEXT_ROUND], true);
 	}
 }

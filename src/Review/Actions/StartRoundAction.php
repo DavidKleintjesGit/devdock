@@ -80,9 +80,9 @@ class StartRoundAction extends Command
 
 		$latest = collect($rounds)->last();
 
-		// a round that left nothing open, or that you broke off, ends its loop, so the next one begins a new series
+		// only a round where every lens passed, or one you broke off, ends its loop; a lens that fell over keeps the count going
 		$startsSeries = $this->startsSeries
-			|| $latest?->openFindings() === 0
+			|| $latest?->isClean() === true
 			|| $latest?->status === RoundStatusEnum::STOPPED;
 		$maxRounds = GetWorkflowSettingAction::execute($cardObject->project)->maxRounds;
 
@@ -156,7 +156,8 @@ class StartRoundAction extends Command
 	private function running(iterable $rounds): ?ReviewRoundEntity
 	{
 		foreach ($rounds as $reviewRoundEntity) {
-			if ($reviewRoundEntity->isRunning()) {
+			// a round whose lenses are still at work is not over, whatever its status says
+			if ($reviewRoundEntity->isRunning() || $reviewRoundEntity->hasLensesAtWork()) {
 				return $reviewRoundEntity;
 			}
 		}

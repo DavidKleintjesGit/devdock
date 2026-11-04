@@ -1567,5 +1567,8 @@
     "Tussen het begin en het eind van de beurt": "Between the start and the end of the turn",
     "Alleen wat de agent in deze beurt veranderde, van het begin tot het eind (:from – :until).": "Only what the agent changed in this turn, from start to end (:from – :until).",
     "Hele PR tonen": "Show the whole PR",
-    "De lens gaf binnen de tijd geen oordeel en is gestopt.": "The lens gave no verdict in time and was stopped."
+    "De lens gaf binnen de tijd geen oordeel en is gestopt.": "The lens gave no verdict in time and was stopped.",
+    "De agent meldde dat hij klaar is, maar de lenzen gingen er niet vanzelf weer over, bijvoorbeeld omdat de werkkopie nog bezig was of er niets veranderde.": "The agent reported it is done, but the lenses did not go over the work again by themselves, for instance because the working copy was still busy or nothing changed.",
+    "Volgende ronde starten": "Start the next round",
+    "De agent is klaar met ronde :position · de volgende ronde startte niet vanzelf": "The agent finished round :position · the next round did not start by itself"
 }

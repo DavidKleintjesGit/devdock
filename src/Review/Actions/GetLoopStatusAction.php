@@ -33,10 +33,12 @@ class GetLoopStatusAction extends Command
 			$latestRound->isRunning() => LoopStatusEnum::LENSES,
 			$latestRound->status === RoundStatusEnum::STOPPED => LoopStatusEnum::BROKEN_OFF,
 			$latestRound->openFindings() === 0 && $latestRound->fallenLenses() > 0 => LoopStatusEnum::LENS_FELL,
-			$latestRound->status === RoundStatusEnum::PASSED || $latestRound->openFindings() === 0 => LoopStatusEnum::CLEAN,
+			$latestRound->isClean() => LoopStatusEnum::CLEAN,
 			$this->latestTurn?->run->isRunning() === true => LoopStatusEnum::AGENT,
 			$this->latestTurn !== null && $this->latestTurn->report?->status !== ReportStatusEnum::DONE => LoopStatusEnum::AGENT_ASKS,
 			$latestRound->positionInSeries() >= $this->maxRounds => LoopStatusEnum::STOPPED,
+			// a done turn starts the next round on the spot; standing here means that start was refused
+			$this->latestTurn !== null => LoopStatusEnum::NEXT_ROUND,
 			default => LoopStatusEnum::WAITING,
 		};
 	}

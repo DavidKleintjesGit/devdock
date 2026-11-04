@@ -85,6 +85,20 @@ class ReviewRoundEntity extends ValueObject
 	}
 
 	/**
+	 * Whether a lens of this round has no verdict yet.
+	 */
+	public function hasLensesAtWork(): bool
+	{
+		foreach ($this->results as $resultEntity) {
+			if (! $resultEntity->verdict->isSettled()) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Every point the lenses left open in this round.
 	 */
 	public function openFindings(): int

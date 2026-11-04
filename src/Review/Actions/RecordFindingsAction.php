@@ -7,6 +7,7 @@ namespace Src\Review\Actions;
 use Src\Packages\Cqrs\Command;
 use Src\Review\Contracts\ReviewFindingRepositoryContract;
 use Src\Review\Enums\FindingStatusEnum;
+use Src\Review\Enums\VerdictEnum;
 use Src\Review\Objects\LensId;
 use Src\Review\Objects\ReviewFindingEntity;
 use Src\Review\Objects\ReviewRoundId;
@@ -40,6 +41,15 @@ class RecordFindingsAction extends Command
 
 			if ($reviewFindingEntity !== null && $reviewFindingEntity->status !== FindingStatusEnum::IGNORED) {
 				$reviewFindingRepository->markSeen($reviewFindingEntity->reviewFindingId, $this->reviewRoundId, $status);
+			}
+		}
+
+		// PASS means the lens found everything of its own fixed; only a finding it still calls OPEN stays
+		if ($this->verdictObject->verdict === VerdictEnum::PASS) {
+			foreach ($earlier as $number => $reviewFindingEntity) {
+				if ($reviewFindingEntity->isOpen() && ($this->verdictObject->earlierFindings[$number] ?? null) !== FindingStatusEnum::OPEN) {
+					$reviewFindingRepository->markSeen($reviewFindingEntity->reviewFindingId, $this->reviewRoundId, FindingStatusEnum::RESOLVED);
+				}
 			}
 		}
 

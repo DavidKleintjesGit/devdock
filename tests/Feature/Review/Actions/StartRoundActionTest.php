@@ -173,6 +173,48 @@ class StartRoundActionTest extends TestCase
 	}
 
 	#[Test]
+	public function execute_continues_the_series_after_a_round_where_only_a_lens_fell_over(): void
+	{
+		$todo = Todo::factory()->create();
+		Lens::factory()->create(['paths' => ['billing/*']]);
+		$reviewRound = ReviewRound::factory()->create([
+			'card' => 'todo:' . $todo->id,
+			'number' => 1,
+			'series_start' => 1,
+			'status' => RoundStatusEnum::FAILED->value,
+		]);
+		ReviewResult::factory()->create(['review_round_id' => $reviewRound->id, 'verdict' => VerdictEnum::PASS->value, 'findings' => 0]);
+		ReviewResult::factory()->create(['review_round_id' => $reviewRound->id, 'verdict' => VerdictEnum::ERROR->value, 'findings' => 0]);
+		$this->repository->commit('billing/Invoice.php', '<?php', 'Add an invoice');
+
+		$reviewRoundEntity = StartRoundAction::execute('todo:' . $todo->id, $this->repository->path);
+
+		// a lens that fell over did not judge, so the round was not clean and the count goes on
+		$this->assertSame(2, $reviewRoundEntity->number);
+		$this->assertSame(1, $reviewRoundEntity->seriesStart);
+	}
+
+	#[Test]
+	public function execute_returns_the_round_whose_lenses_are_still_at_work(): void
+	{
+		$todo = Todo::factory()->create();
+		$reviewRound = ReviewRound::factory()->create([
+			'card' => 'todo:' . $todo->id,
+			'number' => 1,
+			'series_start' => 1,
+			'status' => RoundStatusEnum::FAILED->value,
+		]);
+		ReviewResult::factory()->create(['review_round_id' => $reviewRound->id, 'verdict' => VerdictEnum::FAIL->value, 'findings' => 1]);
+		ReviewResult::factory()->create(['review_round_id' => $reviewRound->id, 'verdict' => VerdictEnum::RUNNING->value, 'findings' => 0]);
+		$this->repository->commit('billing/Invoice.php', '<?php', 'Add an invoice');
+
+		$reviewRoundEntity = StartRoundAction::execute('todo:' . $todo->id, $this->repository->path);
+
+		$this->assertSame($reviewRound->id, $reviewRoundEntity->reviewRoundId->id);
+		$this->assertDatabaseCount('review_rounds', 1);
+	}
+
+	#[Test]
 	public function execute_refuses_a_round_past_the_maximum_while_findings_are_open(): void
 	{
 		$todo = Todo::factory()->create();
