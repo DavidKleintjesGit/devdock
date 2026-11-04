@@ -25,6 +25,8 @@ class PromptRun extends Model
 		'session_uuid',
 		'claims_session',
 		'git_grant',
+		'tree_before',
+		'tree_after',
 		'prompt',
 		'status',
 		'output',

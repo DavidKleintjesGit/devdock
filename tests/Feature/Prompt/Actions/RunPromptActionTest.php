@@ -24,6 +24,7 @@ use Src\Review\Models\ReviewResult;
 use Src\Review\Models\ReviewRound;
 use Src\Session\Contracts\SessionFileRepositoryContract;
 use Src\Session\Objects\SessionObjectCollection;
+use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Models\Worktree;
 use Tests\Support\TemporaryGitRepository;
 use Tests\TestCase;
@@ -199,5 +200,25 @@ class RunPromptActionTest extends TestCase
 			'id' => $promptRun->id,
 			'status' => PromptStatusEnum::DONE->value,
 		]);
+	}
+
+	#[Test]
+	public function execute_keeps_the_working_files_from_before_and_after_the_turn(): void
+	{
+		$promptRun = PromptRun::factory()->create(['status' => PromptStatusEnum::RUNNING->value, 'directory' => $this->repository->path]);
+		$this->mock(ClaudeProcessRepositoryContract::class)
+			->shouldReceive('run')
+			->andReturnUsing(function (): PromptResultObject {
+				// the agent writes a file during its turn
+				$this->repository->write('billing/Credit.php', '<?php');
+
+				return new PromptResultObject(hasFailed: false, sessionUuid: null, output: fake()->sentence(), message: null, cost: null);
+			});
+
+		RunPromptAction::execute(new PromptRunId(id: $promptRun->id));
+
+		$promptRun->refresh();
+		$changeObjects = resolve(WorktreeRepositoryContract::class)->getChangesBetween($this->repository->path, (string) $promptRun->tree_before, (string) $promptRun->tree_after);
+		$this->assertSame(['billing/Credit.php'], collect($changeObjects)->pluck('path')->all());
 	}
 }

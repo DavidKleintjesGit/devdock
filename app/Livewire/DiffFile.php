@@ -55,6 +55,13 @@ class DiffFile extends Component
 	#[Locked]
 	public string $view;
 
+	/** The snapshots a round reads between. */
+	#[Locked]
+	public ?string $from = null;
+
+	#[Locked]
+	public ?string $until = null;
+
 	/** The changed lines, to size the placeholder before the file is read. */
 	#[Locked]
 	public int $lines = 10;
@@ -85,7 +92,10 @@ class DiffFile extends Component
 
 	public function render(): View
 	{
-		$patch = resolve(WorktreeRepositoryContract::class)->getDiff($this->worktreePath, $this->file, DiffViewEnum::from($this->view), $this->context);
+		$worktreeRepository = resolve(WorktreeRepositoryContract::class);
+		$patch = $this->view === DiffViewEnum::ROUND->value && $this->from !== null && $this->until !== null
+			? $worktreeRepository->getDiffBetween($this->worktreePath, $this->file, $this->from, $this->until, $this->context)
+			: $worktreeRepository->getDiff($this->worktreePath, $this->file, DiffViewEnum::from($this->view), $this->context);
 		$longestLine = $patch === null ? 0 : max(array_map('strlen', preg_split('/\R/', $patch) ?: ['']));
 		$isTooLarge = ! $this->isForced && $patch !== null && (strlen($patch) > self::MAX_PATCH_BYTES || $longestLine > self::MAX_LINE_CHARACTERS);
 

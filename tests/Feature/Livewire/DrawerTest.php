@@ -9,8 +9,10 @@ use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Src\Board\Models\Todo;
+use Src\Prompt\Models\PromptRun;
 use Src\Review\Enums\FindingStatusEnum;
 use Src\Review\Models\ReviewFinding;
+use Src\Worktree\Enums\DiffViewEnum;
 use Tests\TestCase;
 
 /**
@@ -51,6 +53,27 @@ class DrawerTest extends TestCase
 		$component->call('startRound');
 
 		$component->assertSet('failure', __('Zonder werkkopie is er niets om de lenzen over te laten gaan.'));
+	}
+
+	#[Test]
+	public function open_turn_diff_reads_the_round_between_the_snapshots_of_the_turn(): void
+	{
+		$promptRun = PromptRun::factory()->create(['tree_before' => sha1(fake()->word()), 'tree_after' => sha1(fake()->word())]);
+
+		$component = Livewire::test(Drawer::class)->call('openTurnDiff', 'billing/Invoice.php', $promptRun->id);
+
+		$component->assertSet('diffView', DiffViewEnum::ROUND->value);
+		$component->assertSet('diffRun', $promptRun->id);
+	}
+
+	#[Test]
+	public function open_turn_diff_falls_back_to_the_whole_branch_for_a_turn_without_snapshots(): void
+	{
+		$promptRun = PromptRun::factory()->create(['tree_before' => null, 'tree_after' => null]);
+
+		$component = Livewire::test(Drawer::class)->call('openTurnDiff', 'billing/Invoice.php', $promptRun->id);
+
+		$component->assertSet('diffView', DiffViewEnum::BRANCH->value);
 	}
 
 	#[Test]

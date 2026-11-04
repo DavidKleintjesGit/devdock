@@ -1562,5 +1562,9 @@
     "Je hebt voor deze beurt toestemming om die rebase af te maken: los elk conflict op, zet het bestand klaar met git add of git rm, en ga verder met git rebase --continue tot de rebase klaar is. Andere git-acties en pushen blijven verboden.": "For this turn you may finish that rebase: resolve each conflict, stage the file with git add or git rm, and continue with git rebase --continue until the rebase is done. Other git actions and pushing stay forbidden.",
     "Draai daarna de tests van wat je aanraakte en zeg wanneer het klaar is. Lukt het niet, breek dan af met git rebase --abort en leg uit waarom.": "Then run the tests of what you touched and say when it is done. If it does not work out, abort with git rebase --abort and explain why.",
     "Rebasen lukte niet.": "Rebasing did not work.",
-    "Een rebase van :branch staat open; de agent maakt hem af.": "A rebase of :branch is open; the agent finishes it."
+    "Een rebase van :branch staat open; de agent maakt hem af.": "A rebase of :branch is open; the agent finishes it.",
+    "Deze ronde": "This round",
+    "Tussen het begin en het eind van de beurt": "Between the start and the end of the turn",
+    "Alleen wat de agent in deze beurt veranderde, van het begin tot het eind (:from – :until).": "Only what the agent changed in this turn, from start to end (:from – :until).",
+    "Hele PR tonen": "Show the whole PR"
 }

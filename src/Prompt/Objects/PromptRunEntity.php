@@ -26,6 +26,9 @@ class PromptRunEntity extends ValueObject
 		public readonly bool $claimsSession,
 		public readonly string $prompt,
 		public readonly ?GitGrantEnum $gitGrant,
+		// the working files as they stood before and after the turn, as trees in git
+		public readonly ?string $treeBefore,
+		public readonly ?string $treeAfter,
 		public readonly PromptStatusEnum $status,
 		public readonly ?string $output,
 		public readonly ?string $message,
@@ -34,6 +37,14 @@ class PromptRunEntity extends ValueObject
 		public readonly ?CarbonImmutable $finishedAt,
 	) {
 		parent::__construct();
+	}
+
+	/**
+	 * Whether the turn kept the working files from before and after it, so its own changes can be read.
+	 */
+	public function hasSnapshots(): bool
+	{
+		return $this->treeBefore !== null && $this->treeAfter !== null;
 	}
 
 	public function isRunning(): bool

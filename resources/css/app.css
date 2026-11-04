@@ -907,6 +907,7 @@ body.is-working .working{opacity:1}
 
 /* De codelezer met alle bestanden onder elkaar, zoals een pull request */
 .diff-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:16px;padding:12px 24px;border-bottom:1px solid var(--line);flex:none}
+.diff-round-note{align-items:center;padding:10px 24px;border-radius:0;border-bottom:1px solid var(--line);flex:none}
 .diff-total{display:flex;align-items:center;gap:6px;padding:4px 8px 10px;font-size:13px}
 .diff-total .plus,.diff-total .minus{font-family:var(--mono);font-size:12px}
 .diffpatch.stacked{display:flex;flex-direction:column;gap:14px;padding:14px 18px 24px;background:var(--bg);overflow:auto}

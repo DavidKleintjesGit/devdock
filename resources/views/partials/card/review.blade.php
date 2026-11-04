@@ -92,7 +92,7 @@
 								· +{{ $roundRow['turn']->addedLines() }} −{{ $roundRow['turn']->removedLines() }}
 							</h4>
 							@foreach ($roundRow['turn']->changes as $change)
-								<button class="filerow" type="button" wire:click="openDiff('{{ $change->path }}', 'branch')" wire:key="round-change-{{ $roundRow['round']->reviewRoundId->id }}-{{ $loop->index }}">
+								<button class="filerow" type="button" wire:click="openTurnDiff('{{ $change->path }}', {{ $roundRow['turn']->run->promptRunId->id }})" wire:key="round-change-{{ $roundRow['round']->reviewRoundId->id }}-{{ $loop->index }}">
 									<span class="name"><b>{{ $change->name() }}</b><small>{{ $change->folder() }}@if ($change->isNew()) · {{ __('nieuw') }}@endif</small></span>
 									<span class="delta">@if ($change->added)<span class="plus">+{{ $change->added }}</span>@endif @if ($change->removed)<span class="minus">−{{ $change->removed }}</span>@endif</span>
 									<x-icon name="chev" small/>

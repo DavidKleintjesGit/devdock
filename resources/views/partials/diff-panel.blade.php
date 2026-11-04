@@ -12,12 +12,15 @@
 		<div class="diff-views">
 			<div class="seg counted" role="group" aria-label="{{ __('Welke wijzigingen') }}">
 				@foreach (\Src\Worktree\Enums\DiffViewEnum::cases() as $view)
+					@continue($view === \Src\Worktree\Enums\DiffViewEnum::ROUND && $roundRun === null)
 					<button type="button" aria-pressed="{{ $diffView === $view ? 'true' : 'false' }}" wire:click="setDiffView('{{ $view->value }}')" @disabled($diffViews[$view->value] === 0 && $diffView !== $view)>{{ $view->label() }}<span class="n">{{ $diffViews[$view->value] }}</span></button>
 				@endforeach
 			</div>
 			<span class="hint">
 				@if ($diffView === \Src\Worktree\Enums\DiffViewEnum::UNCOMMITTED)
 					{{ __('Tegenover de laatste commit') }}
+				@elseif ($diffView === \Src\Worktree\Enums\DiffViewEnum::ROUND)
+					{{ __('Tussen het begin en het eind van de beurt') }}
 				@elseif ($diffView === \Src\Worktree\Enums\DiffViewEnum::UNPUSHED)
 					@if ($unpushedCount === 0){{ __('Alleen wat nog niet gecommit is') }}@else{{ trans_choice(':count commit met wijzigingen die nog niet op origin staan|:count commits met wijzigingen die nog niet op origin staan', $unpushedCount, ['count' => $unpushedCount]) }}{{ $diffViews['uncommitted'] > 0 ? ', ' . __('plus wat nog niet gecommit is') : '' }}@endif
 				@else
@@ -26,6 +29,14 @@
 			</span>
 		</div>
 	</div>
+
+	@if ($diffView === \Src\Worktree\Enums\DiffViewEnum::ROUND && $roundRun !== null)
+		<div class="alert teal diff-round-note">
+			<x-icon name="alert" small/>
+			<span class="grow">{{ __('Alleen wat de agent in deze beurt veranderde, van het begin tot het eind (:from – :until).', ['from' => $roundRun->startedAt?->toDisplayZone()->format('H:i'), 'until' => $roundRun->finishedAt?->toDisplayZone()->format('H:i')]) }}</span>
+			<button class="btn text xs" type="button" wire:click="setDiffView('branch')">{{ __('Hele PR tonen') }}</button>
+		</div>
+	@endif
 
 	<div class="diffsplit">
 		<nav class="difffiles tree" aria-label="{{ __('Bestanden') }}">
@@ -46,7 +57,7 @@
 						<label class="dfile-viewed"><input type="checkbox" :checked="isViewed(@js($diffFile['change']->path))" x-on:change="toggle(@js($diffFile['change']->path)); open = ! isViewed(@js($diffFile['change']->path))">{{ __('Bekeken') }}</label>
 					</header>
 					<div x-show="open">
-						<livewire:diff-file :worktree-path="$worktree->path" :file="$diffFile['change']->path" :view="$diffView->value" :lines="$diffFile['change']->added + $diffFile['change']->removed" :wire:key="'diff-file-' . $diffView->value . '-' . $diffFile['change']->anchor() . '-' . $diffFile['fingerprint']"/>
+						<livewire:diff-file :worktree-path="$worktree->path" :file="$diffFile['change']->path" :view="$diffView->value" :from="$roundRun?->treeBefore" :until="$roundRun?->treeAfter" :lines="$diffFile['change']->added + $diffFile['change']->removed" :wire:key="'diff-file-' . $diffView->value . '-' . $diffFile['change']->anchor() . '-' . $diffFile['fingerprint']"/>
 					</div>
 					@if ($diffFile['isGenerated'])
 						<button class="dfile-large" type="button" x-show="! open" x-on:click="open = true">{{ __('Gegenereerd bestand, niet geladen. Tonen') }}</button>

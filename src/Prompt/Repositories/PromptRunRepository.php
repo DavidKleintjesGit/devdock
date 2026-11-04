@@ -159,6 +159,16 @@ class PromptRunRepository implements PromptRunRepositoryContract
 		return $this->mapToEntity($promptRunEloquent);
 	}
 
+	public function markTreeBefore(PromptRunId $promptRunId, ?string $tree): void
+	{
+		PromptRunEloquent::query()->whereKey($promptRunId->id)->update(['tree_before' => $tree]);
+	}
+
+	public function markTreeAfter(PromptRunId $promptRunId, ?string $tree): void
+	{
+		PromptRunEloquent::query()->whereKey($promptRunId->id)->update(['tree_after' => $tree]);
+	}
+
 	public function logPath(PromptRunId $promptRunId): string
 	{
 		return storage_path('app/prompts/' . $promptRunId->id . '.jsonl');
@@ -239,6 +249,8 @@ class PromptRunRepository implements PromptRunRepositoryContract
 			claimsSession: (bool) $promptRunEloquent->claims_session,
 			prompt: (string) $promptRunEloquent->prompt,
 			gitGrant: GitGrantEnum::tryFrom((string) $promptRunEloquent->git_grant),
+			treeBefore: $promptRunEloquent->tree_before,
+			treeAfter: $promptRunEloquent->tree_after,
 			status: PromptStatusEnum::from((string) $promptRunEloquent->status),
 			output: $promptRunEloquent->output,
 			message: $promptRunEloquent->message,

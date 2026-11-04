@@ -42,11 +42,19 @@ class RunPromptAction extends Command
 		PromptRunRepositoryContract $promptRunRepository,
 		ClaudeProcessRepositoryContract $claudeProcessRepository,
 		TaskRepositoryContract $taskRepository,
+		WorktreeRepositoryContract $worktreeRepository,
 	): PromptRunEntity {
 		$promptRunEntity = $promptRunRepository->getById($this->promptRunId);
 
 		if ($promptRunEntity === null) {
 			abort(404);
+		}
+
+		$directory = $promptRunEntity->directory !== null && is_dir($promptRunEntity->directory) ? $promptRunEntity->directory : null;
+
+		// the working files before and after the turn, so the code reader can show what this turn changed
+		if ($directory !== null) {
+			$promptRunRepository->markTreeBefore($this->promptRunId, $worktreeRepository->snapshot($directory));
 		}
 
 		try {
@@ -61,7 +69,15 @@ class RunPromptAction extends Command
 				]))),
 			);
 		} catch (Throwable $failure) {
+			if ($directory !== null) {
+				$promptRunRepository->markTreeAfter($this->promptRunId, $worktreeRepository->snapshot($directory));
+			}
+
 			return $promptRunRepository->markFailed($this->promptRunId, $failure->getMessage());
+		}
+
+		if ($directory !== null) {
+			$promptRunRepository->markTreeAfter($this->promptRunId, $worktreeRepository->snapshot($directory));
 		}
 
 		$promptRunEntity = $promptRunRepository->markFinished($this->promptRunId, $promptResultObject);
@@ -69,7 +85,7 @@ class RunPromptAction extends Command
 		// the agent has been changing files, so what the board remembers about
 		// this working copy is out of date
 		if ($promptRunEntity->directory !== null) {
-			resolve(WorktreeRepositoryContract::class)->forgetStatus($promptRunEntity->directory);
+			$worktreeRepository->forgetStatus($promptRunEntity->directory);
 		}
 
 		// a turn on a round sends the lenses back over the work, but only when the

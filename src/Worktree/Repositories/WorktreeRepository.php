@@ -272,22 +272,24 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function readChangesSince(string $path, ?string $base): array
+	private function readChangesSince(string $path, ?string $base, ?string $until = null): array
 	{
 		if ($base === null) {
 			return [];
 		}
 
+		// without an end the working files themselves are the end
+		$range = $until === null ? [$base] : [$base, $until];
 		$kinds = [];
 
-		foreach ($this->lines($path, ['git', 'diff', '--name-status', '--find-renames', $base]) as $line) {
+		foreach ($this->lines($path, ['git', 'diff', '--name-status', '--find-renames', ...$range]) as $line) {
 			$parts = explode("\t", $line);
 			$kinds[end($parts)] = $parts[0];
 		}
 
 		$rows = [];
 
-		foreach ($this->lines($path, ['git', 'diff', '--numstat', '--find-renames', $base]) as $line) {
+		foreach ($this->lines($path, ['git', 'diff', '--numstat', '--find-renames', ...$range]) as $line) {
 			$parts = explode("\t", $line);
 
 			if (count($parts) < 3) {
@@ -304,6 +306,10 @@ class WorktreeRepository implements WorktreeRepositoryContract
 				'added' => (int) $parts[0],
 				'removed' => (int) $parts[1],
 			];
+		}
+
+		if ($until !== null) {
+			return array_values($rows);
 		}
 
 		// git diff leaves out what it has never seen; those files are new in full
@@ -357,6 +363,11 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getChangesFor(string $path, DiffViewEnum $view): ChangeObjectCollection
 	{
+		// a round reads between two snapshots, which only getChangesBetween knows
+		if ($view === DiffViewEnum::ROUND) {
+			return ChangeObjectCollection::fromArray([]);
+		}
+
 		if ($view !== DiffViewEnum::UNPUSHED) {
 			return $view === DiffViewEnum::UNCOMMITTED ? $this->getChanges($path) : $this->getBranchChanges($path);
 		}
@@ -392,6 +403,67 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 		// a file git never saw is new in full; one it knows without a patch only changed its line endings
 		return $this->lines($path, ['git', 'ls-files', '--others', '--exclude-standard', '--', $file]) === [] ? null : $this->newFile($path, $file);
+	}
+
+	public function snapshot(string $path): ?string
+	{
+		$gitDirectory = $this->gitDirectoryOf($path);
+
+		if ($gitDirectory === null) {
+			return null;
+		}
+
+		// a copy of the index of the working copy keeps what git knows of each file, so only changed files are read; the real index is never touched
+		$index = sys_get_temp_dir() . '/devdock-index-' . bin2hex(random_bytes(8));
+
+		if (is_file($gitDirectory . '/index')) {
+			copy($gitDirectory . '/index', $index);
+		}
+
+		$environment = ['GIT_INDEX_FILE' => $index];
+		$added = Process::path($path)->env($environment)->timeout(self::TIMEOUT)->run(['git', 'add', '--all']);
+		$tree = $added->successful() ? Process::path($path)->env($environment)->run(['git', 'write-tree']) : null;
+
+		@unlink($index);
+
+		return $tree !== null && $tree->successful() && trim($tree->output()) !== '' ? trim($tree->output()) : null;
+	}
+
+	public function getChangesBetween(string $path, string $from, string $until): ChangeObjectCollection
+	{
+		if (! is_dir($path) || ! $this->hasObject($path, $from) || ! $this->hasObject($path, $until)) {
+			return ChangeObjectCollection::fromArray([]);
+		}
+
+		// two snapshots never change, so their difference is read once
+		$rows = Cache::rememberForever(
+			'worktree.changes-between.' . md5($path . '|' . $from . '|' . $until),
+			fn (): array => $this->readChangesSince($path, $from, $until),
+		);
+
+		return ChangeObjectCollection::fromArray(array_map(
+			fn (array $row) => ChangeObject::from($row),
+			$rows,
+		));
+	}
+
+	public function getDiffBetween(string $path, string $file, string $from, string $until, int $context = 3): ?string
+	{
+		if (! is_dir($path) || $file === '') {
+			return null;
+		}
+
+		$patch = trim(LocalCommand::run($path, ['git', 'diff', '--no-color', '--unified=' . $context, $from, $until, '--', $file])->output());
+
+		return $patch === '' ? null : $patch;
+	}
+
+	/**
+	 * Whether git still holds an object; a snapshot nothing points at is cleared away by git after a few weeks.
+	 */
+	private function hasObject(string $path, string $sha): bool
+	{
+		return LocalCommand::run($path, ['git', 'cat-file', '-e', $sha])->successful();
 	}
 
 	public function getGeneratedFiles(string $path, array $files): array
@@ -431,6 +503,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 				DiffViewEnum::UNPUSHED => $this->pushedBase($path) ?? 'HEAD',
 				// against the branch it merges into: what this branch did to the file, committed or not
 				DiffViewEnum::BRANCH => $this->branchBase($path) ?? 'origin/' . $this->targetBranch($path),
+				// read between snapshots elsewhere; against the last commit it shows nothing wrong
+				DiffViewEnum::ROUND => 'HEAD',
 			},
 		);
 	}

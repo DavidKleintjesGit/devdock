@@ -13,6 +13,9 @@ use Src\Library\Objects\LibraryEntity;
 use Src\Library\Objects\StandingObject;
 use Src\Project\Actions\GetProjectsAction;
 use Src\Project\Objects\ProjectEntity;
+use Src\Prompt\Contracts\PromptRunRepositoryContract;
+use Src\Prompt\Objects\PromptRunEntity;
+use Src\Prompt\Objects\PromptRunId;
 use Src\Worktree\Actions\CarryOverAgainAction;
 use Src\Worktree\Actions\CommitChangesAction;
 use Src\Worktree\Actions\CreateWorktreeDatabaseAction;
@@ -35,6 +38,7 @@ use Src\Worktree\Enums\RebaseOutcomeEnum;
 use Src\Worktree\Enums\WorkingCopyTaskEnum;
 use Src\Worktree\Enums\WorktreeOriginEnum;
 use Src\Worktree\Objects\ChangeObject;
+use Src\Worktree\Objects\ChangeObjectCollection;
 use Src\Worktree\Objects\DatabaseObject;
 use Src\Worktree\Objects\WorkingCopyTaskObject;
 use Src\Worktree\Objects\WorktreeEntity;
@@ -67,6 +71,9 @@ trait WithWorkingCopy
 	public bool $upstreamDialog = false;
 
 	public string $upstreamChoice = '';
+
+	/** The turn of the agent whose changes the round view of the code reader shows. */
+	public ?int $diffRun = null;
 
 	public function rebaseOnMain(): void
 	{
@@ -474,7 +481,8 @@ trait WithWorkingCopy
 	{
 		$picked = DiffViewEnum::tryFrom((string) $this->diffView);
 
-		if ($picked !== null) {
+		// a round needs a turn with both snapshots; without one the reader shows the whole branch
+		if ($picked !== null && ($picked !== DiffViewEnum::ROUND || $this->roundRun() !== null)) {
 			return $picked;
 		}
 
@@ -497,7 +505,7 @@ trait WithWorkingCopy
 		$counts = [];
 
 		foreach (DiffViewEnum::cases() as $diffView) {
-			$counts[$diffView->value] = count(resolve(WorktreeRepositoryContract::class)->getChangesFor($worktreeEntity->path, $diffView));
+			$counts[$diffView->value] = count($this->viewChanges($worktreeEntity, $diffView));
 		}
 
 		return $counts;
@@ -532,6 +540,30 @@ trait WithWorkingCopy
 		if ($projectPath !== null) {
 			resolve(BranchStandingRepositoryContract::class)->warm($projectPath, [$worktreeEntity->branch], again: true);
 		}
+	}
+
+	/**
+	 * The changed files of one view of the code reader; a round reads between the snapshots of its turn.
+	 */
+	protected function viewChanges(WorktreeEntity $worktreeEntity, DiffViewEnum $diffView): ChangeObjectCollection
+	{
+		$roundRun = $diffView === DiffViewEnum::ROUND ? $this->roundRun() : null;
+
+		return match (true) {
+			$diffView !== DiffViewEnum::ROUND => resolve(WorktreeRepositoryContract::class)->getChangesFor($worktreeEntity->path, $diffView),
+			$roundRun === null => ChangeObjectCollection::fromArray([]),
+			default => resolve(WorktreeRepositoryContract::class)->getChangesBetween($worktreeEntity->path, (string) $roundRun->treeBefore, (string) $roundRun->treeAfter),
+		};
+	}
+
+	/**
+	 * The turn the round view reads, when it kept both snapshots.
+	 */
+	protected function roundRun(): ?PromptRunEntity
+	{
+		$promptRunEntity = $this->diffRun === null ? null : resolve(PromptRunRepositoryContract::class)->getById(new PromptRunId(id: $this->diffRun));
+
+		return $promptRunEntity?->hasSnapshots() === true ? $promptRunEntity : null;
 	}
 
 	private function openWorktree(): ?WorktreeEntity

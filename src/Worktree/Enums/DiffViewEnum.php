@@ -12,6 +12,8 @@ enum DiffViewEnum: string
 	case UNCOMMITTED = 'uncommitted';
 	case UNPUSHED = 'unpushed';
 	case BRANCH = 'branch';
+	// what one turn of the agent changed, between its two snapshots
+	case ROUND = 'round';
 
 	public function label(): string
 	{
@@ -19,6 +21,7 @@ enum DiffViewEnum: string
 			self::UNCOMMITTED => 'Niet gecommit',
 			self::UNPUSHED => 'Niet gepusht',
 			self::BRANCH => 'Hele PR',
+			self::ROUND => 'Deze ronde',
 		});
 	}
 }

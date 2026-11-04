@@ -492,16 +492,29 @@ class Drawer extends Component
 
 		$this->diffView = $diffView->value;
 
-		$paths = collect(resolve(WorktreeRepositoryContract::class)->getChangesFor($worktreeEntity->path, $diffView))->pluck('path');
+		$paths = collect($this->viewChanges($worktreeEntity, $diffView))->pluck('path');
 
 		if ($this->openDiffFile !== null && $paths->isNotEmpty() && ! $paths->contains($this->openDiffFile)) {
 			$this->openDiffFile = (string) $paths->first();
 		}
 	}
 
+	/**
+	 * Opens the code reader on what one turn of the agent changed, at one of
+	 * its files. A turn from before the snapshots opens on the whole branch.
+	 */
+	public function openTurnDiff(string $file, int $run): void
+	{
+		$this->failure = null;
+		$this->openDiffFile = $file;
+		$this->diffRun = $run;
+		$this->diffView = $this->roundRun() === null ? DiffViewEnum::BRANCH->value : DiffViewEnum::ROUND->value;
+	}
+
 	public function closeDiff(): void
 	{
 		$this->openDiffFile = null;
+		$this->diffRun = null;
 	}
 
 	/**
@@ -1110,6 +1123,7 @@ class Drawer extends Component
 			'openDiffFile' => $this->openDiffFile,
 			'diffTree' => $diffTree,
 			'diffView' => $diffView,
+			'roundRun' => $this->openDiffFile === null ? null : $this->roundRun(),
 			'diffViews' => $this->openDiffFile === null || $worktreeEntity === null ? [] : $this->diffViewCounts($worktreeEntity),
 			'unpushedCount' => $this->openDiffFile === null || $worktreeEntity === null ? 0 : resolve(WorktreeRepositoryContract::class)->getNewCommitCount($worktreeEntity->path),
 			'diffFiles' => $diffFiles,
@@ -1435,7 +1449,7 @@ class Drawer extends Component
 
 		return $worktreeEntity === null
 			? []
-			: BuildFileTreeAction::execute(collect(resolve(WorktreeRepositoryContract::class)->getChangesFor($worktreeEntity->path, $diffView))->values()->all());
+			: BuildFileTreeAction::execute(collect($this->viewChanges($worktreeEntity, $diffView))->values()->all());
 	}
 
 	/**
@@ -1449,7 +1463,7 @@ class Drawer extends Component
 	private function stackedDiffs(WorktreeEntity $worktreeEntity, DiffViewEnum $diffView, array $diffTree): array
 	{
 		$worktreeRepository = resolve(WorktreeRepositoryContract::class);
-		$changes = collect($worktreeRepository->getChangesFor($worktreeEntity->path, $diffView))->keyBy('path');
+		$changes = collect($this->viewChanges($worktreeEntity, $diffView))->keyBy('path');
 		$generatedFiles = $worktreeRepository->getGeneratedFiles($worktreeEntity->path, $changes->keys()->all());
 		$files = [];
 

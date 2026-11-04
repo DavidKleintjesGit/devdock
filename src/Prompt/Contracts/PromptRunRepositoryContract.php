@@ -59,6 +59,14 @@ interface PromptRunRepositoryContract
 	public function markFailed(PromptRunId $promptRunId, string $message): PromptRunEntity;
 
 	/**
+	 * Keeps the snapshot of the working files from before or after the turn, so
+	 * the code reader can show what this turn changed.
+	 */
+	public function markTreeBefore(PromptRunId $promptRunId, ?string $tree): void;
+
+	public function markTreeAfter(PromptRunId $promptRunId, ?string $tree): void;
+
+	/**
 	 * Where the events of a round are written as they come in, so the page can
 	 * follow the round while it works.
 	 */
