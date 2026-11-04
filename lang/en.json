@@ -1501,5 +1501,17 @@
     "koppelen": "link",
     "eerst een branch kiezen": "choose a branch first",
     "Deze map is buiten DevDock gemaakt. Een agent werkt alleen in een werkkopie die DevDock zelf maakte.": "This folder was made outside DevDock. An agent only works in a working copy DevDock made itself.",
-    "eigen werkkopie maken": "make a working copy of its own"
+    "eigen werkkopie maken": "make a working copy of its own",
+    "Bestanden van DevDock buiten git": "DevDock's files out of git",
+    "Wat DevDock in de werkkopie zet, staat in de exclude van git en gaat nooit mee in een commit.": "What DevDock puts in the working copy stands in git's exclude and never goes along in a commit.",
+    "De exclude van git mist :lines, dus dat zou als wijziging verschijnen.": "Git's exclude lacks :lines, so it would show up as a change.",
+    "toevoegen aan de exclude": "add to the exclude",
+    "Geleend, maar deze pakketten ontbreken: :packages.": "Borrowed, but these packages are missing: :packages.",
+    "opnieuw lenen": "borrow again",
+    "Artisan start niet in deze werkkopie: :failure": "Artisan does not start in this working copy: :failure",
+    "DevDock maakt de werkkopie": "DevDock is making the working copy",
+    "De werkkopie kon niet gemaakt worden": "The working copy could not be made",
+    "Dit loopt in de achtergrond; je kunt intussen gewoon verder.": "This runs in the background; you can carry on meanwhile.",
+    "De taak stopte zonder af te ronden.": "The task stopped without finishing.",
+    "Er loopt al een taak op de werkkopie van deze kaart.": "A task is already running on the working copy of this card."
 }

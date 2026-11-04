@@ -45,6 +45,7 @@
 	</div>
 
 	@if ($isSetup)
+		@include('partials.card.taak-balk')
 		@include('partials.card.inrichten')
 	@else
 		<ol class="steps" aria-label="{{ __('Stappen') }}">
@@ -76,6 +77,7 @@
 			</div>
 		@endif
 
+		@include('partials.card.taak-balk')
 		@include('partials.card.gereed-balk')
 
 		@include('partials.skeletons.tab')

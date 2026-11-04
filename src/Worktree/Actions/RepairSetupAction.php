@@ -147,7 +147,7 @@ class RepairSetupAction extends Command
 
 		return match ($setupCheck) {
 			SetupCheckEnum::BRANCH => $workingCopyStateRepository->runStep($path, ['git', 'branch', '--unset-upstream'], $logPath, self::STEP_SECONDS),
-			SetupCheckEnum::CARRIED_FILES, SetupCheckEnum::SITE => $prepare(),
+			SetupCheckEnum::CARRIED_FILES, SetupCheckEnum::OWN_FILES_OUT_OF_GIT, SetupCheckEnum::SITE => $prepare(),
 			SetupCheckEnum::PHP_PACKAGES => $this->installPackages($projectPath, $path, 'vendor', ['composer', 'install', '--no-interaction'], $prepare, $logPath, $workingCopyStateRepository, $workingCopyRepository),
 			SetupCheckEnum::JS_PACKAGES => $this->installPackages($projectPath, $path, 'node_modules', is_file($path . '/package-lock.json') ? ['npm', 'ci'] : ['npm', 'install'], $prepare, $logPath, $workingCopyStateRepository, $workingCopyRepository),
 			SetupCheckEnum::ASSETS => $workingCopyStateRepository->runStep($path, ['npm', 'run', (string) ProjectKindEnum::of($path)->assetScript()], $logPath, self::STEP_SECONDS),
@@ -184,6 +184,14 @@ class RepairSetupAction extends Command
 		WorkingCopyStateRepositoryContract $workingCopyStateRepository,
 		WorkingCopyRepositoryContract $workingCopyRepository,
 	): ?string {
+		// what stands there is open for a reason, and may be half borrowed; it is given back and borrowed whole again
+		$isBorrowed = collect($workingCopyRepository->getPackages($projectPath, $path))
+			->contains(fn (array $package): bool => $package['folder'] === $folder && $package['isBorrowed']);
+
+		if ($isBorrowed) {
+			$workingCopyRepository->returnBorrowed($path, $folder);
+		}
+
 		$prepare();
 
 		$isBorrowedWell = collect($workingCopyRepository->getPackages($projectPath, $path))

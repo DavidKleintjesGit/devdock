@@ -13,6 +13,7 @@ enum SetupCheckEnum: string
 	case WORKING_COPY = 'working_copy';
 	case BRANCH = 'branch';
 	case CARRIED_FILES = 'carried_files';
+	case OWN_FILES_OUT_OF_GIT = 'own_files_out_of_git';
 	case PHP_PACKAGES = 'php_packages';
 	case JS_PACKAGES = 'js_packages';
 	case ASSETS = 'assets';
@@ -29,6 +30,7 @@ enum SetupCheckEnum: string
 			self::WORKING_COPY => 'Werkkopie van DevDock',
 			self::BRANCH => 'Branch',
 			self::CARRIED_FILES => 'Bestanden uit het project',
+			self::OWN_FILES_OUT_OF_GIT => 'Bestanden van DevDock buiten git',
 			self::PHP_PACKAGES => 'PHP-pakketten',
 			self::JS_PACKAGES => 'JS-pakketten',
 			self::ASSETS => 'Assets',

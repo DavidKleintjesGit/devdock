@@ -208,21 +208,24 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 	private function exclude(string $repositoryPath): void
 	{
 		$file = $repositoryPath . '/.git/info/exclude';
-		$line = trim((string) config('devdock.worktree.folder'), '/') . '/';
 
 		if (! is_file($file)) {
 			return;
 		}
 
+		$lines = [
+			trim((string) config('devdock.worktree.folder'), '/') . '/',
+			...(array) config('devdock.worktree.own_files'),
+		];
 		$standing = (string) file_get_contents($file);
 
 		// the file is written with the line endings of this machine, so the
-		// carriage return has to be allowed for or the line is added twice
-		if (preg_match('/^' . preg_quote($line, '/') . '\r?$/m', $standing) === 1) {
-			return;
-		}
+		// carriage return has to be allowed for or a line is added twice
+		$missing = array_filter($lines, fn (string $line): bool => preg_match('/^' . preg_quote($line, '/') . '\r?$/m', $standing) !== 1);
 
-		file_put_contents($file, rtrim($standing, "\r\n") . PHP_EOL . $line . PHP_EOL);
+		if ($missing !== []) {
+			file_put_contents($file, rtrim($standing, "\r\n") . PHP_EOL . implode(PHP_EOL, $missing) . PHP_EOL);
+		}
 	}
 
 	/**

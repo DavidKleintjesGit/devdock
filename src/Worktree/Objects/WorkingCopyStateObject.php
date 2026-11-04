@@ -14,6 +14,8 @@ class WorkingCopyStateObject extends ValueObject
 {
 	/**
 	 * @param  list<string>  $missingCarried  files of the project that the copy lacks
+	 * @param  list<string>  $missingExcludes  lines for DevDock's own files the exclude of the repository lacks
+	 * @param  list<string>  $missingVendorPackages  package folders of the project a borrowed vendor lacks
 	 */
 	public function __construct(
 		public readonly ?string $currentBranch,
@@ -21,9 +23,11 @@ class WorkingCopyStateObject extends ValueObject
 		public readonly string $mainBranch,
 		public readonly ?string $operationInProgress,
 		public readonly array $missingCarried,
+		public readonly array $missingExcludes,
 		public readonly bool $hasComposer,
 		public readonly bool $hasVendorAutoload,
 		public readonly bool $isVendorBorrowed,
+		public readonly array $missingVendorPackages,
 		public readonly bool $isComposerLockSame,
 		public readonly bool $hasPackageJson,
 		public readonly bool $hasNodeModules,

@@ -85,8 +85,8 @@ use Src\Worktree\Actions\EnsureReadyAction;
 use Src\Worktree\Actions\GetChangesAction;
 use Src\Worktree\Actions\GetReadinessAction;
 use Src\Worktree\Actions\GetRepairStateAction;
+use Src\Worktree\Actions\GetWorkingCopyTaskAction;
 use Src\Worktree\Actions\GetWorktreesAction;
-use Src\Worktree\Actions\LinkWorkingCopyAction;
 use Src\Worktree\Actions\ReadDiffAction;
 use Src\Worktree\Actions\RemoveWorktreeAction;
 use Src\Worktree\Actions\RenameToTicketAction;
@@ -96,6 +96,7 @@ use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Enums\DatabaseFillEnum;
 use Src\Worktree\Enums\DiffViewEnum;
 use Src\Worktree\Enums\SetupCheckEnum;
+use Src\Worktree\Enums\WorkingCopyTaskEnum;
 use Src\Worktree\Enums\WorkKindEnum;
 use Src\Worktree\Exceptions\SetupIncompleteException;
 use Src\Worktree\Exceptions\WorkingCopyBusyException;
@@ -103,6 +104,7 @@ use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Src\Worktree\Objects\ChangeObject;
 use Src\Worktree\Objects\DiffHunkObjectCollection;
 use Src\Worktree\Objects\FileTreeNodeObject;
+use Src\Worktree\Objects\WorkingCopyTaskObject;
 use Src\Worktree\Objects\WorktreeEntity;
 use Throwable;
 
@@ -684,12 +686,13 @@ class Drawer extends Component
 			return;
 		}
 
-		$this->failure = LinkWorkingCopyAction::execute(
-			$cardObject->id,
-			$cardObject->project,
-			$branch,
-			$this->newDatabaseMode === 'empty' ? DatabaseFillEnum::EMPTY : null,
-		);
+		$this->failure = $this->startLinking(new WorkingCopyTaskObject(
+			card: $cardObject->id,
+			task: WorkingCopyTaskEnum::LINK,
+			project: $cardObject->project,
+			branch: $branch,
+			fill: $this->newDatabaseMode === 'empty' ? DatabaseFillEnum::EMPTY : null,
+		));
 
 		if ($this->failure === null) {
 			$this->newBranch = '';
@@ -1072,6 +1075,7 @@ class Drawer extends Component
 			)),
 			'claudeAvailable' => resolve(ClaudeProcessRepositoryContract::class)->isAvailable(),
 			...($tab === 'Werkkopie' ? $this->workingCopyData($cardObject, $worktreeEntity, $changes) : ['worktree' => $worktreeEntity]),
+			'workingCopyTask' => GetWorkingCopyTaskAction::execute($cardObject->id),
 			'readiness' => $worktreeEntity === null ? null : GetReadinessAction::execute($worktreeEntity->path),
 			'repairState' => $worktreeEntity === null ? null : GetRepairStateAction::execute($worktreeEntity->path),
 			...($tab === 'Context' ? $this->cardContextData($cardObject, $this->projectPathFor($cardObject), $worktreeEntity?->path ?? $this->projectPathFor($cardObject)) : []),

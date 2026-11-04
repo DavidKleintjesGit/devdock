@@ -70,6 +70,13 @@ class TemporaryGitRepository
 		$repository->git('push', '--quiet', '-u', 'origin', 'main');
 		$repository->git('remote', 'set-head', 'origin', 'main');
 
+		// a project DevDock prepared keeps the files DevDock writes out of git
+		file_put_contents(
+			$repository->path . '/.git/info/exclude',
+			implode(PHP_EOL, (array) config('devdock.worktree.own_files')) . PHP_EOL,
+			FILE_APPEND,
+		);
+
 		return $repository;
 	}
 
@@ -179,6 +186,20 @@ class TemporaryGitRepository
 		$process->run();
 
 		return $process->isSuccessful();
+	}
+
+	/**
+	 * Borrows a folder the way DevDock does: a junction on Windows, a link elsewhere.
+	 */
+	public function borrow(string $target, string $link): void
+	{
+		if (PHP_OS_FAMILY === 'Windows') {
+			(new Process(['cmd', '/c', 'mklink', '/J', str_replace('/', '\\', $link), str_replace('/', '\\', $target)]))->mustRun();
+
+			return;
+		}
+
+		symlink($target, $link);
 	}
 
 	public function git(string ...$arguments): string

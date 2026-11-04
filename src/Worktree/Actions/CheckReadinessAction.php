@@ -87,17 +87,21 @@ class CheckReadinessAction extends Command
 			$projectKind,
 			array_values((array) config('devdock.worktree.copy')),
 			(array) config('devdock.worktree.share'),
+			array_values((array) config('devdock.worktree.own_files')),
 		);
 
 		$databaseChecks = $projectKind->isLaravel() ? $this->databases($worktreeDatabaseRepository, $projectEntity->path, $worktreeEntity->path) : [];
 
 		// artisan only runs on packages of its own, and the database of the project is never counted
-		$canCountMigrations = $workingCopyStateObject->hasVendorAutoload && ($databaseChecks[0] ?? null)?->isReady() === true;
+		$canCountMigrations = $workingCopyStateObject->hasVendorAutoload
+			&& $workingCopyStateObject->missingVendorPackages === []
+			&& ($databaseChecks[0] ?? null)?->isReady() === true;
 
 		$setupChecks = array_filter([
 			new SetupCheckObject(SetupCheckEnum::WORKING_COPY, CheckStateEnum::READY, $worktreeEntity->path),
 			$this->branch($worktreeEntity, $workingCopyStateObject),
 			$this->carriedFiles($workingCopyStateObject),
+			$this->ownFilesOutOfGit($workingCopyStateObject),
 			$workingCopyStateObject->hasComposer ? $this->phpPackages($workingCopyStateObject) : null,
 			$workingCopyStateObject->hasPackageJson ? $this->jsPackages($workingCopyStateObject) : null,
 			$projectKind->assetManifest() === null ? null : $this->assets($projectKind, $workingCopyStateObject),
@@ -173,9 +177,27 @@ class CheckReadinessAction extends Command
 			);
 	}
 
+	private function ownFilesOutOfGit(WorkingCopyStateObject $workingCopyStateObject): SetupCheckObject
+	{
+		return $workingCopyStateObject->missingExcludes === []
+			? new SetupCheckObject(SetupCheckEnum::OWN_FILES_OUT_OF_GIT, CheckStateEnum::READY, __('Wat DevDock in de werkkopie zet, staat in de exclude van git en gaat nooit mee in een commit.'))
+			: new SetupCheckObject(
+				SetupCheckEnum::OWN_FILES_OUT_OF_GIT,
+				CheckStateEnum::OPEN,
+				__('De exclude van git mist :lines, dus dat zou als wijziging verschijnen.', ['lines' => implode(', ', $workingCopyStateObject->missingExcludes)]),
+				__('toevoegen aan de exclude'),
+			);
+	}
+
 	private function phpPackages(WorkingCopyStateObject $workingCopyStateObject): SetupCheckObject
 	{
 		return match (true) {
+			$workingCopyStateObject->missingVendorPackages !== [] => new SetupCheckObject(
+				SetupCheckEnum::PHP_PACKAGES,
+				CheckStateEnum::OPEN,
+				__('Geleend, maar deze pakketten ontbreken: :packages.', ['packages' => implode(', ', $workingCopyStateObject->missingVendorPackages)]),
+				__('opnieuw lenen'),
+			),
 			$workingCopyStateObject->isVendorBorrowed && ! $workingCopyStateObject->isComposerLockSame => new SetupCheckObject(
 				SetupCheckEnum::PHP_PACKAGES,
 				CheckStateEnum::OPEN,
@@ -270,14 +292,19 @@ class CheckReadinessAction extends Command
 		$fingerprint = $this->migrationsFingerprint($path);
 		$kept = Cache::get($key);
 
-		$pending = is_array($kept) && $kept['fingerprint'] === $fingerprint && ! $this->isThorough ? $kept['pending'] : null;
+		$isKept = is_array($kept) && ($kept['fingerprint'] ?? null) === $fingerprint && ! $this->isThorough;
+		$pending = $isKept ? ($kept['pending'] ?? null) : null;
+		$failure = $isKept ? ($kept['failure'] ?? null) : null;
 
-		if ($pending === null && $this->isThorough && $canCount) {
-			$pending = $workingCopyStateRepository->countPendingMigrations($path);
-			Cache::forever($key, ['fingerprint' => $fingerprint, 'pending' => $pending]);
+		if (! $isKept && $this->isThorough && $canCount) {
+			$migrationCountObject = $workingCopyStateRepository->countPendingMigrations($path);
+			$pending = $migrationCountObject->pending;
+			$failure = $migrationCountObject->failure;
+			Cache::forever($key, ['fingerprint' => $fingerprint, 'pending' => $pending, 'failure' => $failure]);
 		}
 
 		return match (true) {
+			$failure !== null => new SetupCheckObject(SetupCheckEnum::MIGRATIONS, CheckStateEnum::OPEN, __('Artisan start niet in deze werkkopie: :failure', ['failure' => $failure])),
 			$pending === null => new SetupCheckObject(SetupCheckEnum::MIGRATIONS, CheckStateEnum::UNCHECKED, __('Nog niet nagekeken. DevDock kijkt het na voor een agent of lens begint.')),
 			$pending === 0 => new SetupCheckObject(SetupCheckEnum::MIGRATIONS, CheckStateEnum::READY, __('Alle migraties hebben gedraaid.')),
 			default => new SetupCheckObject(

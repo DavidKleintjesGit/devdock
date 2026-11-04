@@ -9,10 +9,11 @@ use Src\Project\Actions\GetProjectsAction;
 use Src\Project\Objects\ProjectEntity;
 use Src\Worktree\Actions\EnsureWorktreeAction;
 use Src\Worktree\Actions\GetBranchChoicesAction;
-use Src\Worktree\Actions\LinkWorkingCopyAction;
 use Src\Worktree\Enums\BranchPlaceEnum;
 use Src\Worktree\Enums\DatabaseFillEnum;
+use Src\Worktree\Enums\WorkingCopyTaskEnum;
 use Src\Worktree\Objects\BranchChoiceObject;
+use Src\Worktree\Objects\WorkingCopyTaskObject;
 use Src\Worktree\Objects\WorktreeEntity;
 
 /**
@@ -52,12 +53,13 @@ trait WithSetup
 			return;
 		}
 
-		$this->failure = LinkWorkingCopyAction::execute(
-			$cardObject->id,
-			$cardObject->project,
-			$branch,
-			$this->chosenFill(),
-		);
+		$this->failure = $this->startLinking(new WorkingCopyTaskObject(
+			card: $cardObject->id,
+			task: WorkingCopyTaskEnum::LINK,
+			project: $cardObject->project,
+			branch: $branch,
+			fill: $this->chosenFill(),
+		));
 	}
 
 	/**

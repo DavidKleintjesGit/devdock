@@ -94,6 +94,47 @@ class CheckReadinessActionTest extends TestCase
 	}
 
 	#[Test]
+	public function execute_opens_the_own_files_point_when_the_exclude_lacks_them(): void
+	{
+		$project = Project::factory()->create(['path' => $this->repository->path]);
+		$path = $this->repository->addWorktree('feature/billing');
+		file_put_contents($this->repository->path . '/.git/info/exclude', '');
+		Worktree::factory()->create([
+			'project' => $project->name,
+			'branch' => 'feature/billing',
+			'path' => $path,
+		]);
+
+		$readinessObject = CheckReadinessAction::execute($path);
+
+		$this->assertSame(CheckStateEnum::OPEN, collect($readinessObject->setupChecks)->firstWhere('setupCheck', SetupCheckEnum::OWN_FILES_OUT_OF_GIT)->state);
+	}
+
+	#[Test]
+	public function execute_opens_the_php_packages_point_when_a_borrowed_package_is_missing(): void
+	{
+		$project = Project::factory()->create(['path' => $this->repository->path]);
+		$this->repository->commit('composer.json', '{}', 'Add composer');
+		$this->repository->write('vendor/autoload.php', '<?php');
+		$this->repository->write('vendor/acme/tool/Tool.php', '<?php');
+		$this->repository->write('vendor/blade-ui-kit/icons/Icons.php', '<?php');
+		$path = $this->repository->addWorktree('feature/billing');
+		// the copy borrows one package of the two, as a borrow that was broken off leaves it
+		mkdir($path . '/vendor');
+		file_put_contents($path . '/vendor/autoload.php', '<?php');
+		$this->repository->borrow($this->repository->path . '/vendor/acme', $path . '/vendor/acme');
+		Worktree::factory()->create([
+			'project' => $project->name,
+			'branch' => 'feature/billing',
+			'path' => $path,
+		]);
+
+		$readinessObject = CheckReadinessAction::execute($path);
+
+		$this->assertStringContainsString('blade-ui-kit', collect($readinessObject->setupChecks)->firstWhere('setupCheck', SetupCheckEnum::PHP_PACKAGES)->detail);
+	}
+
+	#[Test]
 	public function execute_opens_the_branch_point_when_the_copy_stands_on_another_branch(): void
 	{
 		$project = Project::factory()->create(['path' => $this->repository->path]);

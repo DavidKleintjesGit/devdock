@@ -11,6 +11,7 @@ use Src\Packages\Process\DetachedCommand;
 use Src\Packages\Process\ProjectEnvironment;
 use Src\Worktree\Contracts\WorkingCopyStateRepositoryContract;
 use Src\Worktree\Enums\ProjectKindEnum;
+use Src\Worktree\Objects\MigrationCountObject;
 use Src\Worktree\Objects\WorkingCopyStateObject;
 
 class WorkingCopyStateRepository implements WorkingCopyStateRepositoryContract
@@ -20,7 +21,7 @@ class WorkingCopyStateRepository implements WorkingCopyStateRepositoryContract
 	 */
 	private const FAILURE_LINES = 12;
 
-	public function read(string $repositoryPath, string $path, ProjectKindEnum $projectKind, array $carried, array $shared): WorkingCopyStateObject
+	public function read(string $repositoryPath, string $path, ProjectKindEnum $projectKind, array $carried, array $shared, array $ownFiles): WorkingCopyStateObject
 	{
 		$environment = $this->environmentOf($path . '/.env');
 		$composerLock = $shared['vendor'] ?? 'composer.lock';
@@ -38,9 +39,11 @@ class WorkingCopyStateRepository implements WorkingCopyStateRepositoryContract
 				$carried,
 				fn (string $entry): bool => file_exists($repositoryPath . '/' . $entry) && ! file_exists($path . '/' . $entry),
 			)),
+			missingExcludes: $this->missingExcludes($commonDirectory, $ownFiles),
 			hasComposer: is_file($path . '/composer.json'),
 			hasVendorAutoload: is_file($path . '/vendor/autoload.php'),
 			isVendorBorrowed: $this->isBorrowed($path . '/vendor'),
+			missingVendorPackages: $this->isBorrowed($path . '/vendor') ? $this->missingPackages($repositoryPath . '/vendor', $path . '/vendor') : [],
 			isComposerLockSame: $this->isSameFile($repositoryPath . '/' . $composerLock, $path . '/' . $composerLock),
 			hasPackageJson: is_file($path . '/package.json'),
 			hasNodeModules: is_dir($path . '/node_modules'),
@@ -55,7 +58,7 @@ class WorkingCopyStateRepository implements WorkingCopyStateRepositoryContract
 		);
 	}
 
-	public function countPendingMigrations(string $path): ?int
+	public function countPendingMigrations(string $path): MigrationCountObject
 	{
 		$result = Process::path($path)
 			->env(ProjectEnvironment::withoutDevDock())
@@ -66,15 +69,18 @@ class WorkingCopyStateRepository implements WorkingCopyStateRepositoryContract
 
 		// a database without the migrations table has run none of them
 		if (str_contains($output, 'Migration table not found')) {
-			return count(glob($path . '/database/migrations/*.php') ?: []);
+			return new MigrationCountObject(pending: count(glob($path . '/database/migrations/*.php') ?: []), failure: null);
 		}
 
 		if (! $result->successful()) {
-			return null;
+			$lines = array_values(array_filter(array_map('trim', preg_split('/\R/', $output) ?: [])));
+			$telling = collect($lines)->first(fn (string $line): bool => preg_match('/error|exception|failed/i', $line) === 1) ?? ($lines[0] ?? '');
+
+			return new MigrationCountObject(pending: null, failure: mb_substr($telling, 0, 300));
 		}
 
 		// Laravel 9 and later write Pending, older versions a No in the Ran column
-		return preg_match_all('/\bPending\b|^\|\s*No\s*\|/m', $output);
+		return new MigrationCountObject(pending: preg_match_all('/\bPending\b|^\|\s*No\s*\|/m', $output), failure: null);
 	}
 
 	public function runStep(string $path, array $command, string $logPath, int $timeout): ?string
@@ -96,6 +102,35 @@ class WorkingCopyStateRepository implements WorkingCopyStateRepositoryContract
 		$lines = preg_split('/\R/', trim($result->errorOutput() ?: $result->output())) ?: [];
 
 		return implode("\n", array_slice($lines, -self::FAILURE_LINES)) ?: __('De stap liep vast zonder uitleg.');
+	}
+
+	/**
+	 * The lines of the exclude of the repository that are not there yet.
+	 *
+	 * @param  list<string>  $lines
+	 * @return list<string>
+	 */
+	private function missingExcludes(?string $commonDirectory, array $lines): array
+	{
+		$standing = $commonDirectory === null ? '' : (string) @file_get_contents($commonDirectory . '/info/exclude');
+
+		return array_values(array_filter(
+			$lines,
+			fn (string $line): bool => preg_match('/^' . preg_quote($line, '/') . '\r?$/m', $standing) !== 1,
+		));
+	}
+
+	/**
+	 * The package folders of the project that a borrowed vendor lacks.
+	 *
+	 * @return list<string>
+	 */
+	private function missingPackages(string $projectVendor, string $vendor): array
+	{
+		return array_values(array_filter(
+			@scandir($projectVendor) ?: [],
+			fn (string $entry): bool => $entry !== '.' && $entry !== '..' && is_dir($projectVendor . '/' . $entry) && ! file_exists($vendor . '/' . $entry),
+		));
 	}
 
 	/**

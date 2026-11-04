@@ -636,13 +636,27 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function commit(string $path, string $title, string $body, ?array $files = null): bool
 	{
-		// the pinned project name is ours and has no business in his history;
-		// with a choice of files only those go along, the rest stays standing
+		// the files DevDock writes into a copy have no business in the history of
+		// the project, chosen or not; with a choice of files only those go along
+		$ownPatterns = [...(array) config('devdock.worktree.own_files'), self::PROJECT_NAME_FILE];
+		$ownFiles = array_map(
+			fn (string $pattern): string => ':(exclude,glob)' . rtrim($pattern, '/') . (str_ends_with($pattern, '/') ? '/**' : ''),
+			$ownPatterns,
+		);
+		$chosen = $files === null ? ['.'] : array_values(array_filter(
+			$files,
+			fn (string $file): bool => ! collect($ownPatterns)->contains(fn (string $pattern): bool => str_ends_with($pattern, '/')
+				? str_starts_with(str_replace('\\', '/', $file), $pattern)
+				: fnmatch($pattern, str_replace('\\', '/', $file))),
+		));
+
+		if ($chosen === []) {
+			return false;
+		}
+
 		$staged = Process::path($path)
 			->timeout(self::TIMEOUT)
-			->run($files === null
-				? ['git', 'add', '-A', '--', '.', ':(exclude)' . self::PROJECT_NAME_FILE]
-				: ['git', 'add', '-A', '--', ...$files])
+			->run(['git', 'add', '-A', '--', ...$chosen, ...$ownFiles])
 			->successful();
 
 		if (! $staged) {

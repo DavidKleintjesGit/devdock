@@ -79,6 +79,14 @@ return [
 	'worktree' => [
 		'folder' => '.worktrees',
 
+		// the files DevDock itself writes into a working copy; they stand in the
+		// exclude of the repository and never go along in a commit
+		'own_files' => [
+			'.devdock/',
+			'.claude/rules/devdock-*.md',
+			'.wakatime-project',
+		],
+
 		// hoe lang de staat van een werkkopie blijft staan. git status over een
 		// grote repository kost een vijfde seconde per werkkopie, en het bord
 		// vraagt het bij elke klik opnieuw

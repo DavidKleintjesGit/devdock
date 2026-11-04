@@ -18,10 +18,11 @@ use Src\Worktree\Actions\CommitChangesAction;
 use Src\Worktree\Actions\CreateWorktreeDatabaseAction;
 use Src\Worktree\Actions\DescribeCleanUpAction;
 use Src\Worktree\Actions\EnsureWorktreeAction;
-use Src\Worktree\Actions\LinkWorkingCopyAction;
+use Src\Worktree\Actions\ForgetWorkingCopyTaskAction;
 use Src\Worktree\Actions\PushBranchAction;
 use Src\Worktree\Actions\RebaseWorktreeAction;
 use Src\Worktree\Actions\SetUpstreamAction;
+use Src\Worktree\Actions\StartWorkingCopyTaskAction;
 use Src\Worktree\Actions\UseWorktreeDatabaseAction;
 use Src\Worktree\Contracts\BranchStandingRepositoryContract;
 use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
@@ -29,9 +30,11 @@ use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Enums\DatabaseFillEnum;
 use Src\Worktree\Enums\DiffViewEnum;
+use Src\Worktree\Enums\WorkingCopyTaskEnum;
 use Src\Worktree\Enums\WorktreeOriginEnum;
 use Src\Worktree\Objects\ChangeObject;
 use Src\Worktree\Objects\DatabaseObject;
+use Src\Worktree\Objects\WorkingCopyTaskObject;
 use Src\Worktree\Objects\WorktreeEntity;
 
 /**
@@ -296,7 +299,32 @@ trait WithWorkingCopy
 			return;
 		}
 
-		$this->failure = LinkWorkingCopyAction::execute($cardObject->id, $cardObject->project, $cardObject->branch, null, $carryChanges);
+		$this->failure = $this->startLinking(new WorkingCopyTaskObject(
+			card: $cardObject->id,
+			task: WorkingCopyTaskEnum::LINK,
+			project: $cardObject->project,
+			branch: $cardObject->branch,
+			carriesChanges: $carryChanges,
+		));
+	}
+
+	/**
+	 * Makes the working copy of this card in a process of its own; the card
+	 * follows it from there. Returns why it could not start, or null.
+	 */
+	protected function startLinking(WorkingCopyTaskObject $workingCopyTaskObject): ?string
+	{
+		return StartWorkingCopyTaskAction::execute($workingCopyTaskObject)
+			? null
+			: __('Er loopt al een taak op de werkkopie van deze kaart.');
+	}
+
+	/**
+	 * Takes the message of a failed background task off the card.
+	 */
+	public function dismissWorkingCopyTask(): void
+	{
+		ForgetWorkingCopyTaskAction::execute((string) $this->openCard);
 	}
 
 	/**
