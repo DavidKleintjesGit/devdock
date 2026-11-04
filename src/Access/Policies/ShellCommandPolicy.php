@@ -2,21 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Src\Access\Actions;
+namespace Src\Access\Policies;
 
-use Src\Packages\Cqrs\Command;
+use Src\Access\Enums\ShellCommandEnum;
+use Src\Access\Objects\ShellCommandDecisionObject;
+use Src\Access\Objects\ShellCommandObject;
 
 /**
- * Judges a shell command an agent, lens or helper is about to run. Git is
- * read only: every git command outside the reading ones is refused, wherever
- * it stands in the line, so committing, pushing and rebasing stay with the
- * buttons. Anything else passes.
- *
- * Returns why the command is refused, or null when it may run.
- *
- * @method static ?string execute(string $command)
+ * The rule for a shell command an agent, lens or helper is about to run: git
+ * is read only. Every git command outside the reading ones is refused,
+ * wherever it stands in the line, so committing, pushing and rebasing stay
+ * with the buttons. Anything else passes.
  */
-class JudgeShellCommandAction extends Command
+class ShellCommandPolicy
 {
 	/**
 	 * Git commands that only read.
@@ -51,11 +49,14 @@ class JudgeShellCommandAction extends Command
 	public const LISTING = ['branch', 'config', 'remote', 'stash', 'tag', 'worktree'];
 
 	/**
-	 * Options in front of the git command that take the next word as their value.
+	 * Shells a command can be handed to as a string.
 	 */
 	private const SHELLS = ['bash', 'cmd', 'powershell', 'pwsh', 'sh', 'zsh'];
 
-	private const OPTIONS_WITH_VALUE =['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--exec-path', '--config-env'];
+	/**
+	 * Options in front of the git command that take the next word as their value.
+	 */
+	private const OPTIONS_WITH_VALUE = ['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--exec-path', '--config-env'];
 
 	/**
 	 * Options that turn listing branches or tags into changing them.
@@ -65,21 +66,17 @@ class JudgeShellCommandAction extends Command
 		'tag' => ['-a', '-d', '-f', '-m', '-s', '-u', '--annotate', '--delete', '--force', '--local-user', '--sign'],
 	];
 
-	public function __construct(
-		public readonly string $command,
-	) {}
-
-	public function handle(): ?string
+	public function decide(ShellCommandObject $shellCommandObject): ShellCommandDecisionObject
 	{
-		foreach ($this->segments($this->command) as $segment) {
-			$refusal = $this->judgeSegment($segment);
+		foreach ($this->segments($shellCommandObject->command) as $segment) {
+			$gitCommand = $this->writingGitCommandIn($segment);
 
-			if ($refusal !== null) {
-				return $refusal;
+			if ($gitCommand !== null) {
+				return new ShellCommandDecisionObject(ShellCommandEnum::WRITES_GIT, $gitCommand);
 			}
 		}
 
-		return null;
+		return new ShellCommandDecisionObject(ShellCommandEnum::ALLOWED, null);
 	}
 
 	/**
@@ -96,7 +93,11 @@ class JudgeShellCommandAction extends Command
 		));
 	}
 
-	private function judgeSegment(string $segment): ?string
+	/**
+	 * The git command in this part of the line that writes, or null when it
+	 * holds none.
+	 */
+	private function writingGitCommandIn(string $segment): ?string
 	{
 		preg_match_all('/"((?:[^"\\\\]|\\\\.)*)"|\'([^\']*)\'|(\S+)/', $segment, $found, PREG_SET_ORDER);
 
@@ -108,10 +109,10 @@ class JudgeShellCommandAction extends Command
 
 			// a command handed to another shell is judged as a command of its own
 			if ($quoted !== '' && $words !== [] && $this->handsToShell($words)) {
-				$refusal = self::execute($quoted);
+				$gitCommand = $this->decide(new ShellCommandObject(command: $quoted))->gitCommand;
 
-				if ($refusal !== null) {
-					return $refusal;
+				if ($gitCommand !== null) {
+					return $gitCommand;
 				}
 			}
 
@@ -120,10 +121,10 @@ class JudgeShellCommandAction extends Command
 
 		foreach ($words as $position => $word) {
 			if ($this->isGit($word)) {
-				$refusal = $this->judgeGit(array_slice($words, $position + 1));
+				$gitCommand = $this->writingGitCommand(array_slice($words, $position + 1));
 
-				if ($refusal !== null) {
-					return $refusal;
+				if ($gitCommand !== null) {
+					return $gitCommand;
 				}
 			}
 		}
@@ -153,9 +154,11 @@ class JudgeShellCommandAction extends Command
 	}
 
 	/**
+	 * The git command these words run when it writes, or null when it only reads.
+	 *
 	 * @param  list<string>  $arguments  what follows the word git
 	 */
-	private function judgeGit(array $arguments): ?string
+	private function writingGitCommand(array $arguments): ?string
 	{
 		while ($arguments !== [] && str_starts_with($arguments[0], '-')) {
 			$option = array_shift($arguments);
@@ -175,9 +178,7 @@ class JudgeShellCommandAction extends Command
 			return null;
 		}
 
-		return __('DevDock laat git alleen lezen: git :command is voor de knoppen. Committen, pushen en rebasen doet David in DevDock. Laat de wijziging in de werkkopie staan en zeg in je verslag wat klaar is.', [
-			'command' => $subcommand,
-		]);
+		return $subcommand;
 	}
 
 	/**

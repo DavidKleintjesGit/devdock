@@ -12,7 +12,7 @@ use Src\Packages\ValueObject\ValueObject;
  * is denied, the Atlassian operations it may still write through, and the git
  * commands it may run.
  */
-class AccessPolicyObject extends ValueObject
+class RoleAccessObject extends ValueObject
 {
 	/**
 	 * @param  list<string>  $deniedTools

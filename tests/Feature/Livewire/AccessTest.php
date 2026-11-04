@@ -9,7 +9,7 @@ use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Src\Access\Enums\AgentRoleEnum;
 use Src\Access\Objects\AccessOverviewObject;
-use Src\Access\Objects\AccessPolicyObject;
+use Src\Access\Objects\RoleAccessObject;
 use Tests\TestCase;
 
 /**
@@ -25,8 +25,8 @@ class AccessTest extends TestCase
 		$component->assertViewHas(
 			'accessOverview',
 			fn (AccessOverviewObject $accessOverviewObject): bool => array_map(
-				fn (AccessPolicyObject $accessPolicyObject): AgentRoleEnum => $accessPolicyObject->agentRole,
-				$accessOverviewObject->accessPolicies,
+				fn (RoleAccessObject $roleAccessObject): AgentRoleEnum => $roleAccessObject->agentRole,
+				$accessOverviewObject->roleAccesses,
 			) === AgentRoleEnum::cases(),
 		);
 	}

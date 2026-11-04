@@ -29,8 +29,8 @@
 						<thead>
 							<tr>
 								<th style="width:34%"></th>
-								@foreach ($accessOverview->accessPolicies as $accessPolicy)
-									<th>{{ $accessPolicy->agentRole->label() }}<br><span class="hint" style="font-weight:400">{{ $accessPolicy->agentRole->explanation() }}</span></th>
+								@foreach ($accessOverview->roleAccesses as $roleAccess)
+									<th>{{ $roleAccess->agentRole->label() }}<br><span class="hint" style="font-weight:400">{{ $roleAccess->agentRole->explanation() }}</span></th>
 								@endforeach
 							</tr>
 						</thead>
@@ -38,8 +38,8 @@
 							@foreach ($capabilities as $capability)
 								<tr wire:key="capability-{{ $capability->value }}">
 									<td><b>{{ $capability->label() }}</b>@if ($capability->hint())<br><span class="hint">{{ $capability->hint() }}</span>@endif</td>
-									@foreach ($accessOverview->accessPolicies as $accessPolicy)
-										<td><span class="label {{ $capability->answerFor($accessPolicy)->tone() }}">{{ $capability->answerFor($accessPolicy)->label() }}</span></td>
+									@foreach ($accessOverview->roleAccesses as $roleAccess)
+										<td><span class="label {{ $capability->answerFor($roleAccess)->tone() }}">{{ $capability->answerFor($roleAccess)->label() }}</span></td>
 									@endforeach
 								</tr>
 							@endforeach

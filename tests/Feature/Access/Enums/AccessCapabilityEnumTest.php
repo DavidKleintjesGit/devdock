@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Access\Enums;
 
 use PHPUnit\Framework\Attributes\Test;
-use Src\Access\Actions\GetAccessPolicyAction;
+use Src\Access\Actions\GetRoleAccessAction;
 use Src\Access\Enums\AccessAnswerEnum;
 use Src\Access\Enums\AccessCapabilityEnum;
 use Src\Access\Enums\AgentRoleEnum;
@@ -21,7 +21,7 @@ class AccessCapabilityEnumTest extends TestCase
 	{
 		config(['devdock.access.agent_operations' => [AccessCapabilityEnum::PULL_REQUEST_OPERATION]]);
 
-		$accessAnswer = AccessCapabilityEnum::OPEN_PULL_REQUEST->answerFor(GetAccessPolicyAction::execute(AgentRoleEnum::AGENT));
+		$accessAnswer = AccessCapabilityEnum::OPEN_PULL_REQUEST->answerFor(GetRoleAccessAction::execute(AgentRoleEnum::AGENT));
 
 		$this->assertSame(AccessAnswerEnum::GUARDED, $accessAnswer);
 	}
@@ -31,7 +31,7 @@ class AccessCapabilityEnumTest extends TestCase
 	{
 		config(['devdock.access.agent_operations' => [AccessCapabilityEnum::PULL_REQUEST_OPERATION, 'addCommentToJiraIssue']]);
 
-		$accessAnswer = AccessCapabilityEnum::OTHER_ATLASSIAN_WRITES->answerFor(GetAccessPolicyAction::execute(AgentRoleEnum::AGENT));
+		$accessAnswer = AccessCapabilityEnum::OTHER_ATLASSIAN_WRITES->answerFor(GetRoleAccessAction::execute(AgentRoleEnum::AGENT));
 
 		$this->assertSame(AccessAnswerEnum::GUARDED, $accessAnswer);
 	}
@@ -39,7 +39,7 @@ class AccessCapabilityEnumTest extends TestCase
 	#[Test]
 	public function answer_for_refuses_a_lens_any_change_to_files(): void
 	{
-		$accessAnswer = AccessCapabilityEnum::CHANGE_FILES->answerFor(GetAccessPolicyAction::execute(AgentRoleEnum::LENS));
+		$accessAnswer = AccessCapabilityEnum::CHANGE_FILES->answerFor(GetRoleAccessAction::execute(AgentRoleEnum::LENS));
 
 		$this->assertSame(AccessAnswerEnum::NO, $accessAnswer);
 	}

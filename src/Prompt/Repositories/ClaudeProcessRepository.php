@@ -9,7 +9,7 @@ use Dotenv\Dotenv;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
-use Src\Access\Objects\AccessPolicyObject;
+use Src\Access\Objects\RoleAccessObject;
 use Src\Packages\Process\DetachedCommand;
 use Src\Packages\Process\LocalCommand;
 use Src\Prompt\Contracts\ClaudeProcessRepositoryContract;
@@ -40,12 +40,12 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 * Opens Claude Code in a terminal window of its own. The window stays open
 	 * after Claude stops, so an error is still readable.
 	 */
-	public function openInTerminal(AccessPolicyObject $accessPolicyObject, string $directory, ?string $sessionUuid, array $alsoReads = [], ?string $instructionsFile = null): void
+	public function openInTerminal(RoleAccessObject $roleAccessObject, string $directory, ?string $sessionUuid, array $alsoReads = [], ?string $instructionsFile = null): void
 	{
 		$claude = escapeshellarg($this->claudeBinary());
 		$resume = $sessionUuid === null ? '' : ' --resume ' . escapeshellarg($sessionUuid);
 
-		foreach ([...$this->alsoReads($alsoReads), ...$this->accessArguments($accessPolicyObject)] as $argument) {
+		foreach ([...$this->alsoReads($alsoReads), ...$this->accessArguments($roleAccessObject)] as $argument) {
 			$claude .= ' ' . escapeshellarg($argument);
 		}
 
@@ -109,7 +109,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 * session id next to the answer, so a fresh session can be tied to the
 	 * board and renamed afterwards.
 	 */
-	public function run(AccessPolicyObject $accessPolicyObject, PromptRunEntity $promptRunEntity, array $alsoReads, string $logPath, string $instructionsPath): PromptResultObject
+	public function run(RoleAccessObject $roleAccessObject, PromptRunEntity $promptRunEntity, array $alsoReads, string $logPath, string $instructionsPath): PromptResultObject
 	{
 		$directory = $promptRunEntity->directory ?? base_path();
 
@@ -117,7 +117,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 		// which cuts it off past 8191 characters, and a long prompt then arrives empty
 		$arguments = [
 			...$this->alsoReads($alsoReads),
-			...$this->accessArguments($accessPolicyObject),
+			...$this->accessArguments($roleAccessObject),
 			'-p',
 			'--output-format',
 			'stream-json',
@@ -209,7 +209,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 * @param  Closure(array<string, mixed>): void  $onEvent
 	 */
 	public function watch(
-		AccessPolicyObject $accessPolicyObject,
+		RoleAccessObject $roleAccessObject,
 		string $directory,
 		string $question,
 		?string $logPath,
@@ -236,7 +236,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 				[
 					$this->claudeBinary(),
 					...$this->alsoReads($alsoReads),
-					...$this->accessArguments($accessPolicyObject),
+					...$this->accessArguments($roleAccessObject),
 					'-p',
 					'--output-format',
 					'stream-json',
@@ -277,9 +277,9 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 		return $answer;
 	}
 
-	public function ask(AccessPolicyObject $accessPolicyObject, string $directory, ?string $sessionUuid, string $question): ?string
+	public function ask(RoleAccessObject $roleAccessObject, string $directory, ?string $sessionUuid, string $question): ?string
 	{
-		$arguments = [...$this->accessArguments($accessPolicyObject), '-p', '--output-format', 'json'];
+		$arguments = [...$this->accessArguments($roleAccessObject), '-p', '--output-format', 'json'];
 
 		if (filled($sessionUuid)) {
 			$arguments = ['--resume', $sessionUuid, ...$arguments];
@@ -307,13 +307,13 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 *
 	 * @return list<string>
 	 */
-	private function accessArguments(AccessPolicyObject $accessPolicyObject): array
+	private function accessArguments(RoleAccessObject $roleAccessObject): array
 	{
-		$arguments = $accessPolicyObject->deniedTools === []
+		$arguments = $roleAccessObject->deniedTools === []
 			? []
-			: ['--disallowedTools', implode(',', $accessPolicyObject->deniedTools)];
+			: ['--disallowedTools', implode(',', $roleAccessObject->deniedTools)];
 
-		return [...$arguments, '--settings', $this->guardSettings($accessPolicyObject)];
+		return [...$arguments, '--settings', $this->guardSettings($roleAccessObject)];
 	}
 
 	/**
@@ -321,16 +321,16 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 * devdock:guard-git in front of every shell command, and devdock:guard-write
 	 * in front of every executeWrite when the role may still write through it.
 	 */
-	private function guardSettings(AccessPolicyObject $accessPolicyObject): string
+	private function guardSettings(RoleAccessObject $roleAccessObject): string
 	{
-		$path = storage_path('app/claude/' . $accessPolicyObject->agentRole->value . '-settings.json');
+		$path = storage_path('app/claude/' . $roleAccessObject->agentRole->value . '-settings.json');
 
 		$guards = [[
 			'matcher' => 'Bash|PowerShell',
 			'hooks' => [['type' => 'command', 'command' => $this->artisanCommand('devdock:guard-git'), 'timeout' => 30]],
 		]];
 
-		if ($accessPolicyObject->guardsAtlassianWrites()) {
+		if ($roleAccessObject->guardsAtlassianWrites()) {
 			$guards[] = [
 				'matcher' => 'mcp__.*__executeWrite',
 				'hooks' => [['type' => 'command', 'command' => $this->artisanCommand('devdock:guard-write'), 'timeout' => 30]],

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Prompt\Actions;
 
-use Src\Access\Actions\GetAccessPolicyAction;
+use Src\Access\Actions\GetRoleAccessAction;
 use Src\Access\Enums\AgentRoleEnum;
 use Src\Board\Actions\BuildBoardAction;
 use Src\Board\Objects\CardObject;
@@ -44,7 +44,7 @@ class GenerateBranchNameAction extends Command
 
 		// the checkout itself: there is no working copy yet, and the branches
 		// it already holds are the example to follow
-		$answer = $claudeProcessRepository->ask(GetAccessPolicyAction::execute(AgentRoleEnum::HELPER), $projectEntity->path, null, $this->question($cardObject));
+		$answer = $claudeProcessRepository->ask(GetRoleAccessAction::execute(AgentRoleEnum::HELPER), $projectEntity->path, null, $this->question($cardObject));
 
 		return $this->readName($answer);
 	}

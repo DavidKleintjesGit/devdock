@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Src\Prompt\Contracts;
 
 use Closure;
-use Src\Access\Objects\AccessPolicyObject;
+use Src\Access\Objects\RoleAccessObject;
 use Src\Prompt\Objects\PromptResultObject;
 use Src\Prompt\Objects\PromptRunEntity;
 use Src\Prompt\Objects\PromptRunId;
@@ -27,9 +27,9 @@ interface ClaudeProcessRepositoryContract
 	 * Opens Claude Code in a terminal of its own, in that folder and on that
 	 * session, so you can carry on by hand where the board left off. An
 	 * instructions file goes along as the task context of that session.
-	 * Claude Code there reaches what the access policy allows.
+	 * Claude Code there reaches what the role may reach.
 	 */
-	public function openInTerminal(AccessPolicyObject $accessPolicyObject, string $directory, ?string $sessionUuid, array $alsoReads = [], ?string $instructionsFile = null): void;
+	public function openInTerminal(RoleAccessObject $roleAccessObject, string $directory, ?string $sessionUuid, array $alsoReads = [], ?string $instructionsFile = null): void;
 
 	/**
 	 * Breaks off the round that is working on this row. The process tree goes
@@ -44,13 +44,13 @@ interface ClaudeProcessRepositoryContract
 	 *
 	 * @param  array<int, string>  $alsoReads
 	 */
-	public function run(AccessPolicyObject $accessPolicyObject, PromptRunEntity $promptRunEntity, array $alsoReads, string $logPath, string $instructionsPath): PromptResultObject;
+	public function run(RoleAccessObject $roleAccessObject, PromptRunEntity $promptRunEntity, array $alsoReads, string $logPath, string $instructionsPath): PromptResultObject;
 
 	/**
 	 * Asks one short question and waits for the answer. Meant for something
 	 * the page needs straight away, not for work that takes minutes.
 	 */
-	public function ask(AccessPolicyObject $accessPolicyObject, string $directory, ?string $sessionUuid, string $question): ?string;
+	public function ask(RoleAccessObject $roleAccessObject, string $directory, ?string $sessionUuid, string $question): ?string;
 
 	/**
 	 * Lets Claude work while it says what it is doing. Meant for work that
@@ -59,7 +59,7 @@ interface ClaudeProcessRepositoryContract
 	 * @param  Closure(array<string, mixed>): void  $onEvent
 	 */
 	public function watch(
-		AccessPolicyObject $accessPolicyObject,
+		RoleAccessObject $roleAccessObject,
 		string $directory,
 		string $question,
 		?string $logPath,

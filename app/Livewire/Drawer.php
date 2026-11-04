@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use Src\Access\Actions\GetAccessPolicyAction;
+use Src\Access\Actions\GetRoleAccessAction;
 use Src\Access\Enums\AgentRoleEnum;
 use Src\Board\Actions\BuildTaskPromptAction;
 use Src\Board\Actions\DeleteTodoAction;
@@ -646,7 +646,7 @@ class Drawer extends Component
 		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
 
 		resolve(ClaudeProcessRepositoryContract::class)->openInTerminal(
-			GetAccessPolicyAction::execute(AgentRoleEnum::AGENT),
+			GetRoleAccessAction::execute(AgentRoleEnum::AGENT),
 			$directory,
 			$cardObject?->agent?->sessionUuid,
 			GetReadableDirectoriesAction::execute((string) $this->openCard),

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use Src\Access\Actions\GetAccessPolicyAction;
+use Src\Access\Actions\GetRoleAccessAction;
 use Src\Access\Enums\AgentRoleEnum;
 use Src\Prompt\Contracts\ClaudeProcessRepositoryContract;
 use Src\Session\Actions\DeleteSessionAction;
@@ -117,7 +117,7 @@ trait WithSessionActions
 		$sessionEntity = $this->sessionByUuid($uuid);
 
 		if ($sessionEntity?->cwd !== null && is_dir($sessionEntity->cwd)) {
-			resolve(ClaudeProcessRepositoryContract::class)->openInTerminal(GetAccessPolicyAction::execute(AgentRoleEnum::AGENT), $sessionEntity->cwd, $sessionEntity->uuid, []);
+			resolve(ClaudeProcessRepositoryContract::class)->openInTerminal(GetRoleAccessAction::execute(AgentRoleEnum::AGENT), $sessionEntity->cwd, $sessionEntity->uuid, []);
 		}
 	}
 

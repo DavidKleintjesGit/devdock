@@ -2,17 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\Access\Actions;
+namespace Tests\Unit\Access\Policies;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
-use Src\Access\Actions\JudgeShellCommandAction;
-use Tests\TestCase;
+use PHPUnit\Framework\TestCase;
+use Src\Access\Enums\ShellCommandEnum;
+use Src\Access\Objects\ShellCommandObject;
+use Src\Access\Policies\ShellCommandPolicy;
 
 /**
- * @see JudgeShellCommandAction
+ * @see ShellCommandPolicy
  */
-class JudgeShellCommandActionTest extends TestCase
+class ShellCommandPolicyTest extends TestCase
 {
 	/**
 	 * @return array<string, array{string}>
@@ -75,27 +77,27 @@ class JudgeShellCommandActionTest extends TestCase
 
 	#[Test]
 	#[DataProvider('readingCommands')]
-	public function execute_lets_a_command_that_only_reads_git_run(string $command): void
+	public function decide_lets_a_command_that_only_reads_git_run(string $command): void
 	{
-		$refusal = JudgeShellCommandAction::execute($command);
+		$shellCommandDecisionObject = (new ShellCommandPolicy())->decide(new ShellCommandObject(command: $command));
 
-		$this->assertNull($refusal);
+		$this->assertSame(ShellCommandEnum::ALLOWED, $shellCommandDecisionObject->outcome);
 	}
 
 	#[Test]
 	#[DataProvider('writingCommands')]
-	public function execute_refuses_a_command_that_writes_to_git(string $command): void
+	public function decide_refuses_a_command_that_writes_to_git(string $command): void
 	{
-		$refusal = JudgeShellCommandAction::execute($command);
+		$shellCommandDecisionObject = (new ShellCommandPolicy())->decide(new ShellCommandObject(command: $command));
 
-		$this->assertNotNull($refusal);
+		$this->assertSame(ShellCommandEnum::WRITES_GIT, $shellCommandDecisionObject->outcome);
 	}
 
 	#[Test]
-	public function execute_names_the_refused_git_command_in_the_reason(): void
+	public function decide_names_the_git_command_that_writes(): void
 	{
-		$refusal = JudgeShellCommandAction::execute('git push origin main');
+		$shellCommandDecisionObject = (new ShellCommandPolicy())->decide(new ShellCommandObject(command: 'git push origin main'));
 
-		$this->assertStringContainsString('git push', $refusal);
+		$this->assertSame('push', $shellCommandDecisionObject->gitCommand);
 	}
 }

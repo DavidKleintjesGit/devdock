@@ -7,7 +7,7 @@ namespace Tests\Feature\Prompt\Repositories;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Process;
 use PHPUnit\Framework\Attributes\Test;
-use Src\Access\Actions\GetAccessPolicyAction;
+use Src\Access\Actions\GetRoleAccessAction;
 use Src\Access\Enums\AgentRoleEnum;
 use Src\Prompt\Contracts\ClaudeProcessRepositoryContract;
 use Src\Prompt\Repositories\ClaudeProcessRepository;
@@ -39,7 +39,7 @@ class ClaudeProcessRepositoryTest extends TestCase
 	#[Test]
 	public function ask_denies_a_helper_the_tools_that_change_files(): void
 	{
-		resolve(ClaudeProcessRepositoryContract::class)->ask(GetAccessPolicyAction::execute(AgentRoleEnum::HELPER), $this->repository->path, null, fake()->sentence());
+		resolve(ClaudeProcessRepositoryContract::class)->ask(GetRoleAccessAction::execute(AgentRoleEnum::HELPER), $this->repository->path, null, fake()->sentence());
 
 		Process::assertRan(fn (PendingProcess $pendingProcess): bool => in_array('Edit', explode(',', $this->valueAfter($pendingProcess, '--disallowedTools')), true));
 	}
@@ -47,7 +47,7 @@ class ClaudeProcessRepositoryTest extends TestCase
 	#[Test]
 	public function ask_puts_the_git_guard_in_front_of_every_shell_command(): void
 	{
-		resolve(ClaudeProcessRepositoryContract::class)->ask(GetAccessPolicyAction::execute(AgentRoleEnum::HELPER), $this->repository->path, null, fake()->sentence());
+		resolve(ClaudeProcessRepositoryContract::class)->ask(GetRoleAccessAction::execute(AgentRoleEnum::HELPER), $this->repository->path, null, fake()->sentence());
 
 		Process::assertRan(function (PendingProcess $pendingProcess): bool {
 			$settings = json_decode((string) file_get_contents($this->valueAfter($pendingProcess, '--settings')), true);
@@ -60,7 +60,7 @@ class ClaudeProcessRepositoryTest extends TestCase
 	#[Test]
 	public function ask_starts_claude_where_a_commit_to_the_repository_is_refused(): void
 	{
-		resolve(ClaudeProcessRepositoryContract::class)->ask(GetAccessPolicyAction::execute(AgentRoleEnum::HELPER), $this->repository->path, null, fake()->sentence());
+		resolve(ClaudeProcessRepositoryContract::class)->ask(GetRoleAccessAction::execute(AgentRoleEnum::HELPER), $this->repository->path, null, fake()->sentence());
 		$this->repository->write('billing/Invoice.php', '<?php');
 		$this->repository->git('add', 'billing/Invoice.php');
 
@@ -72,7 +72,7 @@ class ClaudeProcessRepositoryTest extends TestCase
 	#[Test]
 	public function ask_starts_claude_where_a_push_is_refused(): void
 	{
-		resolve(ClaudeProcessRepositoryContract::class)->ask(GetAccessPolicyAction::execute(AgentRoleEnum::HELPER), $this->repository->path, null, fake()->sentence());
+		resolve(ClaudeProcessRepositoryContract::class)->ask(GetRoleAccessAction::execute(AgentRoleEnum::HELPER), $this->repository->path, null, fake()->sentence());
 		$this->repository->commit('billing/Invoice.php', '<?php', 'Add an invoice');
 
 		$isPushed = $this->repository->gitSucceedsWith($this->environmentOfClaude(), 'push', '--no-verify', 'origin', 'main');
@@ -83,7 +83,7 @@ class ClaudeProcessRepositoryTest extends TestCase
 	#[Test]
 	public function ask_leaves_a_commit_to_another_repository_alone(): void
 	{
-		resolve(ClaudeProcessRepositoryContract::class)->ask(GetAccessPolicyAction::execute(AgentRoleEnum::HELPER), $this->repository->path, null, fake()->sentence());
+		resolve(ClaudeProcessRepositoryContract::class)->ask(GetRoleAccessAction::execute(AgentRoleEnum::HELPER), $this->repository->path, null, fake()->sentence());
 		$otherRepository = TemporaryGitRepository::create();
 		$otherRepository->write('billing/Invoice.php', '<?php');
 		$otherRepository->git('add', 'billing/Invoice.php');
@@ -97,7 +97,7 @@ class ClaudeProcessRepositoryTest extends TestCase
 	#[Test]
 	public function watch_leaves_an_agent_the_tools_that_change_files(): void
 	{
-		resolve(ClaudeProcessRepositoryContract::class)->watch(GetAccessPolicyAction::execute(AgentRoleEnum::AGENT), $this->repository->path, fake()->sentence(), null, fn (array $event): null => null);
+		resolve(ClaudeProcessRepositoryContract::class)->watch(GetRoleAccessAction::execute(AgentRoleEnum::AGENT), $this->repository->path, fake()->sentence(), null, fn (array $event): null => null);
 
 		Process::assertRan(fn (PendingProcess $pendingProcess): bool => ! in_array('Edit', explode(',', $this->valueAfter($pendingProcess, '--disallowedTools')), true));
 	}
@@ -105,7 +105,7 @@ class ClaudeProcessRepositoryTest extends TestCase
 	#[Test]
 	public function watch_denies_a_lens_the_tools_that_change_files(): void
 	{
-		resolve(ClaudeProcessRepositoryContract::class)->watch(GetAccessPolicyAction::execute(AgentRoleEnum::LENS), $this->repository->path, fake()->sentence(), null, fn (array $event): null => null);
+		resolve(ClaudeProcessRepositoryContract::class)->watch(GetRoleAccessAction::execute(AgentRoleEnum::LENS), $this->repository->path, fake()->sentence(), null, fn (array $event): null => null);
 
 		Process::assertRan(fn (PendingProcess $pendingProcess): bool => in_array('Edit', explode(',', $this->valueAfter($pendingProcess, '--disallowedTools')), true));
 	}

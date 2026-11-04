@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use Src\Access\Actions\JudgeShellCommandAction;
+use Src\Access\Objects\ShellCommandObject;
+use Src\Access\Policies\ShellCommandPolicy;
 
 /**
  * The hook Claude Code calls before an agent, lens or helper runs a shell
@@ -23,7 +24,7 @@ class GuardGitCommand extends Command
 		$call = json_decode((string) file_get_contents('php://stdin'), true);
 		$command = is_array($call) ? ($call['tool_input']['command'] ?? null) : null;
 
-		$refusal = is_string($command) ? JudgeShellCommandAction::execute($command) : null;
+		$refusal = is_string($command) ? resolve(ShellCommandPolicy::class)->decide(new ShellCommandObject(command: $command))->reason() : null;
 
 		if ($refusal !== null) {
 			$this->line((string) json_encode([

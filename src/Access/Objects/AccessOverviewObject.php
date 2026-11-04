@@ -13,7 +13,7 @@ use Src\Packages\ValueObject\ValueObject;
 class AccessOverviewObject extends ValueObject
 {
 	/**
-	 * @param  list<AccessPolicyObject>  $accessPolicies
+	 * @param  list<RoleAccessObject>  $roleAccesses
 	 * @param  list<string>  $servers
 	 * @param  list<string>  $writingTools
 	 * @param  list<string>  $agentOperations
@@ -21,7 +21,7 @@ class AccessOverviewObject extends ValueObject
 	 * @param  list<string>  $gitListing
 	 */
 	public function __construct(
-		public readonly array $accessPolicies,
+		public readonly array $roleAccesses,
 		public readonly array $servers,
 		public readonly array $writingTools,
 		public readonly array $agentOperations,

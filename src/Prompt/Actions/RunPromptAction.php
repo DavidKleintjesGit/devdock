@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Prompt\Actions;
 
-use Src\Access\Actions\GetAccessPolicyAction;
+use Src\Access\Actions\GetRoleAccessAction;
 use Src\Access\Enums\AgentRoleEnum;
 use Src\Packages\Cqrs\Command;
 use Src\Prompt\Contracts\ClaudeProcessRepositoryContract;
@@ -51,7 +51,7 @@ class RunPromptAction extends Command
 
 		try {
 			$promptResultObject = $claudeProcessRepository->run(
-				GetAccessPolicyAction::execute(AgentRoleEnum::AGENT),
+				GetRoleAccessAction::execute(AgentRoleEnum::AGENT),
 				$promptRunEntity,
 				GetReadableDirectoriesAction::execute($promptRunEntity->card),
 				$promptRunRepository->logPath($this->promptRunId),

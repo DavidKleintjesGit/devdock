@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Access\Enums;
 
-use Src\Access\Objects\AccessPolicyObject;
+use Src\Access\Objects\RoleAccessObject;
 
 /**
  * One thing Claude Code could do in a task, as the Access page asks it of
@@ -48,15 +48,15 @@ enum AccessCapabilityEnum: string
 		};
 	}
 
-	public function answerFor(AccessPolicyObject $accessPolicyObject): AccessAnswerEnum
+	public function answerFor(RoleAccessObject $roleAccessObject): AccessAnswerEnum
 	{
-		$otherOperations = array_diff($accessPolicyObject->writableOperations, [self::PULL_REQUEST_OPERATION]);
+		$otherOperations = array_diff($roleAccessObject->writableOperations, [self::PULL_REQUEST_OPERATION]);
 
 		return match ($this) {
-			self::CHANGE_FILES => $accessPolicyObject->agentRole->editsFiles() ? AccessAnswerEnum::YES : AccessAnswerEnum::NO,
+			self::CHANGE_FILES => $roleAccessObject->agentRole->editsFiles() ? AccessAnswerEnum::YES : AccessAnswerEnum::NO,
 			self::READ_GIT, self::READ_ATLASSIAN => AccessAnswerEnum::YES,
 			self::WRITE_GIT => AccessAnswerEnum::NO,
-			self::OPEN_PULL_REQUEST => in_array(self::PULL_REQUEST_OPERATION, $accessPolicyObject->writableOperations, true) ? AccessAnswerEnum::GUARDED : AccessAnswerEnum::NO,
+			self::OPEN_PULL_REQUEST => in_array(self::PULL_REQUEST_OPERATION, $roleAccessObject->writableOperations, true) ? AccessAnswerEnum::GUARDED : AccessAnswerEnum::NO,
 			self::OTHER_ATLASSIAN_WRITES => $otherOperations === [] ? AccessAnswerEnum::NO : AccessAnswerEnum::GUARDED,
 		};
 	}
