@@ -1,7 +1,7 @@
 # Code guidelines
 
 > **Scope:** All of David's Laravel projects
-> **Last reviewed:** 2026-08-24
+> **Last reviewed:** 2026-11-04
 > **Source of truth:** no-time-api (to become its own package)
 
 Rules that apply to every line of PHP — production code and tests alike. Where a rule concerns a specific layer, `architecture.md` has the detail; where it concerns a test, `testing.md` does.
@@ -20,7 +20,7 @@ Rules that apply to every line of PHP — production code and tests alike. Where
 - **A variable name says exactly what it holds, and the suffix says what type it is.** `$orderEntity`, `$orderObject`, `$orderArray`, `$orderEloquent`.
 - **`$order` is wrong** — model, entity, array, object? So are `$data`, `$result`, `$item`, and every other name that survives a copy-paste into any context.
 - `$orderEloquent` never leaves the repository (see `architecture.md`, `## Repositories`).
-- **Every domain class name ends in a type suffix:** `*Object`, `*Entity`, `*Collection`, `*Contract`, `*Repository`, `*Action`, `*Enum`, `*Controller`, `*Request`. No bare class names.
+- **Every domain class name ends in a type suffix:** `*Object`, `*Entity`, `*Collection`, `*Contract`, `*Repository`, `*Action`, `*Enum`, `*Controller`, `*Request`, `*Policy`. No bare class names.
 - **One exception:** events and listeners follow Laravel convention — an event is a past-tense fact (`OrderPaid`), a listener is named after its reaction (`SendInvoiceOnOrderPaid`). Neither takes a suffix. See `architecture.md`, `## Events and listeners`.
 
 ## IDs are objects, everywhere

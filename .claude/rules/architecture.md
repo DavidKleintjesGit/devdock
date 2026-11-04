@@ -1,12 +1,12 @@
 # Architecture guidelines
 
 > **Scope:** All of David's Laravel projects
-> **Last reviewed:** 2026-08-24
+> **Last reviewed:** 2026-11-04
 > **Source of truth:** no-time-api (to become its own package)
 
-DDD + Action + Repository. Not strict DDD — no aggregates. Pragmatic over pure: every rule here exists because it removes a decision, not because a book prescribes it.
+DDD + Action + Repository + Policy. Not strict DDD — no aggregates. Pragmatic over pure: every rule here exists because it removes a decision, not because a book prescribes it.
 
-The layer order is **Controller → Action → Repository**. Nothing skips a layer. Naming conventions for the classes named here are in `code.md`; how they are tested is in `testing.md`.
+The layer order is **Controller → Action → Repository**. Nothing skips a layer. An action that has to decide something asks a **policy**, which stands beside the action and never below it. Naming conventions for the classes named here are in `code.md`; how they are tested is in `testing.md`.
 
 ## How we think
 
@@ -14,7 +14,9 @@ Objects go in, entities come out. A `*Object` is what you hand to the system; an
 
 An entity knows about itself: its state, its labels, its own answers about its own condition. An action knows what happens between things. Knowledge that travels with a thing lives on the thing; knowledge that describes a process lives in an action.
 
-The same instinct holds one level up. A controller knows HTTP, an action knows the process, a repository knows storage, an entity knows itself, a view knows presentation — and nothing knows two of those.
+The same instinct holds one level up. A controller knows HTTP, an action knows the process, a repository knows storage, a policy knows the rule, an entity knows itself, a view knows presentation — and nothing knows two of those.
+
+A rule is a decision that has to come out the same way wherever it is made: whether a branch may be deleted, whether a round passed, whether a working copy is ready. It gets one home, a policy, so it is written once, read in one place, and tested without anything around it.
 
 ## Controllers
 
@@ -38,8 +40,31 @@ The same instinct holds one level up. A controller knows HTTP, an action knows t
 - **One action, one responsibility** — the "and" test from `## How we think`, applied here.
 - **The constructor receives input data only** — a `*Object`, a `*Id`, or primitives. Repositories are parameters of `handle()`, where the container resolves them. A repository in the constructor is wrong.
 - **Accept only `*Object` and `*Id` types.** Never invent a wrapper (`*Options`, `*PatchData`) to smuggle extra parameters past this rule.
-- Actions own the business rules: thresholds, time windows, config reads, and any decision a repository is forbidden to make (see `## Repositories`).
+- **An action gathers the facts and acts on the outcome.** It calls the repositories, reads config and the clock, hands what it found to a policy for every decision a repository is forbidden to make, and carries out what the policy decided (see `## Policies`). The rule itself is never written out inside an action.
 - An action returns an entity or an entity collection as-is. It never unwraps a collection.
+
+## Policies
+
+- **A policy holds one rule: facts in, an outcome out.** It lives in `<Domain>/Domain/Policies/` and has one public method, `decide()`.
+- **A policy is pure.** No repository, no Eloquent, no config, no `now()`, no container, no facade, no file, no process, no log. Everything it needs comes in as a fact, the moment included. The same facts give the same outcome, always.
+- **The facts come in as one `*Object`** — `BranchFactsObject`, `ReadinessFactsObject` — built by the action from what the repositories returned.
+- **The outcome is an `*Enum` that names it**, never a bare `bool`: `BranchCleanUpEnum::UNPUSHED_WORK` says why, `false` does not. The text a user reads comes from `label()` on that enum. When an outcome has to carry data along, it is a `*DecisionObject` holding the enum and that data.
+- **A fact that is expensive may be missing.** It is nullable, and `null` means "not looked at". The policy turns that into an outcome of its own, such as `UNCHECKED`; it never guesses. Only when a fact is too expensive to gather every time does the policy answer in two steps: first which fact it still needs, then the decision.
+- **A policy is named after the rule, never after a model.** `BranchCleanUpPolicy`, not `WorktreePolicy`: Laravel registers a class named after a model plus `Policy` as that model's authorization policy, and a rule would silently become a gate. Authorization stays with the framework's own policies.
+- **A policy is tested without anything around it**: no database, no fake, no temporary folder. Build the facts, call `decide()`, assert the outcome — one test per outcome.
+
+```php
+// the action gathers the facts and acts; the policy decides
+$branchCleanUp = resolve(BranchCleanUpPolicy::class)->decide(new BranchFactsObject(
+	isCreatedHere: $worktreeEntity->branchCreated,
+	pullRequestState: $pullRequestRepository->stateFor($worktreeEntity->branch),
+	unpushedCommits: $worktreeRepository->countUnpushed($worktreeEntity->path),
+));
+
+if ($branchCleanUp === BranchCleanUpEnum::DELETE) {
+	$worktreeRepository->deleteBranch($worktreeEntity->path, $worktreeEntity->branch);
+}
+```
 
 ## Objects and entities
 
@@ -85,6 +110,8 @@ The same instinct holds one level up. A controller knows HTTP, an action knows t
 - **No cross-repository calls.** A repository reaches its own data store and nothing else. When a response needs data from two domains, the action calls both — each call a separate step in `handle()`.
 - **No business logic and no config reads.** A repository fetches and persists. A threshold, a time window, or any derived value is computed by the action and passed in as a parameter.
 - **No filtering that encodes a rule.** Querying `where('created_at', '>=', $since)` is fine when the action supplied `$since`; deciding that `$since` is six months ago is not.
+- **No decision and no text for a user.** Whether something may happen, which state a record ends in, what a message says: a policy decides it and its outcome enum words it. A repository that refuses throws an exception carrying what it ran into, never a sentence for the screen.
+- **The same holds for a repository over git, the disk, a process or an external API** as for one over a database: it reads and writes that store, and nothing more.
 
 ## Events and listeners
 
@@ -102,3 +129,4 @@ The same instinct holds one level up. A controller knows HTTP, an action knows t
 - No Eloquent outside a repository. Not in an action, not in a controller, not in a view, not in a command.
 - No raw arrays passed between controller, action, and repository. Typed objects at every hand-off.
 - No layer skipped. A controller that calls a repository is a bug even when it works.
+- No decision outside a policy. A repository fetches and persists, an action gathers and acts, a policy decides.
