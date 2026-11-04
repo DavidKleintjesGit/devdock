@@ -217,6 +217,11 @@ interface WorktreeRepositoryContract
 	public function isRebasing(string $path): bool;
 
 	/**
+	 * The branch a rebase that stands open in a working copy is rebasing, or null without one.
+	 */
+	public function getRebasingBranch(string $path): ?string;
+
+	/**
 	 * The files that are still unmerged in a working copy.
 	 *
 	 * @return list<string>

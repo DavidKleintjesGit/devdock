@@ -931,6 +931,21 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		return $gitDirectory !== null && (is_dir($gitDirectory . '/rebase-merge') || is_dir($gitDirectory . '/rebase-apply'));
 	}
 
+	public function getRebasingBranch(string $path): ?string
+	{
+		$gitDirectory = $this->gitDirectoryOf($path);
+
+		foreach (['rebase-merge', 'rebase-apply'] as $state) {
+			$headName = $gitDirectory === null ? '' : trim((string) @file_get_contents($gitDirectory . '/' . $state . '/head-name'));
+
+			if ($headName !== '') {
+				return (string) preg_replace('#^refs/heads/#', '', $headName);
+			}
+		}
+
+		return null;
+	}
+
 	public function getConflictedFiles(string $path): array
 	{
 		return is_dir($path) ? $this->conflictedFilesIn($path) : [];

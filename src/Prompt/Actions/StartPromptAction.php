@@ -112,7 +112,7 @@ class StartPromptAction extends Command
 		$directory = ResolveWorkingCopyAction::execute($project, $branch, $this->promptRunObject->card);
 
 		if ($directory !== null) {
-			EnsureOnBranchAction::execute($directory, $branch);
+			EnsureOnBranchAction::execute($directory, $branch, acceptsRebase: $this->promptRunObject->gitGrant === GitGrantEnum::REBASE);
 		}
 
 		return $directory;
