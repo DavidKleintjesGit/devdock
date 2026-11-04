@@ -9,6 +9,7 @@ use Closure;
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Process\Pool;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Src\Packages\Process\LocalCommand;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
@@ -50,6 +51,12 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 * The key under a branch in git's config that names the branch its pull request merges into.
 	 */
 	private const TARGET_KEY = 'devdock-target';
+
+	/**
+	 * The key under a branch in git's config that holds the stand of its target
+	 * the branch was last built on, where its own commits begin.
+	 */
+	private const BASE_KEY = 'devdock-base';
 
 	/**
 	 * How long what the fetch round read ahead stays. A copy that moves is
@@ -336,7 +343,23 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 */
 	private function branchBase(string $path): ?string
 	{
-		return $this->forkPoint($path, $this->targetBranch($path));
+		return $this->ownBase($path, $this->targetBranch($path));
+	}
+
+	/**
+	 * Where the own work of this branch begins: the stand of its target DevDock
+	 * remembered while the branch still held it, else the fork point.
+	 */
+	private function ownBase(string $path, string $target): ?string
+	{
+		$branch = $this->getBranch($path) ?? $this->getRebasingBranch($path);
+		$remembered = $branch === null ? null : trim(LocalCommand::run($path, ['git', 'config', '--get', 'branch.' . $branch . '.' . self::BASE_KEY])->output());
+
+		if (filled($remembered) && LocalCommand::run($path, ['git', 'merge-base', '--is-ancestor', $remembered, 'HEAD'])->successful()) {
+			return $remembered;
+		}
+
+		return $this->forkPoint($path, $target);
 	}
 
 	/**
@@ -360,21 +383,43 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	}
 
 	/**
-	 * The rebase that moves only the own commits of this branch onto its target.
-	 *
-	 * @return list<string>
+	 * Puts only the own commits of this branch on top of its target: the commits
+	 * after its own base that neither the target nor the main line holds. Commits
+	 * a merge of the main line brought in, and old copies of the work below it in
+	 * a stack, stay behind. The list git would replay is cut down to those
+	 * commits before it starts.
 	 */
-	private function rebaseCommand(string $path, string $target, bool $setsAsideWork): array
+	private function rebaseOwnCommits(string $path, string $target, bool $setsAsideWork): ProcessResult
 	{
-		$forkPoint = $this->forkPoint($path, $target);
+		$base = $this->ownBase($path, $target) ?? 'origin/' . $target;
+		$ownCommits = $this->lines($path, ['git', 'rev-list', '--no-merges', 'HEAD', '^' . $base, '^origin/' . $target, '^origin/' . $this->mainBranch($path)]);
 
-		return [
-			'git',
-			'rebase',
-			...($setsAsideWork ? ['--autostash'] : []),
-			...($forkPoint === null ? [] : ['--onto', 'origin/' . $target, $forkPoint]),
-			...($forkPoint === null ? ['origin/' . $target] : []),
-		];
+		$folder = storage_path('app/git-todo/' . bin2hex(random_bytes(6)));
+		File::ensureDirectoryExists($folder);
+		file_put_contents($folder . '/own', implode("\n", $ownCommits) . "\n");
+		// keeps the picks of the own commits and nothing else; without any, the branch becomes its target
+		file_put_contents($folder . '/keep.sh', "#!/bin/sh\n" . ($ownCommits === []
+			? "echo noop > \"\$1\"\n"
+			: "grep -E '^pick ' \"\$1\" | grep -F -f '" . str_replace('\\', '/', $folder) . "/own' > \"\$1.kept\"; mv \"\$1.kept\" \"\$1\"\n"));
+
+		$rebased = Process::path($path)
+			->timeout(self::TIMEOUT)
+			->env(['GIT_SEQUENCE_EDITOR' => 'sh "' . str_replace('\\', '/', $folder) . '/keep.sh"'])
+			->run(['git', '-c', 'core.abbrev=40', 'rebase', '--interactive', ...($setsAsideWork ? ['--autostash'] : []), '--onto', 'origin/' . $target, $base]);
+
+		File::deleteDirectory($folder);
+
+		return $rebased;
+	}
+
+	public function rememberBase(string $repositoryPath, string $branch): void
+	{
+		$target = $this->targetOf($repositoryPath, $branch);
+
+		// only a target the branch still holds marks where its own work begins
+		if (LocalCommand::run($repositoryPath, ['git', 'merge-base', '--is-ancestor', 'refs/remotes/origin/' . $target, 'refs/heads/' . $branch])->successful()) {
+			LocalCommand::run($repositoryPath, ['git', 'config', 'branch.' . $branch . '.' . self::BASE_KEY, trim(LocalCommand::run($repositoryPath, ['git', 'rev-parse', 'refs/remotes/origin/' . $target])->output())]);
+		}
 	}
 
 	public function getChanges(string $path): ChangeObjectCollection
@@ -849,7 +894,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		$before = LocalCommand::run($path, ['git', 'rev-parse', 'HEAD']);
 
 		// what is not committed yet is put aside for the rebase and laid back after it
-		$rebased = Process::path($path)->timeout(self::TIMEOUT)->run($this->rebaseCommand($path, $target, setsAsideWork: true));
+		$rebased = $this->rebaseOwnCommits($path, $target, setsAsideWork: true);
 
 		$this->forgetStatus($path);
 
@@ -891,7 +936,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		}
 
 		$before = LocalCommand::run($path, ['git', 'rev-parse', 'HEAD']);
-		$rebased = Process::path($path)->timeout(self::TIMEOUT)->run($this->rebaseCommand($path, $target, setsAsideWork: false));
+		$rebased = $this->rebaseOwnCommits($path, $target, setsAsideWork: false);
 
 		$this->forgetStatus($path);
 
@@ -1307,6 +1352,9 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		if (($current->successful() ? trim($current->output()) : null) === $wanted) {
 			return false;
 		}
+
+		// a base remembered against another target says nothing about this one
+		LocalCommand::run($repositoryPath, ['git', 'config', '--unset', 'branch.' . $branch . '.' . self::BASE_KEY]);
 
 		if ($wanted === null) {
 			return LocalCommand::run($repositoryPath, ['git', 'config', '--unset', $key])->successful();

@@ -51,6 +51,8 @@ class FollowPullRequestTargetsAction extends Command
 				$branchStandingRepository->forget($projectEntity->path, $worktreeEntity->branch);
 				$changedWorkingCopies++;
 			}
+
+			$worktreeRepository->rememberBase($projectEntity->path, $worktreeEntity->branch);
 		}
 
 		return $changedWorkingCopies;

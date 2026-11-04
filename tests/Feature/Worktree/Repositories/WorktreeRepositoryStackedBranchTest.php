@@ -67,6 +67,36 @@ class WorktreeRepositoryStackedBranchTest extends TestCase
 	}
 
 	#[Test]
+	public function rebase_leaves_main_line_commits_and_old_parent_copies_behind_when_git_forgot_the_fork(): void
+	{
+		$worktreeRepository = resolve(WorktreeRepositoryContract::class);
+		// the base is noted while the child still holds its parent, before the parent is rewritten again
+		$this->repository->git('-C', $this->path, 'reset', '--quiet', '--hard', 'origin/feature/parent');
+		file_put_contents($this->path . '/billing/Credit.php', "<?php\n");
+		$this->repository->git('-C', $this->path, 'add', '.');
+		$this->repository->git('-C', $this->path, 'commit', '--quiet', '-m', 'Add a credit');
+		$worktreeRepository->rememberBase($this->repository->path, 'feature/child');
+		// the main line moves on and is merged into the child, as a hand merge does
+		$this->repository->checkout('main');
+		$this->repository->commit('billing/Tax.php', "<?php\n", 'Add tax on the main line');
+		$this->repository->git('push', '--quiet', 'origin', 'main');
+		$mainLineCommit = $this->repository->git('rev-parse', 'HEAD');
+		$this->repository->git('-C', $this->path, 'merge', '--quiet', '--no-edit', 'origin/main');
+		// the parent is rewritten once more, and git keeps no memory of its old tip
+		$this->repository->checkout('feature/parent');
+		$this->repository->write('billing/Invoice.php', "<?php\n// eins\n");
+		$this->repository->git('commit', '--quiet', '--all', '--amend', '--no-edit');
+		$this->repository->git('push', '--quiet', '--force', 'origin', 'feature/parent');
+		$this->repository->git('reflog', 'expire', '--expire=now', '--all');
+
+		$failure = $worktreeRepository->rebase($this->path);
+
+		$this->assertNull($failure);
+		$this->assertSame('1', $this->repository->git('-C', $this->path, 'rev-list', '--count', 'origin/feature/parent..HEAD'));
+		$this->assertFalse($this->repository->gitSucceedsWith([], '-C', $this->path, 'merge-base', '--is-ancestor', $mainLineCommit, 'HEAD'));
+	}
+
+	#[Test]
 	public function get_for_sees_no_conflict_where_only_the_old_copy_of_the_parent_would_clash(): void
 	{
 		$branchStandingObject = resolve(BranchStandingRepositoryContract::class)->getFor($this->repository->path, 'feature/child');

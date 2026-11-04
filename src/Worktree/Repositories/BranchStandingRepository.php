@@ -83,7 +83,7 @@ class BranchStandingRepository implements BranchStandingRepositoryContract
 				$unread[$targetShas[$branch] . '|' . $branchShas[$branch]] = [
 					'target' => $targetShas[$branch],
 					'branch' => $branchShas[$branch],
-					'forkPoint' => $this->forkPoint($repositoryPath, $targets[$branch], $branchShas[$branch]),
+					'forkPoint' => $this->ownBase($repositoryPath, $branch, $targets[$branch], $branchShas[$branch]),
 				];
 			}
 		}
@@ -165,12 +165,19 @@ class BranchStandingRepository implements BranchStandingRepositoryContract
 	}
 
 	/**
-	 * Where a branch left its target on origin: the old tip of that target when
-	 * it was rewritten since, as git's reflog remembers it, or null to let git
-	 * take the common ancestor.
+	 * Where the own work of a branch begins: the stand of its target that
+	 * WorktreeRepository remembered while the branch held it, else the old tip of
+	 * the target as git's reflog knows it, or null to let git take the common
+	 * ancestor.
 	 */
-	private function forkPoint(string $repositoryPath, string $target, string $branchSha): ?string
+	private function ownBase(string $repositoryPath, string $branch, string $target, string $branchSha): ?string
 	{
+		$remembered = trim(LocalCommand::run($repositoryPath, ['git', 'config', '--get', 'branch.' . $branch . '.devdock-base'])->output());
+
+		if ($remembered !== '' && LocalCommand::run($repositoryPath, ['git', 'merge-base', '--is-ancestor', $remembered, $branchSha])->successful()) {
+			return $remembered;
+		}
+
 		$result = LocalCommand::run($repositoryPath, ['git', 'merge-base', '--fork-point', 'refs/remotes/origin/' . $target, $branchSha]);
 
 		return $result->successful() && trim($result->output()) !== '' ? trim($result->output()) : null;

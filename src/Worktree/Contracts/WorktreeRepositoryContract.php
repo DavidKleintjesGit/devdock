@@ -260,6 +260,12 @@ interface WorktreeRepositoryContract
 	public function setTargetBranch(string $repositoryPath, string $branch, ?string $target): bool;
 
 	/**
+	 * Notes the stand of its target a branch is built on, while the branch still
+	 * holds it, so its own commits stay known after the target is rewritten.
+	 */
+	public function rememberBase(string $repositoryPath, string $branch): void;
+
+	/**
 	 * Throws the standing state of a working copy away, for when something
 	 * outside this repository changed what is in it. The next look reads it
 	 * from git again.
