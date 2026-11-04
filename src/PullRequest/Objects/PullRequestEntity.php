@@ -81,6 +81,6 @@ class PullRequestEntity extends ValueObject
 	 */
 	public function boardKey(): string
 	{
-		return $this->ticketKey() ?? 'pr:' . $this->repository . '#' . $this->number;
+		return TicketKey::ofBranch($this->sourceBranch) ?? $this->ticketKey() ?? 'pr:' . $this->repository . '#' . $this->number;
 	}
 }

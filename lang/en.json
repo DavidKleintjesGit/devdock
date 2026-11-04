@@ -1580,5 +1580,7 @@
     "Er kwam geen bericht terug. Probeer het nog eens of schrijf het zelf.": "No message came back. Try again or write it yourself.",
     "Committen lukte niet: :reason": "Committing did not work: :reason",
     "Alleen bestanden van DevDock zelf waren gekozen; die gaan nooit mee in een commit.": "Only files of DevDock itself were chosen; those never go along in a commit.",
-    "Git gaf geen reden.": "Git gave no reason."
+    "Git gaf geen reden.": "Git gave no reason.",
+    "Aftakking van :ticket": "Variant of :ticket",
+    "aftakking": "variant"
 }

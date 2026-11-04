@@ -31,6 +31,24 @@ class TicketKey
 	}
 
 	/**
+	 * The key of the task a branch is: its ticket number, with what follows it in
+	 * the branch name when the branch is a variant of that ticket, such as
+	 * CSM-3396-medewerkerskaart next to CSM-3396. Null without a ticket number.
+	 */
+	public static function ofBranch(?string $branch): ?string
+	{
+		$ticket = self::find($branch);
+
+		if ($ticket === null) {
+			return null;
+		}
+
+		$name = (string) last(explode('/', (string) $branch));
+
+		return stripos($name, $ticket . '-') === 0 ? $ticket . substr($name, strlen($ticket)) : $ticket;
+	}
+
+	/**
 	 * Forgets the prefixes, for when a fetch brought in tickets of a new
 	 * project.
 	 */

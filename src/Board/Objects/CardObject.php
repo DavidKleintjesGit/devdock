@@ -129,6 +129,17 @@ class CardObject extends ValueObject
 	/**
 	 * Whether something happened on the task since you last opened it.
 	 */
+	/**
+	 * What sets this task apart from the ticket it branches off, such as
+	 * medewerkerskaart for CSM-3396-medewerkerskaart; null for the ticket's own task.
+	 */
+	public function variant(): ?string
+	{
+		return $this->ticketKey !== null && str_starts_with($this->id, $this->ticketKey . '-')
+			? substr($this->id, strlen($this->ticketKey) + 1)
+			: null;
+	}
+
 	public function hasUnread(): bool
 	{
 		return $this->unreadCount() > 0;

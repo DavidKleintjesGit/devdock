@@ -5,6 +5,7 @@
 	<span class="kline">
 		@if ($card->isHighPriority())<svg class="ic s prio" width="11" height="11" role="img" aria-label="{{ __('Hoge prioriteit') }}"><use href="#i-prio"/></svg>@endif
 		<span class="kkey">{{ $card->ticketKey ?? ($card->isTodo() ? __('to-do') : __('zonder ticket')) }}</span>
+		@if ($card->variant())<span class="label teal kvariant" title="{{ __('Aftakking van :ticket', ['ticket' => $card->ticketKey]) }}">{{ $card->variant() }}</span>@endif
 		@if ($card->project)<span>·</span><span class="kproject">{{ $card->project }}</span>@else<span class="kproject"></span>@endif
 		@if ($card->behind > 0)<span class="kbehind" title="{{ trans_choice(':count commit achter op :main|:count commits achter op :main', $card->behind, ['count' => $card->behind, 'main' => $card->targetBranch]) }}">↓{{ $card->behind }}</span>@endif
 		<span>{{ $card->ageLabel() }}</span>

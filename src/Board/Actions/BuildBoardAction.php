@@ -247,7 +247,7 @@ class BuildBoardAction extends Command
 				'key' => $this->pinned['pull_request'][$pullRequestEntity->repository . '#' . $pullRequestEntity->number]
 					// a pull request opened from the branch a task already holds belongs to that task
 					?? $this->pinned['branch'][(string) $pullRequestEntity->sourceBranch]
-					?? $this->pinned['ticket'][(string) $pullRequestEntity->ticketKey()]
+					?? $this->pinned['ticket'][$pullRequestEntity->boardKey()]
 					?? $pullRequestEntity->boardKey(),
 				'pullRequest' => $pullRequestEntity,
 			]);
@@ -261,7 +261,7 @@ class BuildBoardAction extends Command
 			->reject(fn (ProjectEntity $projectEntity) => $projectEntity->changedFiles === 0 && $projectEntity->ahead === 0)
 			->map(fn (ProjectEntity $projectEntity) => [
 				'key' => $this->pinned['branch'][$projectEntity->name . '/' . $projectEntity->branch]
-					?? $projectEntity->ticketKey()
+					?? TicketKey::ofBranch($projectEntity->branch)
 					?? $this->ticketFromSessions($projectEntity->branch)
 					?? 'branch:' . $projectEntity->name . '/' . $projectEntity->branch,
 				'project' => $projectEntity,
@@ -270,8 +270,11 @@ class BuildBoardAction extends Command
 
 		$started = $pullRequests->pluck('key')->concat($projects->pluck('key'));
 
+		// a ticket worked on only in a variant branch has its card there, not a second empty one
+		$startedTickets = $started->map(fn (string $key): ?string => TicketKey::find($key))->filter();
+
 		$tickets = $this->ticketsByKey
-			->reject(fn (TicketEntity $ticketEntity) => $started->contains($ticketEntity->key))
+			->reject(fn (TicketEntity $ticketEntity) => $startedTickets->contains($ticketEntity->key))
 			->map(fn (TicketEntity $ticketEntity) => [
 				'key' => $this->pinned['ticket'][$ticketEntity->key] ?? $ticketEntity->key,
 				'ticket' => $ticketEntity,
@@ -315,7 +318,7 @@ class BuildBoardAction extends Command
 		$projectEntity = $pieces->pluck('project')->filter()->first();
 		$taskEntity = $this->tasksByKey->get($key);
 		$ticketKey = $taskEntity?->ticketKey()
-			?? ($this->isTicketKey($key) ? $key : null);
+			?? ($this->isTicketKey($key) ? (TicketKey::find($key) ?? $key) : null);
 		$ticketEntity = $ticketKey === null ? null : $this->ticketsByKey->get($ticketKey);
 		$workingCopy = $pieces->pluck('worktree')->filter()->first();
 		$branch = $taskEntity?->branch()
@@ -879,9 +882,11 @@ class BuildBoardAction extends Command
 				->values();
 		}
 
+		// a session on a branch with a ticket belongs to the task of that branch, so a variant keeps its own sessions
 		return $this->sessionEntities
-			->filter(fn (SessionEntity $sessionEntity) => str_contains((string) $sessionEntity->branch, $key)
-				|| str_contains((string) $sessionEntity->title, $key))
+			->filter(fn (SessionEntity $sessionEntity) => TicketKey::ofBranch($sessionEntity->branch) !== null
+				? TicketKey::ofBranch($sessionEntity->branch) === $key
+				: str_contains((string) $sessionEntity->title, $key))
 			->values();
 	}
 }

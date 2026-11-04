@@ -3,7 +3,7 @@
 		@if ($previous)
 			<button class="back kind" type="button" wire:click="back"><x-icon name="back" small/>{{ $previous }}</button>
 		@else
-			<span class="kind">{{ __('Kaart') }} · {{ $card->ticketKey ?? ($card->isTodo() ? __('to-do') : $card->project) }}</span>
+			<span class="kind">{{ __('Kaart') }} · {{ $card->ticketKey === null ? ($card->isTodo() ? __('to-do') : $card->project) : $card->id }}</span>
 		@endif
 
 		@if ($tab === 'Agent')
@@ -36,6 +36,7 @@
 		<span class="meta">
 			@if ($card->ticketKey)
 				@if ($card->ticketUrl)<a class="mono" href="{{ $card->ticketUrl }}" target="_blank" rel="noopener" style="text-decoration:none">{{ $card->ticketKey }}</a>@else<span class="mono">{{ $card->ticketKey }}</span>@endif
+				@if ($card->variant())<span class="label teal" title="{{ __('Aftakking van :ticket', ['ticket' => $card->ticketKey]) }}">{{ __('aftakking') }} · {{ $card->variant() }}</span>@endif
 			@endif
 			@if ($card->ticketStatus)<span class="label amber">{{ $card->ticketStatus }}</span>@endif
 			@if ($card->isHighPriority())<span class="label red">{{ __('Hoge prioriteit') }}</span>@endif
