@@ -1566,5 +1566,6 @@
     "Deze ronde": "This round",
     "Tussen het begin en het eind van de beurt": "Between the start and the end of the turn",
     "Alleen wat de agent in deze beurt veranderde, van het begin tot het eind (:from – :until).": "Only what the agent changed in this turn, from start to end (:from – :until).",
-    "Hele PR tonen": "Show the whole PR"
+    "Hele PR tonen": "Show the whole PR",
+    "De lens gaf binnen de tijd geen oordeel en is gestopt.": "The lens gave no verdict in time and was stopped."
 }

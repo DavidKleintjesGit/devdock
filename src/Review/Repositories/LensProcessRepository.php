@@ -16,7 +16,7 @@ class LensProcessRepository implements LensProcessRepositoryContract
 		// every worker keeps going until the queue is empty. One that falls over
 		// then costs speed and not a lens: the others pick its work up
 		$command = sprintf(
-			'queue:work --queue=lenses --stop-when-empty --timeout=%d',
+			'queue:work lenses --queue=lenses --stop-when-empty --timeout=%d',
 			(int) config('devdock.review.lens_timeout') + 120,
 		);
 

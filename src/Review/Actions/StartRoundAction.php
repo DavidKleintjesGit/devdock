@@ -143,6 +143,7 @@ class StartRoundAction extends Command
 
 		Bus::batch($jobs)
 			->name(__('ronde :number', ['number' => $reviewRoundEntity->number]) . ' · ' . $this->card)
+			->onConnection('lenses')
 			->onQueue('lenses')
 			->finally(fn () => SettleRoundAction::execute(new ReviewRoundId(id: $roundId)))
 			->dispatch();

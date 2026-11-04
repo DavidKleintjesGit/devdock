@@ -7,6 +7,7 @@ namespace Src\Review\Actions;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Queue\InteractsWithQueue;
 use Src\Access\Actions\GetRoleAccessAction;
 use Src\Access\Enums\AgentRoleEnum;
@@ -101,20 +102,31 @@ class RunLensAction extends Command implements ShouldQueue
 
 		$reviewRoundRepository->markResultRunning($this->reviewRoundId, $this->lensId, null);
 
-		$answer = $claudeProcessRepository->watch(
-			GetRoleAccessAction::execute(AgentRoleEnum::LENS),
-			$directory,
-			WriteLensContextAction::execute(
+		try {
+			$answer = $claudeProcessRepository->watch(
+				GetRoleAccessAction::execute(AgentRoleEnum::LENS),
 				$directory,
-				$lensEntity,
-				$lensEntity->touches($worktreeRepository->getChangedFiles($directory)),
-				$this->earlierFindings($reviewRoundEntity->card),
-				$project === null ? [] : $this->rulesFor($project, $lensEntity),
-			),
-			$this->logPath($lensEntity),
-			fn (array $event) => $this->note($reviewRoundRepository, $event),
-			GetReadableDirectoriesAction::execute($reviewRoundEntity->card),
-		);
+				WriteLensContextAction::execute(
+					$directory,
+					$lensEntity,
+					$lensEntity->touches($worktreeRepository->getChangedFiles($directory)),
+					$this->earlierFindings($reviewRoundEntity->card),
+					$project === null ? [] : $this->rulesFor($project, $lensEntity),
+				),
+				$this->logPath($lensEntity),
+				fn (array $event) => $this->note($reviewRoundRepository, $event),
+				GetReadableDirectoriesAction::execute($reviewRoundEntity->card),
+			);
+		} catch (ProcessTimedOutException) {
+			// a lens that gave its verdict and then stayed awake, waiting on a background task, keeps that verdict
+			if ($this->verdictMessage === null) {
+				$reviewRoundEntity = $reviewRoundRepository->writeResult($this->reviewRoundId, $this->lensId, VerdictEnum::ERROR, 0, __('De lens gaf binnen de tijd geen oordeel en is gestopt.'));
+
+				return CloseRoundAction::execute($this->reviewRoundId) ?? $reviewRoundEntity;
+			}
+
+			$answer = null;
+		}
 
 		// the answer is only the last message; a lens that was woken again after
 		// its verdict, by a background task finishing, ends on a line without it

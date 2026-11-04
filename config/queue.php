@@ -46,6 +46,17 @@ return [
             'after_commit' => false,
         ],
 
+        // lenses run for minutes; the queue hands a job to the next worker only after the longest lens
+        // could have ended, so a lens that is still at work is never taken for one that fell over
+        'lenses' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => 'lenses',
+            'retry_after' => (int) env('DEVDOCK_LENS_TIMEOUT', 1800) + 300,
+            'after_commit' => false,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),

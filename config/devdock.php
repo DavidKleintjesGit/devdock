@@ -189,8 +189,8 @@ return [
 		// what happens once the rounds run out: back, continue or blocking
 		'after_rounds' => env('DEVDOCK_AFTER_ROUNDS', 'back'),
 
-		// een lens mag lang nadenken; stilte betekent dat hij weg is. Daarom
-		// telt niet de klok maar de tijd sinds het laatste teken van leven
+		// the longest a lens may run in total; silence is measured by lens_idle,
+		// and the lenses queue hands a job on only after this has passed
 		'lens_timeout' => (int) env('DEVDOCK_LENS_TIMEOUT', 1800),
 
 		// tijdens één aanroep stuurt Claude niets: draait een lens de testsuite,

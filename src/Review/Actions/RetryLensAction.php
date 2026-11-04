@@ -42,6 +42,7 @@ class RetryLensAction extends Command
 
 		Bus::batch([new RunLensAction($this->reviewRoundId, $this->lensId)])
 			->name(__('lens opnieuw'))
+			->onConnection('lenses')
 			->onQueue('lenses')
 			->finally(fn () => SettleRoundAction::execute(new ReviewRoundId(id: $roundId)))
 			->dispatch();
