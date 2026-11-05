@@ -14,7 +14,7 @@ class ShellCommandDecisionObject extends ValueObject
 {
 	public function __construct(
 		public readonly ShellCommandEnum $outcome,
-		public readonly ?string $gitCommand,
+		public readonly ?string $refusedCommand,
 	) {
 		parent::__construct();
 	}
@@ -32,7 +32,10 @@ class ShellCommandDecisionObject extends ValueObject
 		return match ($this->outcome) {
 			ShellCommandEnum::ALLOWED => null,
 			ShellCommandEnum::WRITES_GIT => __('DevDock laat git alleen lezen: git :command is voor de knoppen. Committen, pushen en rebasen doet David in DevDock. Laat de wijziging in de werkkopie staan en zeg in je verslag wat klaar is.', [
-				'command' => $this->gitCommand,
+				'command' => $this->refusedCommand,
+			]),
+			ShellCommandEnum::WRITES_REMOTE => __('DevDock laat je Jira, Bitbucket, CircleCI en GitHub alleen lezen: :command schrijft daar. Zet in je verslag wat er moet gebeuren; David doet het of geeft er een knop voor.', [
+				'command' => $this->refusedCommand,
 			]),
 		};
 	}

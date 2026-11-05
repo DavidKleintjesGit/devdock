@@ -99,7 +99,7 @@ class ShellCommandPolicyTest extends TestCase
 	{
 		$shellCommandDecisionObject = (new ShellCommandPolicy())->decide(new ShellCommandObject(command: 'git push origin main'));
 
-		$this->assertSame('push', $shellCommandDecisionObject->gitCommand);
+		$this->assertSame('push', $shellCommandDecisionObject->refusedCommand);
 	}
 
 	/**
@@ -144,7 +144,7 @@ class ShellCommandPolicyTest extends TestCase
 	{
 		$shellCommandDecisionObject = (new ShellCommandPolicy())->decide(new ShellCommandObject(command: $command, grants: [GitGrantEnum::REBASE]));
 
-		$this->assertSame($gitCommand, $shellCommandDecisionObject->gitCommand);
+		$this->assertSame($gitCommand, $shellCommandDecisionObject->refusedCommand);
 	}
 
 	#[Test]
@@ -152,6 +152,61 @@ class ShellCommandPolicyTest extends TestCase
 	{
 		$shellCommandDecisionObject = (new ShellCommandPolicy())->decide(new ShellCommandObject(command: 'git rebase --continue'));
 
-		$this->assertSame('rebase', $shellCommandDecisionObject->gitCommand);
+		$this->assertSame('rebase', $shellCommandDecisionObject->refusedCommand);
+	}
+
+	/**
+	 * @return array<string, array{string}>
+	 */
+	public static function remoteReadingCommands(): array
+	{
+		return [
+			'reading a Jira issue' => ['curl -s -u me:token https://mtvtd.atlassian.net/rest/api/3/issue/CSM-1'],
+			'failing quietly on an error' => ['curl -sf https://api.bitbucket.org/2.0/repositories/mtvtd/shop/pullrequests'],
+			'an explicit GET' => ['curl -X GET https://circleci.com/api/v2/me'],
+			'posting somewhere else' => ['curl -X POST -d x=1 https://example.com/hook'],
+			'reading with PowerShell' => ['Invoke-RestMethod -Uri https://api.github.com/repos/mtvtd/shop'],
+			'looking up a twg command' => ['twg help describe'],
+			'searching with twg' => ['twg jira search "project = CSM"'],
+		];
+	}
+
+	/**
+	 * @return array<string, array{string, string}>
+	 */
+	public static function remoteWritingCommands(): array
+	{
+		return [
+			'posting a Jira comment' => ['curl -X POST -H "Content-Type: application/json" -d @comment.json https://mtvtd.atlassian.net/rest/api/3/issue/CSM-1/comment', 'curl'],
+			'a method glued to -X' => ['curl -XDELETE https://api.bitbucket.org/2.0/repositories/mtvtd/shop/refs/branches/old', 'curl'],
+			'sending a json body' => ['curl --json \'{"body":"x"}\' https://api.bitbucket.org/2.0/repositories/mtvtd/shop/pullrequests/1/comments', 'curl'],
+			'rerunning a workflow' => ['curl --request=POST https://circleci.com/api/v2/workflow/abc/rerun', 'curl'],
+			'uploading a file' => ['curl -T notes.txt https://mtvtd.atlassian.net/wiki/upload', 'curl'],
+			'posting with wget' => ['wget --post-data=x https://api.github.com/repos/mtvtd/shop/issues', 'wget'],
+			'posting with PowerShell' => ['Invoke-RestMethod -Method Post -Uri https://mtvtd.atlassian.net/rest/api/3/issue -Body $payload', 'invoke-restmethod'],
+			'handed to another shell' => ['sh -c "curl -X PUT https://mtvtd.atlassian.net/rest/api/3/issue/CSM-1"', 'curl'],
+			'after a chain' => ['cd app && curl -d x=1 https://api.bitbucket.org/2.0/x', 'curl'],
+			'creating a pull request with twg' => ['twg bitbucket pr create --title Fix', 'twg create'],
+			'commenting with twg' => ['twg jira comment CSM-1 "Done"', 'twg comment'],
+		];
+	}
+
+	#[Test]
+	#[DataProvider('remoteReadingCommands')]
+	public function decide_lets_a_command_that_only_reads_a_guarded_service_run(string $command): void
+	{
+		$shellCommandDecisionObject = (new ShellCommandPolicy())->decide(new ShellCommandObject(command: $command));
+
+		$this->assertSame(ShellCommandEnum::ALLOWED, $shellCommandDecisionObject->outcome);
+	}
+
+	#[Test]
+	#[DataProvider('remoteWritingCommands')]
+	public function decide_refuses_a_command_that_writes_to_a_guarded_service(string $command, string $refusedCommand): void
+	{
+		$shellCommandDecisionObject = (new ShellCommandPolicy())->decide(new ShellCommandObject(command: $command));
+
+		$this->assertSame(ShellCommandEnum::WRITES_REMOTE, $shellCommandDecisionObject->outcome);
+		$this->assertSame($refusedCommand, $shellCommandDecisionObject->refusedCommand);
 	}
 }

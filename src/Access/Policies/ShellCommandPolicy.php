@@ -51,6 +51,32 @@ class ShellCommandPolicy
 	public const LISTING = ['branch', 'config', 'remote', 'stash', 'tag', 'worktree'];
 
 	/**
+	 * Hosts of the services an agent may only read.
+	 */
+	private const GUARDED_HOSTS = ['atlassian.com', 'atlassian.net', 'bitbucket.org', 'circleci.com', 'github.com'];
+
+	/**
+	 * Programs that send a request over the web.
+	 */
+	private const WEB_CLIENTS = ['curl', 'http', 'invoke-restmethod', 'invoke-webrequest', 'irm', 'iwr', 'wget'];
+
+	/**
+	 * Options of those programs that send a body along, which makes the request a
+	 * write. Exact case: curl -F sends a form, curl -f only fails on an error.
+	 */
+	private const SENDING_OPTIONS = ['-d', '-F', '-T', '--data', '--data-ascii', '--data-binary', '--data-raw', '--data-urlencode', '--form', '--form-string', '--json', '--upload-file', '--post-data', '--post-file', '--body-data', '--body-file'];
+
+	/**
+	 * Options of the PowerShell clients that send a body along; PowerShell ignores case.
+	 */
+	private const POWERSHELL_SENDING_OPTIONS = ['-body', '-infile', '-form'];
+
+	/**
+	 * Words in a twg command that change something in Jira, Confluence or Bitbucket.
+	 */
+	private const TWG_WRITING_WORDS = ['add', 'approve', 'assign', 'comment', 'create', 'decline', 'delete', 'edit', 'merge', 'move', 'post', 'publish', 'put', 'remove', 'reopen', 'transition', 'unapprove', 'update', 'upload', 'write'];
+
+	/**
 	 * Shells a command can be handed to as a string.
 	 */
 	private const SHELLS = ['bash', 'cmd', 'powershell', 'pwsh', 'sh', 'zsh'];
@@ -76,9 +102,99 @@ class ShellCommandPolicy
 			if ($gitCommand !== null) {
 				return new ShellCommandDecisionObject(ShellCommandEnum::WRITES_GIT, $gitCommand);
 			}
+
+			$remoteCommand = $this->writingRemoteCommandIn($segment);
+
+			if ($remoteCommand !== null) {
+				return new ShellCommandDecisionObject(ShellCommandEnum::WRITES_REMOTE, $remoteCommand);
+			}
 		}
 
 		return new ShellCommandDecisionObject(ShellCommandEnum::ALLOWED, null);
+	}
+
+	/**
+	 * The program in this part of the line that writes to a guarded service,
+	 * or null when it holds none: twg with a writing word, or a web client that
+	 * sends something to a guarded host.
+	 */
+	private function writingRemoteCommandIn(string $segment): ?string
+	{
+		$words = preg_split('/\s+/', trim(str_replace(['"', "'"], ' ', $segment))) ?: [];
+		$program = strtolower(pathinfo(str_replace('\\', '/', (string) ($words[0] ?? '')), PATHINFO_FILENAME));
+
+		// a command handed to another shell is judged as a command of its own
+		$handedOver = match (true) {
+			in_array($program, ['eval', 'xargs'], true) => array_slice($words, 1),
+			count($words) > 2 && $this->handsToShell(array_slice($words, 0, 2)) => array_slice($words, 2),
+			default => null,
+		};
+
+		if ($handedOver !== null) {
+			return $this->writingRemoteCommandIn(implode(' ', $handedOver));
+		}
+
+		if ($program === 'twg') {
+			$writingWords = array_values(array_intersect(array_map(strtolower(...), $words), self::TWG_WRITING_WORDS));
+
+			return $writingWords === [] ? null : 'twg ' . implode(' ', $writingWords);
+		}
+
+		if (! in_array($program, self::WEB_CLIENTS, true) || ! $this->namesGuardedHost($words)) {
+			return null;
+		}
+
+		return $this->sendsSomething($words) ? $program : null;
+	}
+
+	/**
+	 * @param  list<string>  $words
+	 */
+	private function namesGuardedHost(array $words): bool
+	{
+		foreach ($words as $word) {
+			$host = (string) parse_url(str_contains($word, '://') ? $word : 'https://' . $word, PHP_URL_HOST);
+
+			foreach (self::GUARDED_HOSTS as $guardedHost) {
+				if ($host === $guardedHost || str_ends_with($host, '.' . $guardedHost)) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Whether the request carries a body or asks for a method other than reading.
+	 *
+	 * @param  list<string>  $words
+	 */
+	private function sendsSomething(array $words): bool
+	{
+		foreach ($words as $position => $word) {
+			$option = explode('=', $word, 2)[0];
+
+			if (in_array($option, self::SENDING_OPTIONS, true) || in_array(strtolower($option), self::POWERSHELL_SENDING_OPTIONS, true)) {
+				return true;
+			}
+
+			// curl -X POST, --request=PUT, wget --method=PUT, powershell -Method Delete
+			if (in_array($option, ['-X', '--request', '--method'], true) || strtolower($option) === '-method') {
+				$method = str_contains($word, '=') ? explode('=', $word, 2)[1] : (string) ($words[$position + 1] ?? '');
+
+				if (! in_array(strtolower($method), ['get', 'head', 'options'], true)) {
+					return true;
+				}
+			}
+
+			// curl -XPOST
+			if (preg_match('/^-X(?!GET$|HEAD$)[A-Z]+$/', $word) === 1) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -114,10 +230,10 @@ class ShellCommandPolicy
 
 			// a command handed to another shell is judged as a command of its own
 			if ($quoted !== '' && $words !== [] && $this->handsToShell($words)) {
-				$gitCommand = $this->decide(new ShellCommandObject(command: $quoted, grants: $grants))->gitCommand;
+				$shellCommandDecisionObject = $this->decide(new ShellCommandObject(command: $quoted, grants: $grants));
 
-				if ($gitCommand !== null) {
-					return $gitCommand;
+				if ($shellCommandDecisionObject->outcome === ShellCommandEnum::WRITES_GIT) {
+					return $shellCommandDecisionObject->refusedCommand;
 				}
 			}
 

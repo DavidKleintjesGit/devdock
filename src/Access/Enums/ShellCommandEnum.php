@@ -11,4 +11,5 @@ enum ShellCommandEnum: string
 {
 	case ALLOWED = 'allowed';
 	case WRITES_GIT = 'writes_git';
+	case WRITES_REMOTE = 'writes_remote';
 }
