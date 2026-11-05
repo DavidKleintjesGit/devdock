@@ -1014,6 +1014,15 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			: [];
 	}
 
+	public function getUpstreamCommitsLostByOverwrite(string $path): array
+	{
+		// a commit with the same change, or after a resolved conflict the same subject, is the version before the rebase
+		$onUpstream = $this->lines($path, ['git', 'log', '--format=%s', '--left-only', '--cherry-pick', '@{upstream}...HEAD']);
+		$here = $this->lines($path, ['git', 'log', '--format=%s', '--right-only', '@{upstream}...HEAD']);
+
+		return array_values(array_diff($onUpstream, $here));
+	}
+
 	public function getConflictedFiles(string $path): array
 	{
 		return is_dir($path) ? $this->conflictedFilesIn($path) : [];

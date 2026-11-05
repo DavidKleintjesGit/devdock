@@ -429,6 +429,7 @@ trait WithWorkingCopy
 			'unpushed' => $worktreeRepository->getUnpushedCommits($worktreeEntity->path),
 			'lastRebase' => $worktreeRepository->getLastRebase($worktreeEntity->path),
 			'openConflicts' => $worktreeEntity->isRebasing ? $worktreeRepository->getConflictedFiles($worktreeEntity->path) : [],
+			'lostByOverwrite' => $worktreeEntity->onlyOnUpstream > 0 ? $worktreeRepository->getUpstreamCommitsLostByOverwrite($worktreeEntity->path) : [],
 			'branchChain' => $branchChain,
 			'blockingLink' => $branchChain?->blockingLink(),
 			'levelFirst' => $branchChain?->blockingLink() === null ? null : $this->levelFirst($branchChain->blockingLink()),

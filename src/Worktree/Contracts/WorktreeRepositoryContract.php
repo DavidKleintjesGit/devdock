@@ -242,6 +242,15 @@ interface WorktreeRepositoryContract
 	public function getConflictedFiles(string $path): array;
 
 	/**
+	 * The subjects of the commits on the upstream of a working copy that are
+	 * not an earlier version of a commit here, so a push that overwrites the
+	 * upstream would lose them.
+	 *
+	 * @return list<string>
+	 */
+	public function getUpstreamCommitsLostByOverwrite(string $path): array;
+
+	/**
 	 * The last rebase DevDock did here; null when there was none.
 	 */
 	public function getLastRebase(string $path): ?RebaseObject;
