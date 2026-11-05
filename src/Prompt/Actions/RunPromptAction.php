@@ -17,6 +17,7 @@ use Src\Review\Contracts\AgentContextRepositoryContract;
 use Src\Review\Exceptions\RoundNotStartedException;
 use Src\Session\Actions\RenameSessionAction;
 use Src\Session\Actions\ScanSessionsAction;
+use Src\Session\Contracts\SessionFileRepositoryContract;
 use Src\Session\Objects\SessionEntity;
 use Src\Task\Actions\GetReadableDirectoriesAction;
 use Src\Task\Contracts\TaskRepositoryContract;
@@ -71,6 +72,11 @@ class RunPromptAction extends Command
 		} catch (Throwable $failure) {
 			if ($directory !== null) {
 				$promptRunRepository->markTreeAfter($this->promptRunId, $worktreeRepository->snapshot($directory));
+			}
+
+			// a turn that failed after Claude took the key still took it; the next one resumes it
+			if (filled($promptRunEntity->sessionUuid) && resolve(SessionFileRepositoryContract::class)->exists($promptRunEntity->directory ?? base_path(), $promptRunEntity->sessionUuid)) {
+				$taskRepository->markAgentStarted($promptRunEntity->sessionUuid);
 			}
 
 			return $promptRunRepository->markFailed($this->promptRunId, $failure->getMessage());

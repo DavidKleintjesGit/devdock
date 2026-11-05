@@ -11,6 +11,7 @@ use Src\Prompt\Contracts\PromptRunRepositoryContract;
 use Src\Prompt\Objects\PromptRunEntity;
 use Src\Prompt\Objects\PromptRunObject;
 use Src\Review\Actions\WriteAgentContextAction;
+use Src\Session\Contracts\SessionFileRepositoryContract;
 use Src\Task\Actions\OpenAgentAction;
 use Src\Task\Contracts\TaskRepositoryContract;
 use Src\Task\Objects\TaskAgentEntity;
@@ -62,6 +63,7 @@ class StartPromptAction extends Command
 		WriteAgentContextAction::execute($this->promptRunObject->card, $directory);
 
 		$taskAgentEntity = $this->agentFor($taskRepository, $directory);
+		$isClaimed = $taskAgentEntity->hasStarted() || resolve(SessionFileRepositoryContract::class)->exists($directory ?? base_path(), $taskAgentEntity->sessionUuid);
 
 		$promptRunEntity = $promptRunRepository->create(new PromptRunObject(
 			card: $this->promptRunObject->card,
@@ -71,7 +73,8 @@ class StartPromptAction extends Command
 			directory: $directory,
 			ticketKey: $this->promptRunObject->ticketKey,
 			sessionUuid: $taskAgentEntity->sessionUuid,
-			claimsSession: ! $taskAgentEntity->hasStarted(),
+			// Claude refuses to claim a key a second time, also when the turn that claimed it failed
+			claimsSession: ! $isClaimed,
 			prompt: $this->promptRunObject->prompt,
 			gitGrant: $this->promptRunObject->gitGrant,
 		));

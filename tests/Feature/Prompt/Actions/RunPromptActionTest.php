@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Prompt\Actions;
 
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 use Src\Board\Models\Todo;
@@ -24,6 +25,7 @@ use Src\Review\Models\ReviewResult;
 use Src\Review\Models\ReviewRound;
 use Src\Session\Contracts\SessionFileRepositoryContract;
 use Src\Session\Objects\SessionObjectCollection;
+use Src\Task\Actions\OpenAgentAction;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Models\Worktree;
 use Tests\Support\TemporaryGitRepository;
@@ -99,6 +101,32 @@ class RunPromptActionTest extends TestCase
 			'status' => PromptStatusEnum::FAILED->value,
 			'message' => $message,
 		]);
+	}
+
+	#[Test]
+	public function execute_counts_the_agent_as_started_when_a_failed_turn_already_claimed_its_session(): void
+	{
+		$todo = Todo::factory()->create();
+		$taskAgentEntity = OpenAgentAction::execute('todo:' . $todo->id, $this->repository->path);
+		$promptRun = PromptRun::factory()->create([
+			'card' => 'todo:' . $todo->id,
+			'directory' => $this->repository->path,
+			'session_uuid' => $taskAgentEntity->sessionUuid,
+			'claims_session' => true,
+			'status' => PromptStatusEnum::RUNNING->value,
+		]);
+		// Claude wrote the session down before the turn broke off
+		$this->mock(SessionFileRepositoryContract::class)
+			->shouldReceive('exists')
+			->with($this->repository->path, $taskAgentEntity->sessionUuid)
+			->andReturn(true);
+		$this->mock(ClaudeProcessRepositoryContract::class)
+			->shouldReceive('run')
+			->andThrow(new RuntimeException(fake()->sentence()));
+
+		RunPromptAction::execute(new PromptRunId(id: $promptRun->id));
+
+		$this->assertNotNull(DB::table('task_agents')->where('session_uuid', $taskAgentEntity->sessionUuid)->value('started_at'));
 	}
 
 	#[Test]

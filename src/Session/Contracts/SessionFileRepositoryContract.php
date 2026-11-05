@@ -32,6 +32,11 @@ interface SessionFileRepositoryContract
 	public function delete(string $relativePath): bool;
 
 	/**
+	 * Whether Claude Code already keeps a session with this key for this folder.
+	 */
+	public function exists(string $workingDirectory, string $uuid): bool;
+
+	/**
 	 * How many sessions Claude Code keeps for this folder.
 	 */
 	public function countFor(string $workingDirectory): int;

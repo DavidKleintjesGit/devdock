@@ -82,6 +82,11 @@ class SessionFileRepository implements SessionFileRepositoryContract
 		return ! is_file($path) || @unlink($path);
 	}
 
+	public function exists(string $workingDirectory, string $uuid): bool
+	{
+		return is_file($this->sessionFolderOf($workingDirectory) . '/' . $uuid . '.jsonl');
+	}
+
 	public function countFor(string $workingDirectory): int
 	{
 		return count(glob($this->sessionFolderOf($workingDirectory) . '/*.jsonl') ?: []);
