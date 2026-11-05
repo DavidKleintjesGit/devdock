@@ -49,6 +49,7 @@ class DescribeCleanUpAction extends Command
 				WorktreeOriginEnum::ADOPTED => __('Niet de map: die stond er al, alleen de koppeling gaat weg'),
 				WorktreeOriginEnum::PROJECT => __('Niet het project zelf: alleen de koppeling gaat weg'),
 			},
+			$worktreeEntity->origin === WorktreeOriginEnum::MADE ? __('Processen die nog in de werkkopie draaien, zoals een queue of een testrun; die worden eerst gestopt') : null,
 			$worktreeEntity->ownDatabase === null ? null : __('De eigen database :name', ['name' => $worktreeEntity->ownDatabase]),
 			$testDatabase === null ? null : __('De eigen testdatabase :name', ['name' => $testDatabase]),
 			$worktreeEntity->site === null ? null : __('Het adres :site in Herd', ['site' => $worktreeEntity->site]),

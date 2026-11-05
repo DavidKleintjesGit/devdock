@@ -26,6 +26,13 @@ interface WorkingCopyRepositoryContract
 	public function release(string $path, ?string $site): void;
 
 	/**
+	 * Stops the processes that still run in a working copy, such as a site
+	 * worker, a queue or a test run that outlived its page, and returns how
+	 * many there were. A process holding a file there blocks taking it away.
+	 */
+	public function stopProcesses(string $path): int;
+
+	/**
 	 * The ignored files and folders the copy got from the checkout.
 	 *
 	 * @return array<int, string>

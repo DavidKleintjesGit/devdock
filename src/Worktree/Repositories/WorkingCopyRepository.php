@@ -55,6 +55,31 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 		}
 	}
 
+	public function stopProcesses(string $path): int
+	{
+		$this->ensureWorkingCopy($path);
+
+		if (PHP_OS_FAMILY !== 'Windows') {
+			return Process::run(['pkill', '-f', '--', rtrim($path, '/') . '/'])->successful() ? 1 : 0;
+		}
+
+		// command lines are compared with forward slashes, and the folder must end there, so .worktrees/shop does not also hit .worktrees/shop-billing
+		$script = <<<'POWERSHELL'
+			$folder = [regex]::Escape($env:DEVDOCK_STOP_FOLDER) + '([/" '']|$)'
+			$stopped = 0
+			Get-CimInstance Win32_Process |
+				Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -and $_.CommandLine.Replace([char]92, [char]47).ToLower() -match $folder } |
+				ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; $stopped++ }
+			$stopped
+			POWERSHELL;
+
+		$result = Process::env(['DEVDOCK_STOP_FOLDER' => strtolower(rtrim(str_replace(DIRECTORY_SEPARATOR, '/', $path), '/'))])
+			->timeout(60)
+			->run(['powershell', '-NoProfile', '-NonInteractive', '-Command', $script]);
+
+		return $result->successful() ? (int) trim($result->output()) : 0;
+	}
+
 	public function returnBorrowed(string $path, string $folder): void
 	{
 		$this->ensureWorkingCopy($path);
