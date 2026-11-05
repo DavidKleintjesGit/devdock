@@ -1,5 +1,5 @@
 @if ($workingCopyTask?->isRunning)
-	<div class="banner amber" style="padding:12px 24px;display:flex;align-items:center;gap:12px" wire:poll.3s>
+	<div class="banner amber" style="padding:12px 24px;display:flex;align-items:center;gap:12px" wire:poll.3s="followWorkingCopyTask">
 		<span class="sdot busy" style="box-shadow:none"></span>
 		<span class="grow" style="display:flex;flex-direction:column;gap:2px"><b>{{ $workingCopyTask->task->busyLabel() }}</b><span>{{ __('Dit loopt in de achtergrond; je kunt intussen gewoon verder.') }}</span></span>
 	</div>

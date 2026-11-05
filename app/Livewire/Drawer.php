@@ -35,8 +35,6 @@ use Src\Packages\Markdown\RenderMarkdown;
 use Src\Project\Actions\GetBranchesAction;
 use Src\Project\Actions\GetProjectsAction;
 use Src\Project\Objects\ProjectEntity;
-use Src\Prompt\Actions\GenerateBranchNameAction;
-use Src\Prompt\Actions\GenerateCommitMessageAction;
 use Src\Prompt\Actions\GetConversationAction;
 use Src\Prompt\Actions\GetLatestPromptRunAction;
 use Src\Prompt\Actions\ReadReportAction;
@@ -238,6 +236,17 @@ class Drawer extends Component
 	}
 
 	/**
+	 * Takes in a finished background task on every request to the open panel.
+	 */
+	public function hydrate(): void
+	{
+		// another poll may redraw the panel before the task bar's own, and then that bar and its poll are gone
+		if ($this->openCard !== null) {
+			$this->followWorkingCopyTask();
+		}
+	}
+
+	/**
 	 * The board sends this when a card is clicked; any write the panel makes
 	 * goes back the other way.
 	 */
@@ -270,6 +279,7 @@ class Drawer extends Component
 		$this->renameBranch = (string) $this->renameSuggestion($cardObject);
 		$this->resetSetup($cardObject);
 		$this->replaceDrawer('card', $card);
+		$this->followWorkingCopyTask();
 	}
 
 	/**
@@ -995,15 +1005,20 @@ class Drawer extends Component
 	{
 		$this->failure = null;
 
-		$branch = GenerateBranchNameAction::execute((string) $this->openCard);
+		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
 
-		if ($branch === null) {
-			$this->failure = __('De agent kon geen branchnaam voorstellen.');
+		if ($cardObject?->project === null) {
+			$this->failure = __('Zonder project weet ik niet in welke checkout de werkkopie moet komen.');
 
 			return;
 		}
 
-		$this->newBranch = $branch;
+		$this->failure = $this->startLinking(new WorkingCopyTaskObject(
+			card: $cardObject->id,
+			task: WorkingCopyTaskEnum::BRANCH_NAME,
+			project: $cardObject->project,
+			branch: (string) $cardObject->branch,
+		));
 	}
 
 	/**
@@ -1022,17 +1037,7 @@ class Drawer extends Component
 			return;
 		}
 
-		$commitMessageObject = GenerateCommitMessageAction::execute($worktreeEntity->path, $files, $cardObject->ticketKey);
-
-		if ($commitMessageObject === null) {
-			$this->committed = __('Er kwam geen bericht terug. Probeer het nog eens of schrijf het zelf.');
-
-			return;
-		}
-
-		$this->commitMessage = $commitMessageObject->title;
-		$this->commitBody = $commitMessageObject->body;
-		$this->committed = null;
+		$this->startWorkingCopyTask(WorkingCopyTaskEnum::COMMIT_MESSAGE, $worktreeEntity, ticketKey: $cardObject->ticketKey, files: $files);
 	}
 
 	/**

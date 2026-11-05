@@ -14,11 +14,16 @@ use Src\Worktree\Enums\WorkingCopyTaskEnum;
  */
 class WorkingCopyTaskStateObject extends ValueObject
 {
+	/**
+	 * @param  array<string, string>  $result  what the task brings back for the panel, such as a written commit message
+	 */
 	public function __construct(
 		public readonly WorkingCopyTaskEnum $task,
 		public readonly bool $isRunning,
 		public readonly CarbonImmutable $startedAt,
 		public readonly ?string $failure,
+		public readonly ?string $notice = null,
+		public readonly array $result = [],
 	) {
 		parent::__construct();
 	}
@@ -33,6 +38,8 @@ class WorkingCopyTaskStateObject extends ValueObject
 			isRunning: (bool) ($data['is_running'] ?? false),
 			startedAt: CarbonImmutable::parse((string) ($data['started_at'] ?? 'now')),
 			failure: $data['failure'] ?? null,
+			notice: $data['notice'] ?? null,
+			result: (array) ($data['result'] ?? []),
 		);
 	}
 }

@@ -22,10 +22,8 @@ use Src\Worktree\Actions\CreateWorktreeDatabaseAction;
 use Src\Worktree\Actions\DescribeCleanUpAction;
 use Src\Worktree\Actions\EnsureWorktreeAction;
 use Src\Worktree\Actions\ForgetWorkingCopyTaskAction;
+use Src\Worktree\Actions\GetWorkingCopyTaskAction;
 use Src\Worktree\Actions\GetBranchChainAction;
-use Src\Worktree\Actions\PushBranchAction;
-use Src\Worktree\Actions\RebaseWorktreeAction;
-use Src\Worktree\Actions\ResolveConflictsAction;
 use Src\Worktree\Actions\SetUpstreamAction;
 use Src\Worktree\Actions\StartWorkingCopyTaskAction;
 use Src\Worktree\Actions\UseWorktreeDatabaseAction;
@@ -35,7 +33,6 @@ use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Enums\DatabaseFillEnum;
 use Src\Worktree\Enums\DiffViewEnum;
-use Src\Worktree\Enums\RebaseOutcomeEnum;
 use Src\Worktree\Enums\WorkingCopyTaskEnum;
 use Src\Worktree\Enums\WorktreeOriginEnum;
 use Src\Worktree\Objects\BranchChainObject;
@@ -101,12 +98,7 @@ trait WithWorkingCopy
 			return;
 		}
 
-		$failure = RebaseWorktreeAction::execute($worktreeEntity->path);
-
-		$this->failure = $failure;
-		$this->committed = $failure === null ? __('Gerebased op :main.', ['main' => $worktreeEntity->targetBranch]) : null;
-
-		$this->refreshStanding($worktreeEntity);
+		$this->startWorkingCopyTask(WorkingCopyTaskEnum::REBASE, $worktreeEntity);
 	}
 
 	/**
@@ -135,16 +127,12 @@ trait WithWorkingCopy
 	public function giveOwnTestDatabase(): void
 	{
 		$worktreeEntity = $this->openWorktree();
-		$projectPath = $worktreeEntity === null ? null : GetProjectsAction::execute()
-			->first(fn (ProjectEntity $projectEntity) => $projectEntity->name === $worktreeEntity->project)
-			?->path;
 
-		if ($projectPath === null) {
+		if ($worktreeEntity === null) {
 			return;
 		}
 
-		$this->failure = resolve(WorktreeDatabaseRepositoryContract::class)->giveOwnTestDatabase($projectPath, $worktreeEntity->path, $worktreeEntity->branch);
-		$this->committed = $this->failure === null ? __('Deze kopie test nu in een eigen database.') : null;
+		$this->startWorkingCopyTask(WorkingCopyTaskEnum::OWN_TEST_DATABASE, $worktreeEntity);
 	}
 
 	/**
@@ -169,15 +157,7 @@ trait WithWorkingCopy
 			return;
 		}
 
-		$rebaseOutcomeObject = ResolveConflictsAction::execute($cardObject->id, $cardObject->project, $cardObject->branch, $cardObject->ticketKey, $worktreeEntity->path);
-
-		$this->refreshStanding($worktreeEntity);
-
-		match ($rebaseOutcomeObject->outcome) {
-			RebaseOutcomeEnum::CONFLICTED => $this->setDrawerTab('Agent'),
-			RebaseOutcomeEnum::DONE => $this->committed = __('Gerebased op :main zonder conflicten.', ['main' => $rebaseOutcomeObject->targetBranch]),
-			RebaseOutcomeEnum::FAILED => $this->failure = $rebaseOutcomeObject->failure,
-		};
+		$this->startWorkingCopyTask(WorkingCopyTaskEnum::RESOLVE_CONFLICTS, $worktreeEntity, ticketKey: $cardObject->ticketKey);
 	}
 
 	public function toggleCommitFile(string $path): void
@@ -242,14 +222,7 @@ trait WithWorkingCopy
 			return;
 		}
 
-		$pushed = PushBranchAction::execute($worktreeEntity->path);
-
-		$this->committed = $pushed ? __('Gepusht naar origin.') : null;
-		$this->failure = match (true) {
-			$pushed => null,
-			$worktreeEntity->onlyOnUpstream > 0 => __('Overschrijven lukte niet: origin veranderde sinds DevDock er voor het laatst keek. Haal eerst op en kijk wat er bij kwam.'),
-			default => __('Pushen lukte niet. Een taakbranch pusht nooit naar de hoofdlijn.'),
-		};
+		$this->startWorkingCopyTask(WorkingCopyTaskEnum::PUSH, $worktreeEntity);
 	}
 
 	public function startDatabase(): void
@@ -375,6 +348,52 @@ trait WithWorkingCopy
 	public function dismissWorkingCopyTask(): void
 	{
 		ForgetWorkingCopyTaskAction::execute((string) $this->openCard);
+	}
+
+	/**
+	 * Brings what a finished task on the open card's working copy found into
+	 * the panel, once: its message, its failure, and what it wrote. Making a
+	 * working copy keeps its own bar, so that one is left alone.
+	 */
+	public function followWorkingCopyTask(): void
+	{
+		$workingCopyTaskStateObject = GetWorkingCopyTaskAction::execute((string) $this->openCard);
+
+		if ($workingCopyTaskStateObject === null || $workingCopyTaskStateObject->isRunning || $workingCopyTaskStateObject->task === WorkingCopyTaskEnum::LINK) {
+			return;
+		}
+
+		$this->failure = $workingCopyTaskStateObject->failure;
+		$this->committed = $workingCopyTaskStateObject->notice;
+		$this->commitMessage = $workingCopyTaskStateObject->result['title'] ?? $this->commitMessage;
+		$this->commitBody = $workingCopyTaskStateObject->result['body'] ?? $this->commitBody;
+		$this->newBranch = $workingCopyTaskStateObject->result['branch'] ?? $this->newBranch;
+
+		if (isset($workingCopyTaskStateObject->result['tab'])) {
+			$this->setDrawerTab($workingCopyTaskStateObject->result['tab']);
+		}
+
+		ForgetWorkingCopyTaskAction::execute((string) $this->openCard);
+	}
+
+	/**
+	 * Hands a slow button's work on a working copy to a process of its own,
+	 * so the panel stays free while git or a helper is busy.
+	 *
+	 * @param  list<string>  $files
+	 */
+	protected function startWorkingCopyTask(WorkingCopyTaskEnum $workingCopyTaskEnum, WorktreeEntity $worktreeEntity, ?string $ticketKey = null, array $files = []): void
+	{
+		$this->failure = $this->startLinking(new WorkingCopyTaskObject(
+			card: (string) $this->openCard,
+			task: $workingCopyTaskEnum,
+			project: $worktreeEntity->project,
+			branch: $worktreeEntity->branch,
+			path: $worktreeEntity->path,
+			ticketKey: $ticketKey,
+			files: $files,
+		));
+		$this->committed = null;
 	}
 
 	/**

@@ -14,6 +14,9 @@ use Src\Worktree\Enums\WorkingCopyTaskEnum;
  */
 class WorkingCopyTaskObject extends ValueObject
 {
+	/**
+	 * @param  list<string>  $files  the files a commit message is written about
+	 */
 	public function __construct(
 		public readonly string $card,
 		public readonly WorkingCopyTaskEnum $task,
@@ -21,6 +24,9 @@ class WorkingCopyTaskObject extends ValueObject
 		public readonly string $branch,
 		public readonly ?DatabaseFillEnum $fill = null,
 		public readonly bool $carriesChanges = false,
+		public readonly ?string $path = null,
+		public readonly ?string $ticketKey = null,
+		public readonly array $files = [],
 	) {
 		parent::__construct();
 	}
@@ -37,6 +43,9 @@ class WorkingCopyTaskObject extends ValueObject
 			branch: (string) $data['branch'],
 			fill: DatabaseFillEnum::tryFrom((string) ($data['fill'] ?? '')),
 			carriesChanges: (bool) ($data['carries_changes'] ?? false),
+			path: $data['path'] ?? null,
+			ticketKey: $data['ticket_key'] ?? null,
+			files: array_values((array) ($data['files'] ?? [])),
 		);
 	}
 
@@ -52,6 +61,9 @@ class WorkingCopyTaskObject extends ValueObject
 			'branch' => $this->branch,
 			'fill' => $this->fill?->value,
 			'carries_changes' => $this->carriesChanges,
+			'path' => $this->path,
+			'ticket_key' => $this->ticketKey,
+			'files' => $this->files,
 		]));
 	}
 
