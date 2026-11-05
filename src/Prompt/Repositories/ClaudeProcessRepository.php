@@ -13,6 +13,8 @@ use Src\Access\Enums\GitGrantEnum;
 use Src\Access\Objects\RoleAccessObject;
 use Src\Packages\Process\DetachedCommand;
 use Src\Packages\Process\LocalCommand;
+use Src\Packages\Process\ProjectEnvironment;
+use Src\Project\Contracts\ProjectPhpRepositoryContract;
 use Src\Prompt\Contracts\ClaudeProcessRepositoryContract;
 use Src\Prompt\Objects\PromptResultObject;
 use Src\Prompt\Objects\PromptRunEntity;
@@ -142,7 +144,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 		$rest = '';
 
 		$result = Process::path($directory)
-			->env([...$this->environment(), ...$this->gitGuard($directory, $promptRunEntity->gitGrant)])
+			->env([...$this->environment($directory), ...$this->gitGuard($directory, $promptRunEntity->gitGrant)])
 			->input($promptRunEntity->prompt)
 			->timeout((int) config('devdock.prompt_timeout'))
 			->run(
@@ -228,7 +230,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 		$directory = is_dir($directory) ? $directory : base_path();
 
 		Process::path($directory)
-			->env([...$this->environment(), ...$this->gitGuard($directory)])
+			->env([...$this->environment($directory), ...$this->gitGuard($directory)])
 			// through stdin for the same reason as in run()
 			->input($question)
 			->timeout((int) config('devdock.review.lens_timeout'))
@@ -289,7 +291,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 		$directory = is_dir($directory) ? $directory : base_path();
 
 		$result = Process::path($directory)
-			->env([...$this->environment(), ...$this->gitGuard($directory)])
+			->env([...$this->environment($directory), ...$this->gitGuard($directory)])
 			// through stdin for the same reason as in run()
 			->input($question)
 			->timeout(self::ASK_TIMEOUT)
@@ -406,13 +408,16 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 * long-lived token put in. Without a token, Claude Code falls back on the
 	 * session you are signed in with, which expires.
 	 */
-	private function environment(): array
+	private function environment(string $directory): array
 	{
 		$token = (string) config('devdock.claude_token');
 
 		// Laravel writes DevDock's .env into the process environment, and a project
 		// run from here would read DB_CONNECTION and APP_ENV as its own; false unsets them
 		$ownSettings = array_fill_keys(array_keys(Dotenv::parse((string) @file_get_contents(base_path('.env')))), false);
+
+		// a plain php in the agent's shell is the PHP the project asks for
+		$ownSettings = [...$ownSettings, ...ProjectEnvironment::withPhpFirst(resolve(ProjectPhpRepositoryContract::class)->binaryFor($directory))];
 
 		return $token === '' ? $ownSettings : [...$ownSettings, 'CLAUDE_CODE_OAUTH_TOKEN' => $token];
 	}

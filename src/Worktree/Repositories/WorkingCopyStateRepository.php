@@ -7,8 +7,8 @@ namespace Src\Worktree\Repositories;
 use Dotenv\Dotenv;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
-use Src\Packages\Process\DetachedCommand;
 use Src\Packages\Process\ProjectEnvironment;
+use Src\Project\Contracts\ProjectPhpRepositoryContract;
 use Src\Worktree\Contracts\WorkingCopyStateRepositoryContract;
 use Src\Worktree\Enums\ProjectKindEnum;
 use Src\Worktree\Objects\MigrationCountObject;
@@ -61,9 +61,9 @@ class WorkingCopyStateRepository implements WorkingCopyStateRepositoryContract
 	public function countPendingMigrations(string $path): MigrationCountObject
 	{
 		$result = Process::path($path)
-			->env(ProjectEnvironment::withoutDevDock())
+			->env([...ProjectEnvironment::withoutDevDock(), ...ProjectEnvironment::withPhpFirst(resolve(ProjectPhpRepositoryContract::class)->binaryFor($path))])
 			->timeout(120)
-			->run([resolve(DetachedCommand::class)->phpBinary(), 'artisan', 'migrate:status', '--no-ansi']);
+			->run([resolve(ProjectPhpRepositoryContract::class)->binaryFor($path), 'artisan', 'migrate:status', '--no-ansi']);
 
 		$output = $result->output() . $result->errorOutput();
 
@@ -89,7 +89,7 @@ class WorkingCopyStateRepository implements WorkingCopyStateRepositoryContract
 		File::append($logPath, '$ ' . implode(' ', $command) . PHP_EOL);
 
 		$result = Process::path($path)
-			->env(ProjectEnvironment::withoutDevDock())
+			->env([...ProjectEnvironment::withoutDevDock(), ...ProjectEnvironment::withPhpFirst(resolve(ProjectPhpRepositoryContract::class)->binaryFor($path))])
 			->timeout($timeout)
 			->run($command, function (string $type, string $output) use ($logPath): void {
 				File::append($logPath, $output);

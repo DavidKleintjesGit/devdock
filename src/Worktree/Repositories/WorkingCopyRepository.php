@@ -7,6 +7,7 @@ namespace Src\Worktree\Repositories;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
+use Src\Project\Contracts\ProjectPhpRepositoryContract;
 use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
 use Src\Worktree\Exceptions\NotAWorkingCopyException;
 use Src\Worktree\Objects\SiteName;
@@ -510,8 +511,13 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 
 		$link = $sites . '/' . $siteName->name;
 
-		if (! file_exists($link) && ! $this->link($path, $link)) {
-			return null;
+		if (! file_exists($link)) {
+			if (! $this->link($path, $link)) {
+				return null;
+			}
+
+			// a new site gets the PHP its project asks for, not the one Herd serves by default
+			resolve(ProjectPhpRepositoryContract::class)->isolateSite($path, $siteName->name);
 		}
 
 		return $siteName->name . '.' . $this->tld();

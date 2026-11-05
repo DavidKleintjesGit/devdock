@@ -9,7 +9,7 @@ use Closure;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Src\Packages\Cqrs\Command;
-use Src\Packages\Process\DetachedCommand;
+use Src\Project\Contracts\ProjectPhpRepositoryContract;
 use Src\Project\Actions\GetProjectsAction;
 use Src\Project\Objects\ProjectEntity;
 use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
@@ -137,7 +137,7 @@ class RepairSetupAction extends Command
 		}
 
 		$path = $worktreeEntity->path;
-		$php = resolve(DetachedCommand::class)->phpBinary();
+		$php = resolve(ProjectPhpRepositoryContract::class)->binaryFor($worktreeEntity->path);
 		$prepare = function () use ($workingCopyRepository, $worktreeRepository, $worktreeEntity, $projectPath): ?string {
 			$host = $workingCopyRepository->prepare($projectPath, $worktreeEntity->path, SiteName::for($worktreeEntity->project, $worktreeEntity->branch));
 			$worktreeRepository->pinSite($worktreeEntity->worktreeId, $host ?? $worktreeEntity->site);
@@ -148,7 +148,7 @@ class RepairSetupAction extends Command
 		return match ($setupCheck) {
 			SetupCheckEnum::BRANCH => $workingCopyStateRepository->runStep($path, ['git', 'branch', '--unset-upstream'], $logPath, self::STEP_SECONDS),
 			SetupCheckEnum::CARRIED_FILES, SetupCheckEnum::OWN_FILES_OUT_OF_GIT, SetupCheckEnum::SITE => $prepare(),
-			SetupCheckEnum::PHP_PACKAGES => $this->installPackages($projectPath, $path, 'vendor', ['composer', 'install', '--no-interaction'], $prepare, $logPath, $workingCopyStateRepository, $workingCopyRepository),
+			SetupCheckEnum::PHP_PACKAGES => $this->installPackages($projectPath, $path, 'vendor', resolve(ProjectPhpRepositoryContract::class)->composerCommand($path, ['install', '--no-interaction']), $prepare, $logPath, $workingCopyStateRepository, $workingCopyRepository),
 			SetupCheckEnum::JS_PACKAGES => $this->installPackages($projectPath, $path, 'node_modules', is_file($path . '/package-lock.json') ? ['npm', 'ci'] : ['npm', 'install'], $prepare, $logPath, $workingCopyStateRepository, $workingCopyRepository),
 			SetupCheckEnum::ASSETS => $workingCopyStateRepository->runStep($path, ['npm', 'run', (string) ProjectKindEnum::of($path)->assetScript()], $logPath, self::STEP_SECONDS),
 			SetupCheckEnum::APP_KEY => $workingCopyStateRepository->runStep($path, [$php, 'artisan', 'key:generate', '--force'], $logPath, self::STEP_SECONDS),

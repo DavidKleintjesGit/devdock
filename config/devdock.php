@@ -142,6 +142,8 @@ return [
 	'herd' => [
 		'sites' => env('DEVDOCK_HERD_SITES_PATH'),
 		'tld' => env('DEVDOCK_HERD_TLD'),
+		// the folder with Herd's PHP versions, composer.phar and herd.phar; empty looks in ~/.config/herd/bin
+		'bin' => env('DEVDOCK_HERD_BIN'),
 	],
 
 	/*

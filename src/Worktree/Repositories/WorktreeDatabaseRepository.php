@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 use PDO;
-use Src\Packages\Process\DetachedCommand;
+use Src\Project\Contracts\ProjectPhpRepositoryContract;
 use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Enums\DatabaseFillEnum;
 use Src\Worktree\Objects\DatabaseObject;
@@ -131,7 +131,7 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 		if ($fill === DatabaseFillEnum::MIGRATE) {
 			$migrated = Process::path($path)
 				->timeout(600)
-				->run([resolve(DetachedCommand::class)->phpBinary(), 'artisan', 'migrate', '--seed', '--force']);
+				->run([resolve(ProjectPhpRepositoryContract::class)->binaryFor($path), 'artisan', 'migrate', '--seed', '--force']);
 
 			if (! $migrated->successful()) {
 				return trim($migrated->errorOutput() ?: $migrated->output()) ?: __('De migraties liepen vast.');
