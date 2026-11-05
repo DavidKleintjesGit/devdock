@@ -20,11 +20,11 @@
 			@endforeach
 		</div>
 		@if ($repairState && ! $repairState->isRunning)
-			<details class="fold" @if ($repairState->failure) open @endif>
+			<details class="fold" wire:ignore.self wire:key="repair-log-{{ $repairState->finishedAt?->getTimestamp() }}">
 				<summary><x-icon name="chev" small/><b class="grow">{{ __('Log van de laatste herstelactie') }}</b><span class="hint" @if ($repairState->failure) style="color:var(--red)" @endif>{{ $repairState->failure ? __('vastgelopen') : __('klaar') }} · {{ $repairState->finishedAt?->diffForHumans() }}</span></summary>
-				<div class="foldbody">
-					@if ($repairState->failure)<p class="hint" style="margin:0 0 8px;color:var(--red)">{{ $repairState->failure }}</p>@endif
-					<pre class="mono" style="margin:0;font-size:12px;white-space:pre-wrap;color:var(--fg-2)">{{ $repairState->logTail() }}</pre>
+				<div class="foldbody" style="max-height:360px;overflow:auto">
+					@if ($repairState->failure)<p class="hint" style="margin:0 0 8px;color:var(--red);overflow-wrap:anywhere">{{ $repairState->failure }}</p>@endif
+					<pre class="mono" style="margin:0;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--fg-2)">{{ $repairState->logTail() }}</pre>
 				</div>
 			</details>
 		@endif
