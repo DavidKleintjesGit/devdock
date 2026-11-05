@@ -297,8 +297,34 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 			$server->exec(sprintf('INSERT INTO `%s`.`%s` (%s) SELECT %s FROM `%s`.`%s`', $to, $table, $copied, $copied, $from, $table));
 		}
 
+		// CREATE TABLE ... LIKE leaves the foreign keys behind; they come along once every table stands
+		foreach ($tables as $table) {
+			foreach ($this->foreignKeysOf($server, $from, $table, $to) as $foreignKey) {
+				$server->exec(sprintf('ALTER TABLE `%s`.`%s` ADD %s', $to, $table, $foreignKey));
+			}
+		}
+
 		$server->prepare('SET SESSION sql_mode = ?')->execute([$sqlMode]);
 		$server->exec('SET FOREIGN_KEY_CHECKS = 1');
+	}
+
+	/**
+	 * The foreign key clauses of a table as the server writes them, pointed at
+	 * the tables of the copy instead of the original.
+	 *
+	 * @return list<string>
+	 */
+	private function foreignKeysOf(PDO $server, string $from, string $table, string $to): array
+	{
+		$definition = (string) $server->query(sprintf('SHOW CREATE TABLE `%s`.`%s`', $from, $table))->fetchColumn(1);
+
+		preg_match_all('/^\s*(CONSTRAINT `[^`]+` FOREIGN KEY .+?),?$/m', $definition, $matches);
+
+		// a reference without a database names a table next to it; in the copy that is a table of the copy
+		return array_map(
+			fn (string $foreignKey): string => (string) preg_replace('/REFERENCES `([^`]+)` \(/', 'REFERENCES `' . $to . '`.`$1` (', $foreignKey),
+			$matches[1],
+		);
 	}
 
 	/**
