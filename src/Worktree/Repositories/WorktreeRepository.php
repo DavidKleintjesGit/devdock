@@ -1690,15 +1690,16 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return;
 		}
 
-		$targets = array_map(fn (string $path) => $this->targetBranch($path), $cold);
+		$targets = $this->targetBranches($cold);
+		$commands = [];
 
-		$results = Process::pool(function (Pool $pool) use ($cold, $targets): void {
-			foreach ($cold as $index => $path) {
-				$pool->as('status-' . $index)->path($path)->command($this->statusCommand());
-				$pool->as('sides-' . $index)->path($path)->command($this->sidesCommand($targets[$index]));
-				$pool->as('unpushed-' . $index)->path($path)->command(['git', 'log', '--format=%h%x09%cI%x09%s', 'HEAD', '--not', '--remotes']);
-			}
-		})->start()->wait();
+		foreach ($cold as $index => $path) {
+			$commands['status-' . $index] = [$path, $this->statusCommand()];
+			$commands['sides-' . $index] = [$path, $this->sidesCommand($targets[$index])];
+			$commands['unpushed-' . $index] = [$path, ['git', 'log', '--format=%h%x09%cI%x09%s', 'HEAD', '--not', '--remotes']];
+		}
+
+		$results = LocalCommand::pool($commands);
 
 		foreach ($cold as $index => $path) {
 			$seconds = $keepSeconds ?? (int) config('devdock.worktree.status_seconds');
@@ -1711,6 +1712,51 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			);
 			Cache::put($this->unpushedKey($path), $unpushed->successful() ? trim($unpushed->output()) : '', $seconds);
 		}
+	}
+
+	/**
+	 * The branch each copy merges into, read for all of them at once: the
+	 * branch, the stored targets and the main line come in one wave of git
+	 * calls instead of three calls per copy one after the other.
+	 *
+	 * @param  list<string>  $paths
+	 * @return list<string>
+	 */
+	private function targetBranches(array $paths): array
+	{
+		$commands = [];
+
+		foreach ($paths as $index => $path) {
+			$commands['branch-' . $index] = [$path, ['git', 'symbolic-ref', '--short', 'HEAD']];
+			$commands['targets-' . $index] = [$path, ['git', 'config', '--get-regexp', '^branch\..*\.' . self::TARGET_KEY . '$']];
+
+			if (! Cache::has('worktree.main.' . md5($path))) {
+				$commands['main-' . $index] = [$path, ['git', 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD']];
+			}
+		}
+
+		$results = LocalCommand::pool($commands);
+
+		return array_map(function (string $path, int $index) use ($results): string {
+			if (isset($results['main-' . $index])) {
+				$main = trim($results['main-' . $index]->output());
+
+				Cache::put('worktree.main.' . md5($path), $results['main-' . $index]->successful() && $main !== '' ? str_replace('origin/', '', $main) : 'master', 86400);
+			}
+
+			$branch = trim($results['branch-' . $index]->output());
+			$suffix = '.' . self::TARGET_KEY;
+
+			foreach (preg_split('/\R/', $results['targets-' . $index]->output()) ?: [] as $line) {
+				[$name, $target] = array_pad(explode(' ', trim($line), 2), 2, '');
+
+				if ($branch !== '' && $target !== '' && $name === 'branch.' . $branch . $suffix) {
+					return $target;
+				}
+			}
+
+			return $this->mainBranch($path);
+		}, $paths, array_keys($paths));
 	}
 
 	/**

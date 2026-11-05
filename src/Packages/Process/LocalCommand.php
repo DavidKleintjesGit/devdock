@@ -56,4 +56,50 @@ class LocalCommand
 
 		return new LocalCommandResult($command, $exitCode, $output, $errorOutput);
 	}
+
+	/**
+	 * Several short reads started at once and waited for together, each in its
+	 * own folder. The results keep the keys the commands came in with.
+	 *
+	 * @param  array<string, array{0: string, 1: array<int, string>}>  $commands  per key the folder and the command
+	 * @return array<string, LocalCommandResult>
+	 */
+	public static function pool(array $commands): array
+	{
+		$environment = [...getenv(), 'GIT_OPTIONAL_LOCKS' => '0', 'GIT_TERMINAL_PROMPT' => '0'];
+		$started = [];
+		$results = [];
+
+		foreach ($commands as $key => [$path, $command]) {
+			// files instead of pipes: nothing has to be read while the others still run
+			$outputFile = tmpfile();
+			$errorFile = tmpfile();
+
+			if ($outputFile === false || $errorFile === false) {
+				throw new RuntimeException('No temporary file for ' . $command[0] . '.');
+			}
+
+			$process = proc_open($command, [0 => ['pipe', 'r'], 1 => $outputFile, 2 => $errorFile], $pipes, $path, $environment, ['bypass_shell' => true]);
+
+			if (! is_resource($process)) {
+				$results[$key] = new LocalCommandResult($command, -1, '', 'Could not start ' . $command[0] . '.');
+
+				continue;
+			}
+
+			fclose($pipes[0]);
+			$started[$key] = [$command, $process, $outputFile, $errorFile];
+		}
+
+		foreach ($started as $key => [$command, $process, $outputFile, $errorFile]) {
+			$exitCode = proc_close($process);
+
+			rewind($outputFile);
+			rewind($errorFile);
+
+			$results[$key] = new LocalCommandResult($command, $exitCode, (string) stream_get_contents($outputFile), (string) stream_get_contents($errorFile));
+		}
+
+		return array_replace(array_intersect_key($commands, $results), $results);
+	}
 }
