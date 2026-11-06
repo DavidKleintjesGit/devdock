@@ -53,7 +53,7 @@
 		<section class="dsec">
 			<h3 class="eyebrow">{{ __('Leest deze regels') }}</h3>
 			@if ($project)
-				<p class="hint" style="margin:0">{{ __('DevDock vond deze regelbestanden in het project. Vink aan wat deze lens moet lezen.') }}</p>
+				<p class="hint">{{ __('DevDock vond deze regelbestanden in het project. Vink aan wat deze lens moet lezen.') }}</p>
 				<div class="list">
 					@forelse ($rules as $rule)
 						<label class="tick row" style="min-height:42px" wire:key="rule-{{ $rule['file'] }}">
@@ -67,7 +67,7 @@
 					@endforelse
 				</div>
 			@else
-				<p class="hint" style="margin:0">{{ __('Patronen; in elk project kijkt DevDock welke bestanden erop passen.') }}</p>
+				<p class="hint">{{ __('Patronen; in elk project kijkt DevDock welke bestanden erop passen.') }}</p>
 				<div class="chips">
 					@foreach ($lensRules as $rule)<span class="tchip on">{{ $rule }}<button class="icon-btn" type="button" style="width:18px;height:18px" wire:click="toggleRule('{{ $rule }}')" aria-label="{{ __('Weghalen') }}"><x-icon name="x" small/></button></span>@endforeach
 				</div>

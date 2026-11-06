@@ -28,7 +28,7 @@
 
 	<div class="dbody">
 		<section class="dsec">
-			<dl style="margin:0;display:grid;grid-template-columns:100px 1fr;gap:8px 14px;font-size:13.5px">
+			<dl style="display:grid;grid-template-columns:100px 1fr;gap:8px 14px;font-size:13.5px">
 				<dt class="muted">{{ __('Waar') }}</dt><dd style="margin:0">{{ $skill->project ?? $skill->scope->label() }}</dd>
 				<dt class="muted">{{ __('Bestand') }}</dt><dd style="margin:0" class="mono">{{ $skill->location() }}</dd>
 			</dl>

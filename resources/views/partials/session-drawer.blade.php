@@ -66,7 +66,7 @@
 					<span class="label" style="align-self:center;border-radius:999px;padding:4px 12px">{{ trans_choice(':count bericht ertussen|:count berichten ertussen', $hiddenTurns, ['count' => $hiddenTurns]) }}</span>
 				@endif
 			@empty
-				<p class="hint" style="margin:0">{{ __('Geen berichten van jou in deze sessie.') }}</p>
+				<p class="hint">{{ __('Geen berichten van jou in deze sessie.') }}</p>
 			@endforelse
 		</section>
 	</div>
