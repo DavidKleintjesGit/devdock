@@ -1702,5 +1702,16 @@
     "Klaarzetten lukte niet": "Setting up did not work",
     "Bij stap 2 staat wat er misging en wat je kunt doen.": "Step 2 shows what went wrong and what you can do.",
     "Kies hierboven een andere branch of database, of los het op in de map die genoemd wordt. Daarna zet je hem opnieuw klaar.": "Pick another branch or database above, or solve it in the folder that is named. Then set it up again.",
-    "Opnieuw klaarzetten": "Set up again"
+    "Opnieuw klaarzetten": "Set up again",
+    "Checkout eromheen": "Checkout around it",
+    "Jouw map": "Your folder",
+    "Van DevDock, geen bestand": "From DevDock, not a file",
+    "de agent": "the agent",
+    "deze lens": "this lens",
+    "agent en lenzen": "agent and lenses",
+    "Krijgen": "Given to",
+    "Wat deze lens leest in de laatste ronde, met wie het nog meer krijgt.": "What this lens reads in the latest round, with who else is given it.",
+    "Wat de agent bij elk bericht leest, met wie het nog meer krijgt.": "What the agent reads with every message, with who else is given it.",
+    "lens": "lens",
+    "allebei": "both"
 }

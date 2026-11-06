@@ -1257,7 +1257,7 @@ class Drawer extends Component
 				},
 			])->all(),
 			'repairState' => $repairState,
-			...(in_array($subtab, [CardSubtabEnum::CONTEXT, CardSubtabEnum::LENSES], true) ? $this->cardContextData($cardObject, $this->projectPathFor($cardObject), $worktreeEntity?->path ?? $this->projectPathFor($cardObject)) : []),
+			...(in_array($subtab, [CardSubtabEnum::CONTEXT, CardSubtabEnum::LENSES], true) ? $this->cardContextData($cardObject, $this->projectPathFor($cardObject), $worktreeEntity?->path ?? $this->projectPathFor($cardObject), $subtab) : []),
 			'branchSuggestion' => $this->newBranch,
 			'readableProjects' => $taskEntity?->valuesFor(TaskLinkKindEnum::READABLE_PROJECT) ?? [],
 			'projectChoices' => GetProjectsAction::execute()->pluck('name')->sort()->values(),

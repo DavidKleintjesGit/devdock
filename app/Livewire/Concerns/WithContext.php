@@ -7,9 +7,11 @@ namespace App\Livewire\Concerns;
 use Src\Board\Enums\CardSubtabEnum;
 use Src\Board\Objects\CardObject;
 use Src\Packages\Markdown\RenderMarkdown;
+use Src\Review\Actions\BuildContextTreeAction;
 use Src\Review\Actions\GetContextFilesAction;
 use Src\Review\Actions\GetLensesAction;
 use Src\Review\Actions\GetStandardContextFilesAction;
+use Src\Review\Enums\ContextAudienceEnum;
 use Src\Review\Enums\ContextChoiceEnum;
 use Src\Review\Objects\ContextFileObject;
 use Src\Review\Objects\LensEntity;
@@ -59,15 +61,32 @@ trait WithContext
 	/**
 	 * @return array<string, mixed>
 	 */
-	private function cardContextData(CardObject $cardObject, ?string $projectPath, ?string $workingPath): array
+	private function cardContextData(CardObject $cardObject, ?string $projectPath, ?string $workingPath, CardSubtabEnum $cardSubtab): array
 	{
 		[$choice, $lens] = $this->pickedContext();
+		$own = $cardSubtab === CardSubtabEnum::LENSES ? ContextChoiceEnum::LENS : ContextChoiceEnum::AGENT;
+		$choices = $own === ContextChoiceEnum::LENS && ($choice !== ContextChoiceEnum::LENS || $lens === null)
+			? [ContextChoiceEnum::RULES, ContextChoiceEnum::SKILLS]
+			: [$own, ContextChoiceEnum::RULES, ContextChoiceEnum::SKILLS];
 
-		return $this->contextView(
-			GetContextFilesAction::execute($choice, $lens, $cardObject->id, $cardObject->project, $projectPath, $workingPath),
-			$choice->explanation(),
-			$this->contextChoices($cardObject->project, __('Agent · :name', ['name' => $cardObject->agent?->name ?? __('nog geen')])),
-		);
+		$entries = collect($choices)
+			->flatMap(fn (ContextChoiceEnum $contextChoice) => collect(GetContextFilesAction::execute($contextChoice, $lens, $cardObject->id, $cardObject->project, $projectPath, $workingPath))
+				->map(fn (ContextFileObject $contextFileObject) => ['file' => $contextFileObject, 'audience' => ContextAudienceEnum::of($contextChoice)]))
+			->values();
+		$openEntry = $entries->first(fn (array $entry) => $entry['file']->key === $this->contextFile)
+			?? $entries->first(fn (array $entry) => $entry['file']->contents !== null);
+
+		return [
+			'contextTree' => BuildContextTreeAction::execute($entries->all(), $projectPath, $workingPath),
+			'contextCount' => $entries->count(),
+			'contextExplanation' => $own === ContextChoiceEnum::LENS
+				? __('Wat deze lens leest in de laatste ronde, met wie het nog meer krijgt.')
+				: __('Wat de agent bij elk bericht leest, met wie het nog meer krijgt.'),
+			'contextLenses' => $own === ContextChoiceEnum::LENS ? $this->contextChoices($cardObject->project, '')[__('Alleen voor een lens')] : [],
+			'contextOpen' => $openEntry['file'] ?? null,
+			'contextOpenAudience' => $openEntry['audience'] ?? null,
+			'contextHtml' => ($openEntry['file'] ?? null)?->contents === null ? null : resolve(RenderMarkdown::class)->toHtml($openEntry['file']->contents),
+		];
 	}
 
 	/**

@@ -1,33 +1,29 @@
 <div class="dbody workspace card-context">
 	<x-panel :title="trans_choice(':count bron|:count bronnen', $contextCount, ['count' => $contextCount])" :meta="$contextExplanation" :padded="false">
-		<x-slot:actions>
-			<label class="context-choice">
-				<span class="sr">{{ __('Context van') }}</span>
-				<select class="input" wire:model.live="contextChoice">
-					@foreach ($contextChoices as $group => $options)
-						<optgroup label="{{ $group }}">
-							@foreach ($options as $value => $label)<option value="{{ $value }}">{{ $label }}</option>@endforeach
-						</optgroup>
-					@endforeach
-				</select>
-			</label>
-		</x-slot:actions>
+		@if ($contextLenses !== [])
+			<x-slot:actions>
+				<label class="context-choice">
+					<span class="sr">{{ __('Lens') }}</span>
+					<select class="input" wire:model.live="contextChoice">
+						@foreach ($contextLenses as $value => $label)<option value="{{ $value }}">{{ $label }}</option>@endforeach
+					</select>
+				</label>
+			</x-slot:actions>
+		@endif
 
 		<div class="context-columns">
 			<nav class="context-tree" aria-label="{{ __('Bronnen') }}">
-				@forelse ($contextGroups as $group => $files)
-					@if ($group !== '')<span class="context-folder"><x-icon name="folder" small/>{{ $group }}</span>@endif
-					@foreach ($files as $file)
-						<button type="button" @class(['context-file', 'on' => $contextOpen?->key === $file->key])
-							@if ($file->tab) wire:click="setDrawerTab('{{ $file->tab }}')" @else wire:click="openContextFile('{{ $file->key }}')" @endif
-							@if ($contextOpen?->key === $file->key) aria-current="true" @endif>
-							<x-icon name="file" small/>
-							<span class="grow">
-								<span class="name">{{ $file->name }}</span>
-								@if ($file->path)<span class="path mono">{{ $file->path }}</span>@elseif ($file->description)<span class="hint">{{ $file->description }}</span>@endif
-							</span>
-						</button>
-					@endforeach
+				@forelse ($contextTree as $contextRoot)
+					<details class="context-root" open>
+						<summary>
+							<x-icon name="chev" small/>
+							<span class="grow"><b>{{ $contextRoot['label'] }}</b>@if ($contextRoot['path'])<span class="path mono">{{ $contextRoot['path'] }}</span>@endif</span>
+							<span class="count">{{ $contextRoot['count'] }}</span>
+						</summary>
+						<div class="context-node-children">
+							@include('partials.card.context-nodes', ['nodes' => $contextRoot['nodes']])
+						</div>
+					</details>
 				@empty
 					<p class="hint" style="padding:8px 10px">{{ __('Hier is nog niets meegegeven.') }}</p>
 				@endforelse
@@ -43,7 +39,8 @@
 						</div>
 						@if ($contextOpen->path)<span class="mono path">{{ $contextOpen->path }}</span>@endif
 						<div class="context-reader-meta">
-							<span>{{ $contextOpen->group ?? $contextOpen->description }}</span>
+							@if ($contextOpenAudience)<span>{{ __('Krijgen') }}: <b>{{ $contextOpenAudience->label() }}</b></span>@endif
+							@if ($contextOpen->group)<span>· {{ $contextOpen->group }}</span>@endif
 							<span class="grow"></span>
 							@if ($contextOpen->settingsRoute())
 								<a class="btn xs" href="{{ route($contextOpen->settingsRoute()) }}">{{ $contextOpen->settingsLabel() }}<x-icon name="arrow" small/></a>
