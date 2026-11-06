@@ -544,6 +544,17 @@ button.row{width:100%;border:0;background:transparent;text-align:left;cursor:poi
 .card-context .context-reader-head .path{font-size:12px;color:var(--fg-2);overflow-wrap:anywhere}
 .context-reader-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
 .card-context .context-reader>.md{flex:1;min-height:0;overflow:auto;padding:16px 20px}
+.panel-grid.changes-grid{grid-template-columns:minmax(0,1fr) 340px}
+.panel .panel-body>.list,.panel .panel-body>.dsec>.list{border:0;border-radius:0}
+.panel-head .seg{flex:none}
+.fact-grid{flex:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:stretch}
+.fact-grid>.kv{background:var(--surface);border:1px solid var(--line);border-radius:14px;min-width:0}
+.fact-grid>.kv+.kv{border-top:1px solid var(--line)}
+.workspace>.external-note{border:1px solid var(--line);border-radius:14px}
+.setup-workspace .panel .dsec{padding:0}
+.setup-workspace .panel .dsec>.headrow{min-height:52px;padding:0 16px;border-bottom:1px solid var(--line)}
+.setup-workspace .panel .dsec>.list{border:0;border-radius:0}
+.setup-workspace .panel .dsec>.alert,.setup-workspace .panel .dsec>.fold{margin:12px 16px}
 .dbar .step-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);font-size:12px;font-weight:600;white-space:nowrap;flex:none}
 .dbar .step-pill .circle{width:8px;height:8px;box-sizing:border-box;border-radius:50%;border:2px solid var(--accent)}
 .drawer.compact:not(.chat-tall) .card-head{display:none}

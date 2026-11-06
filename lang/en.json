@@ -1667,5 +1667,8 @@
     "Kopieer pad": "Copy path",
     ":count bron|:count bronnen": ":count source|:count sources",
     "Agent van deze taak": "Agent of this task",
-    "bekijken in Context": "view in Context"
+    "bekijken in Context": "view in Context",
+    "in orde": "in order",
+    ":count open": ":count open",
+    "Deze werkkopie is nog niet nagekeken.": "This working copy has not been checked yet."
 }

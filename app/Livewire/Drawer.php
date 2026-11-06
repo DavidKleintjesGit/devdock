@@ -112,6 +112,7 @@ use Src\Worktree\Objects\ChangeObject;
 use Src\Worktree\Objects\DiffHunkObjectCollection;
 use Src\Worktree\Objects\FileTreeNodeObject;
 use Src\Worktree\Objects\WorkingCopyTaskObject;
+use Src\Worktree\Objects\ReadinessObject;
 use Src\Worktree\Objects\WorktreeEntity;
 use Throwable;
 
@@ -1156,7 +1157,6 @@ class Drawer extends Component
 		}
 
 		$tab = $top['tab'];
-		$subtab = CardTabEnum::tryFrom($tab)?->subtab($this->openSubtab);
 		$taskEntity = resolve(TaskRepositoryContract::class)->getByKey($cardObject->id);
 		$reviewCommentEntities = $this->reviewCommentsOn($cardObject);
 		$promptRunEntity = GetLatestPromptRunAction::execute($cardObject->id);
@@ -1165,6 +1165,8 @@ class Drawer extends Component
 		$roundTurns = $tab === 'Review' ? GetRoundTurnsAction::execute($cardObject->id) : [];
 		$rounds = $tab === 'Review' ? collect(GetRoundsAction::execute($cardObject->id))->reverse()->values() : collect();
 		$worktreeEntity = $this->worktreeFor($cardObject);
+		// a task without a working copy shows how to get one, not its subtabs
+		$subtab = $tab === CardTabEnum::WORKING_COPY->value && $worktreeEntity === null ? null : CardTabEnum::tryFrom($tab)?->subtab($this->openSubtab);
 		$changes = $tab === 'Werkkopie' && $worktreeEntity !== null ? $this->changesFor($cardObject) : collect();
 		// a task with a working copy but without an agent is not set up yet: the panel stays until all three steps are done
 		$isSetup = in_array($cardObject->column, [BoardColumnEnum::TO_DO, BoardColumnEnum::LATER], true)
@@ -1190,7 +1192,7 @@ class Drawer extends Component
 			'previous' => $previousLabel,
 			'cardSteps' => $cardSteps,
 			'currentStep' => collect($cardSteps)->firstWhere('state', 'now'),
-			'tabSubtabs' => CardTabEnum::tryFrom($tab)?->subtabs() ?? [],
+			'tabSubtabs' => $subtab === null ? [] : $this->subtabRows(CardTabEnum::from($tab), $worktreeEntity, $readiness),
 			'nextStep' => $this->nextStep($cardObject, $worktreeEntity, $latestRound),
 			...($isSetup ? $this->setupData($cardObject, $worktreeEntity) : []),
 			'databaseSuggestion' => $worktreeEntity === null && ($isSetup || $tab === 'Werkkopie') ? $this->databaseSuggestionFor($cardObject) : null,
@@ -1735,6 +1737,25 @@ class Drawer extends Component
 		}
 
 		$this->switchDrawerTab($tab);
+	}
+
+	/**
+	 * The subtabs of a tab, each with the short state shown next to its name.
+	 *
+	 * @return list<array{subtab: CardSubtabEnum, note: string, isWaiting: bool}>
+	 */
+	private function subtabRows(CardTabEnum $cardTab, ?WorktreeEntity $worktreeEntity, ?ReadinessObject $readiness): array
+	{
+		return collect($cardTab->subtabs())->map(fn (CardSubtabEnum $cardSubtab) => [
+			'subtab' => $cardSubtab,
+			'note' => match ($cardSubtab) {
+				CardSubtabEnum::CHANGES => $worktreeEntity?->changedFiles ? (string) $worktreeEntity->changedFiles : '',
+				CardSubtabEnum::BRANCH => $worktreeEntity?->behind ? __(':count achter', ['count' => $worktreeEntity->behind]) : '',
+				CardSubtabEnum::SETUP => $readiness === null ? '' : ($readiness->isReady() ? __('in orde') : __(':count open', ['count' => $readiness->openCount()])),
+				default => '',
+			},
+			'isWaiting' => $cardSubtab === CardSubtabEnum::SETUP && $readiness !== null && ! $readiness->isReady(),
+		])->all();
 	}
 
 	/**

@@ -86,8 +86,12 @@
 		@if ($subtab)
 			<div class="subbar">
 				<nav class="segmented" aria-label="{{ __($tab) }}">
-					@foreach ($tabSubtabs as $tabSubtab)
-						<button type="button" @if ($subtab === $tabSubtab) aria-current="page" @endif @click="if (@js($subtab->value) !== @js($tabSubtab->value)) { pendingSubtab = true; compact = false }" wire:click="setDrawerSubtab('{{ $tabSubtab->value }}')">{{ $tabSubtab->label() }}</button>
+					@foreach ($tabSubtabs as $subtabRow)
+						<button type="button" @if ($subtab === $subtabRow['subtab']) aria-current="page" @endif @click="if (@js($subtab->value) !== @js($subtabRow['subtab']->value)) { pendingSubtab = true; compact = false }" wire:click="setDrawerSubtab('{{ $subtabRow['subtab']->value }}')">
+							@if ($subtabRow['isWaiting'])<span class="waits" title="{{ __('Wacht op jou') }}"></span>@endif
+							{{ $subtabRow['subtab']->label() }}
+							@if ($subtabRow['note'] !== '')<span class="note">{{ $subtabRow['note'] }}</span>@endif
+						</button>
 					@endforeach
 				</nav>
 				<span class="grow"></span>
