@@ -104,6 +104,7 @@ trait WithContext
 		return [
 			'contextChoices' => $choices,
 			'contextExplanation' => $explanation,
+			'contextCount' => count($files),
 			'contextGroups' => collect($files)->groupBy(fn (ContextFileObject $contextFileObject) => $contextFileObject->group ?? '')->all(),
 			'contextOpen' => $openFile,
 			'contextHtml' => $openFile?->contents === null ? null : resolve(RenderMarkdown::class)->toHtml($openFile->contents),

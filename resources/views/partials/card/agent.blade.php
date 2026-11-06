@@ -16,12 +16,6 @@
 			</div>
 		</div>
 	@else
-		<div class="banner gray chat-banner">
-			<span>{{ __('Krijgt mee') }}</span>
-			<b>{{ $card->ticketKey ? __('het ticket en de werkwijze van :project', ['project' => $card->project]) : __('de werkwijze van :project', ['project' => $card->project]) }}</b>
-			@if ($card->agent)<span class="mono agent-name">{{ $card->agent->name }}</span>@endif
-		</div>
-
 		@if ($conversation)
 			<div class="chat">
 				@foreach ($conversation as $exchange)
@@ -123,24 +117,6 @@
 			</div>
 		@endif
 
-		@if ($agents && $agents->count() > 1)
-			<section class="dsec line">
-				<h3 class="eyebrow">{{ __('Eerdere agents') }}</h3>
-				<div class="list">
-					@foreach ($agents as $agent)
-						<div class="row">
-							<span class="sdot {{ $agent->isActive ? 'yours' : 'quiet' }}"></span>
-							<span class="grow title"><b>{{ $agent->name }}</b><small class="mono">{{ $agent->shortKey() }}</small></span>
-							@if ($agent->isActive)
-								<span class="label teal">{{ __('actief') }}</span>
-							@else
-								<button class="btn xs" type="button" wire:click="useAgent('{{ $agent->sessionUuid }}')">{{ __('Op actief zetten') }}</button>
-							@endif
-						</div>
-					@endforeach
-				</div>
-			</section>
-		@endif
 	@endif
 </div>
 
@@ -169,17 +145,7 @@
 			@endif
 		@endif
 
-		<div class="composer-row">
-			@if ($promptSources !== [] && ! $composing)
-				<button class="btn text sm" type="button" wire:click="toggleComposing">
-					<x-icon name="plus" small/>{{ __('Prompt maken uit context') }}
-					<span class="muted" style="font-weight:400">· {{ $promptSourceSummary }}</span>
-				</button>
-			@endif
-			<span class="hint">{{ __('Enter stuurt · Shift+Enter is een nieuwe regel') }}</span>
-		</div>
-
-		<div class="boxwrap">
+		<div class="composer-box">
 			<label class="sr" for="prompt-text">{{ __('Bericht aan de agent') }}</label>
 			@if ($attachments !== [])
 				<div class="attachment-chips">
@@ -194,15 +160,49 @@
 				</div>
 			@endif
 			<span class="attachment-busy hint"><span class="dot amber pulse"></span>{{ __('Bijlage wordt toegevoegd…') }}</span>
-			<label class="clip" title="{{ __('Bestand toevoegen') }}">
-				<input type="file" multiple class="sr" @change="pick($event)" accept="image/*,.pdf,.txt,.log,.csv,.json,.md,.xml,.html,.sql">
-				<x-icon name="clip" small/><span class="sr">{{ __('Bestand toevoegen') }}</span>
-			</label>
 			<textarea id="prompt-text" class="textarea" data-send-on-enter wire:model="prompt" @paste="paste($event)" placeholder="{{ __('Wat is de volgende stap? Sleep of plak er een bestand bij.') }}" @disabled($run?->isRunning())></textarea>
-			<button class="btn primary send" type="button" wire:click="send" wire:target="send" wire:loading.attr="disabled" aria-label="{{ __('Versturen') }}" @disabled($run?->isRunning())>
-				<span wire:loading.remove wire:target="send"><x-icon name="send" small/></span>
-				<span wire:loading wire:target="send" class="dot amber pulse"></span>
-			</button>
+			<div class="composer-tools">
+				<label class="clip icon-btn" title="{{ __('Bestand toevoegen') }}">
+					<input type="file" multiple class="sr" @change="pick($event)" accept="image/*,.pdf,.txt,.log,.csv,.json,.md,.xml,.html,.sql">
+					<x-icon name="clip" small/><span class="sr">{{ __('Bestand toevoegen') }}</span>
+				</label>
+				@if ($promptSources !== [] && ! $composing)
+					<button class="btn sm soft" type="button" wire:click="toggleComposing">
+						<x-icon name="plus" small/>{{ __('Prompt maken uit context') }}
+						<span class="muted" style="font-weight:400">· {{ $promptSourceSummary }}</span>
+					</button>
+				@endif
+				<span class="grow"></span>
+				@if ($card->agent)
+					<details class="menu agent-picker" x-data="{ open: false }" :open="open" @click.outside="open = false">
+						<summary class="picker-btn mono" @click.prevent="open = ! open" aria-label="{{ __('Agent van deze taak') }}"><span class="sdot yours"></span><span class="name">{{ $card->agent->name }}</span><x-icon name="up" small/></summary>
+						<div class="menu-pop agent-menu" role="menu">
+							<span class="eyebrow">{{ __('Agent van deze taak') }}</span>
+							@foreach ($agents ?? [] as $agent)
+								<div @class(['agent-option', 'on' => $agent->isActive])>
+									<span class="sdot {{ $agent->isActive ? 'yours' : 'quiet' }}"></span>
+									<span class="grow title"><b>{{ $agent->name }}</b><small class="mono">{{ $agent->shortKey() }}</small></span>
+									@if ($agent->isActive)
+										<span class="label teal">{{ __('actief') }}</span>
+									@else
+										<button class="btn xs" type="button" role="menuitem" wire:click="useAgent('{{ $agent->sessionUuid }}')" @click="open = false">{{ __('Op actief zetten') }}</button>
+									@endif
+								</div>
+							@endforeach
+							<hr>
+							<button type="button" role="menuitem" wire:click="openInClaude" @click="open = false"><x-icon name="external" small/>{{ __('Openen in Claude Code') }}</button>
+						</div>
+					</details>
+				@endif
+				<button class="btn primary send" type="button" wire:click="send" wire:target="send" wire:loading.attr="disabled" aria-label="{{ __('Versturen') }}" @disabled($run?->isRunning())>
+					<span wire:loading.remove wire:target="send"><x-icon name="send" small/></span>
+					<span wire:loading wire:target="send" class="dot amber pulse"></span>
+				</button>
+			</div>
+		</div>
+		<div class="composer-note">
+			<span class="grow">{{ __('Krijgt mee') }}: {{ $card->ticketKey ? __('het ticket en de werkwijze van :project', ['project' => $card->project]) : __('de werkwijze van :project', ['project' => $card->project]) }} · <button class="link" type="button" wire:click="setDrawerSubtab('context')">{{ __('bekijken in Context') }}</button></span>
+			<span>{{ __('Enter stuurt · Shift+Enter is een nieuwe regel') }}</span>
 		</div>
 		@error('prompt')<span class="field"><span class="err">{{ $message }}</span></span>@enderror
 		<span class="field attachment-failure"><span class="err" x-text="failure"></span></span>

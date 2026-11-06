@@ -24,4 +24,30 @@ class ContextFileObject extends ValueObject
 	) {
 		parent::__construct();
 	}
+
+	/**
+	 * The route of the page where this piece is set, or null when no page sets it.
+	 */
+	public function settingsRoute(): ?string
+	{
+		return match (true) {
+			str_starts_with($this->key, 'global:'), str_starts_with($this->key, 'checkout:'), str_starts_with($this->key, 'project:') => 'rules',
+			str_starts_with($this->key, 'skill:') => 'skills',
+			str_starts_with($this->key, 'step:'), in_array($this->key, ['standing', 'chat', 'project', 'definition', 'assignment', 'instruction'], true) => 'workflows',
+			default => null,
+		};
+	}
+
+	/**
+	 * The button text that leads to the page where this piece is set.
+	 */
+	public function settingsLabel(): ?string
+	{
+		return match ($this->settingsRoute()) {
+			'rules' => __('Instellen in Regels'),
+			'skills' => __('Instellen in Skills'),
+			'workflows' => __('Instellen in Workflows'),
+			default => null,
+		};
+	}
 }

@@ -1660,5 +1660,12 @@
     "Feedback uit Bitbucket": "Feedback from Bitbucket",
     "Eigen map naast het project, waar de agent en de lenzen werken.": "Its own folder next to the project, where the agent and the lenses work.",
     "Werkt in deze werkkopie. Wisselen doe je in de chat.": "Works in this working copy. You switch agents in the chat.",
-    "Naar de chat": "Go to the chat"
+    "Naar de chat": "Go to the chat",
+    "Instellen in Regels": "Set in Rules",
+    "Instellen in Skills": "Set in Skills",
+    "Instellen in Workflows": "Set in Workflows",
+    "Kopieer pad": "Copy path",
+    ":count bron|:count bronnen": ":count source|:count sources",
+    "Agent van deze taak": "Agent of this task",
+    "bekijken in Context": "view in Context"
 }
