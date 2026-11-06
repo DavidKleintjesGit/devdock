@@ -31,6 +31,27 @@ document.addEventListener('livewire:init', () => {
 	});
 });
 
+// Reloads the page when the session ended, so the login page opens and leads back to the same card and tab.
+document.addEventListener('livewire:init', () => {
+	Livewire.hook('request', ({ fail }) => {
+		fail(({ status, preventDefault }) => {
+			if (status === 401 || status === 419) {
+				preventDefault();
+				window.location.reload();
+			}
+		});
+	});
+});
+
+// Closes the logout menu in the sidebar on a click anywhere else.
+document.addEventListener('click', (event) => {
+	document.querySelectorAll('.side-menu[open]').forEach((menu) => {
+		if (! menu.contains(event.target)) {
+			menu.removeAttribute('open');
+		}
+	});
+});
+
 // Op een telefoon staat de lade als een blad onderaan het scherm. Die duw je
 // naar beneden weg; het kruisje bovenin blijft, maar je hoeft er niet heen.
 document.addEventListener('livewire:init', () => {

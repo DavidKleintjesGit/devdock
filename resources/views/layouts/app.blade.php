@@ -41,6 +41,30 @@
 					<x-icon name="instellingen"/>
 					<span class="nav-label">{{ __('Instellingen') }}</span>
 				</button>
+				<details class="menu side-menu">
+					<summary>
+						<x-icon name="uitloggen"/>
+						<span class="nav-label">{{ __('Uitloggen') }}</span>
+					</summary>
+					<div class="menu-pop up" role="menu">
+						<form method="post" action="{{ route('logout') }}">
+							@csrf
+							@method('DELETE')
+							<button type="submit" role="menuitem">
+								<x-icon name="uitloggen"/>
+								<span><b>{{ __('Uitloggen') }}</b><small>{{ __('Alleen op dit apparaat.') }}</small></span>
+							</button>
+						</form>
+						<form method="post" action="{{ route('devices.destroy') }}">
+							@csrf
+							@method('DELETE')
+							<button type="submit" role="menuitem">
+								<x-icon name="apparaten"/>
+								<span><b>{{ __('Overal uitloggen') }}</b><small>{{ __('Ook je telefoon en elk ander onthouden apparaat. Voor als je telefoon kwijt is.') }}</small></span>
+							</button>
+						</form>
+					</div>
+				</details>
 			</div>
 		</div>
 	</aside>

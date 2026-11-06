@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Providers\AppServiceProvider;
+use Src\Account\Providers\AccountServiceProvider;
 use Src\Board\Providers\BoardServiceProvider;
 use Src\Fetch\Providers\FetchServiceProvider;
 use Src\Library\Providers\LibraryServiceProvider;
@@ -20,6 +21,7 @@ use Src\Worktree\Providers\WorktreeServiceProvider;
 
 return [
 	AppServiceProvider::class,
+	AccountServiceProvider::class,
 	BoardServiceProvider::class,
 	FetchServiceProvider::class,
 	LibraryServiceProvider::class,
