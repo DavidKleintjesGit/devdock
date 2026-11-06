@@ -1114,3 +1114,51 @@ body.is-working .working{opacity:1}
   .auth-card .input{height:48px;font-size:16px}
   .auth-card>.btn{height:48px;font-size:15px}
 }
+
+/* ---------- kaart op de telefoon: kop boven, tabs als balk onder ---------- */
+@media (max-width:900px){
+  .card-drawer{height:100dvh;border-radius:0;animation:slide .2s cubic-bezier(.2,.8,.2,1)}
+  .card-drawer::before{display:none}
+  .card-drawer>.card-head{display:none}
+  .card-drawer>.dbar{height:60px;padding:0 6px 0 4px;gap:4px}
+  .card-drawer>.dbar>.kind{display:none}
+  .card-drawer>.dbar>.back.kind{display:inline-flex;order:-1;padding:0 8px}
+  .card-drawer>.dbar .compact-title{display:flex;flex:1;flex-wrap:wrap;align-items:center;gap:0 6px;min-width:0}
+  .card-drawer>.dbar .compact-title b{flex-basis:100%;font-size:15px}
+  .card-drawer>.dbar .compact-title .mono{font-size:12px}
+  .card-drawer>.dbar .step-pill{padding:0;background:none;font-size:12px}
+  .card-drawer>.dbar .step-pill .circle{display:none}
+  .card-drawer>.dbar>.icon-btn:last-child{order:-1;width:44px;height:44px}
+  .card-drawer>.dbar .menu .icon-btn{width:44px;height:44px;background:transparent}
+  .card-drawer>.card-tabs{order:2;display:grid;grid-template-columns:repeat(5,1fr);gap:0;height:calc(68px + env(safe-area-inset-bottom,0px));padding:0 0 env(safe-area-inset-bottom,0px);border-top:1px solid var(--line);border-bottom:0;overflow:visible}
+  .card-drawer>.card-tabs [role=tab]{position:relative;flex-direction:column;justify-content:flex-start;gap:4px;height:auto;padding:14px 0 0;font-size:11px;color:var(--muted)}
+  .card-drawer>.card-tabs [role=tab] .ic{width:22px;height:22px}
+  .card-drawer>.card-tabs [aria-selected="true"]{box-shadow:none;color:var(--accent-ink);font-weight:600}
+  .card-drawer>.card-tabs .tunread{position:absolute;top:7px;left:calc(50% + 4px);box-shadow:0 0 0 2px var(--surface)}
+  .card-drawer>.card-tabs .waits{position:absolute;top:12px;left:calc(50% + 8px);width:8px;height:8px;box-shadow:0 0 0 2px var(--surface)}
+  .card-drawer .notice{flex-wrap:wrap;padding:10px 16px}
+  .card-drawer .notice-text{min-width:180px}
+  .card-drawer .notice-text span{display:none}
+  .card-drawer>.subbar{justify-content:flex-end;padding:10px 12px;min-height:0;gap:8px}
+  .card-drawer>.subbar>.grow{display:none}
+  .card-drawer>.subbar .segmented{flex:1;display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
+  .card-drawer>.subbar .segmented button{justify-content:center;height:36px;padding:0 4px}
+  .card-drawer>.subbar .segmented .note,.card-drawer>.subbar>.hint{display:none}
+  .card-drawer .dbody.workspace{padding:0 12px 12px;gap:12px}
+  .card-drawer>.subbar+.dbody.workspace,.card-drawer>.subbar~.dbody.workspace{padding-top:0}
+  .card-drawer>.notices+.dbody.workspace,.card-drawer>.card-tabs+.notices+.dbody.workspace{padding-top:12px}
+  .card-drawer .panel-grid.ticket-grid,.card-drawer .panel-grid.changes-grid,.card-drawer .link-grid,.card-drawer .fact-grid{grid-template-columns:minmax(0,1fr);grid-auto-rows:auto}
+  .card-drawer .card-context{overflow-y:auto}
+  .card-drawer .card-context>.panel{flex:none}
+  .card-drawer .context-columns{grid-template-columns:minmax(0,1fr)}
+  .card-drawer .context-tree{max-height:40dvh;border-right:0;border-bottom:1px solid var(--line)}
+  .card-drawer .panel-head{flex-wrap:wrap;padding:8px 14px;min-height:48px}
+  .card-drawer .chat{padding:16px}
+  .card-drawer .round-head{flex-wrap:wrap;row-gap:2px;padding:8px 14px}
+  .card-drawer .composer{padding:10px 12px 12px}
+  .card-drawer .composer-tools .btn.soft .muted,.card-drawer .composer-note>span:last-child{display:none}
+  .card-drawer .composer-tools .btn.soft{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .card-drawer .agent-picker .picker-btn{max-width:110px}
+  .card-drawer .agent-menu{position:fixed;left:12px;right:12px;bottom:84px;width:auto}
+  .card-drawer .dfoot{padding:10px 12px}
+}
