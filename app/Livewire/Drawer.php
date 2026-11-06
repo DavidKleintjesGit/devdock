@@ -40,8 +40,10 @@ use Src\Prompt\Actions\GetLatestPromptRunAction;
 use Src\Prompt\Actions\ReadReportAction;
 use Src\Prompt\Actions\StartPromptAction;
 use Src\Prompt\Actions\StopPromptAction;
+use Src\Prompt\Contracts\AttachmentRepositoryContract;
 use Src\Prompt\Contracts\ClaudeProcessRepositoryContract;
 use Src\Prompt\Contracts\PromptRunRepositoryContract;
+use Src\Prompt\Objects\PromptRunEntity;
 use Src\Prompt\Objects\PromptRunObject;
 use Src\PullRequest\Actions\BuildReviewPromptAction;
 use Src\PullRequest\Actions\GetReviewCommentsAction;
@@ -131,6 +133,8 @@ class Drawer extends Component
 	 */
 	private const LARGE_DIFF_LINES = 600;
 
+	private const MAX_ATTACHMENTS = 10;
+
 
 	/**
 	 * A finished round of fetching brings the panel up to date.
@@ -156,6 +160,13 @@ class Drawer extends Component
 	public string $openTab = 'Overzicht';
 
 	public string $prompt = '';
+
+	/**
+	 * The files dropped on the chat that go along with the next message.
+	 *
+	 * @var list<array{upload: string, name: string, size: string, isImage: bool}>
+	 */
+	public array $attachments = [];
 
 	/** @var array<int, string> */
 	public array $pickedSources = [];
@@ -262,6 +273,7 @@ class Drawer extends Component
 	{
 		$this->openCard = $card;
 		$this->prompt = '';
+		$this->attachments = [];
 		$this->pickedSources = [];
 		$this->composing = false;
 		$this->confirmingDeleteTask = false;
@@ -332,15 +344,51 @@ class Drawer extends Component
 			return;
 		}
 
+		$paths = resolve(AttachmentRepositoryContract::class)->attach($cardObject->id, array_column($this->attachments, 'upload'));
+
 		StartPromptAction::execute(PromptRunObject::from([
 			'card' => $cardObject->id,
 			'project' => $cardObject->project,
 			'branch' => $cardObject->branch,
 			'ticket_key' => $cardObject->ticketKey,
-			'prompt' => $this->prompt,
+			'prompt' => PromptRunEntity::withAttachments($this->prompt, $paths),
 		]));
 
 		$this->prompt = '';
+		$this->attachments = [];
+	}
+
+	/**
+	 * Puts a file that arrived whole next to the message being written.
+	 */
+	public function addAttachment(string $upload): void
+	{
+		$attachmentObject = resolve(AttachmentRepositoryContract::class)->getPending($upload);
+
+		if ($attachmentObject === null || in_array($upload, array_column($this->attachments, 'upload'), true)) {
+			return;
+		}
+
+		if (count($this->attachments) >= self::MAX_ATTACHMENTS) {
+			$this->addError('prompt', __('Een bericht neemt hoogstens :count bijlagen mee.', ['count' => self::MAX_ATTACHMENTS]));
+
+			return;
+		}
+
+		$this->attachments[] = [
+			'upload' => $upload,
+			'name' => $attachmentObject->name,
+			'size' => $attachmentObject->sizeLabel(),
+			'isImage' => $attachmentObject->isImage(),
+		];
+	}
+
+	public function removeAttachment(string $upload): void
+	{
+		$this->attachments = array_values(array_filter(
+			$this->attachments,
+			fn (array $attachment): bool => $attachment['upload'] !== $upload,
+		));
 	}
 
 	/**
@@ -839,6 +887,7 @@ class Drawer extends Component
 
 		DeleteTaskAction::execute($card);
 		resolve(ReviewRoundRepositoryContract::class)->deleteForCard($card);
+		resolve(AttachmentRepositoryContract::class)->deleteFor($card);
 
 		if (str_starts_with($card, 'todo:')) {
 			DeleteTodoAction::execute(new TodoId(id: (int) substr($card, 5)));

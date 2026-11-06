@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Src\Worktree\Actions;
 
 use Src\Packages\Cqrs\Command;
+use Src\Prompt\Contracts\AttachmentRepositoryContract;
 use Src\Review\Contracts\AgentContextRepositoryContract;
 use Src\Session\Contracts\SessionFileRepositoryContract;
 use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
@@ -64,6 +65,7 @@ class RemoveWorktreeAction extends Command
 		// a folder DevDock did not make stays, but the round reports of this task were ours
 		if ($worktreeEntity->card !== null) {
 			resolve(AgentContextRepositoryContract::class)->removeReports($worktreeEntity->path, $worktreeEntity->card);
+			resolve(AttachmentRepositoryContract::class)->deleteFor($worktreeEntity->card);
 		}
 
 		if (! $worktreeRepository->remove($this->worktreeId)) {

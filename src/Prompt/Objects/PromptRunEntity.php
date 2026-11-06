@@ -7,6 +7,7 @@ namespace Src\Prompt\Objects;
 use Carbon\CarbonImmutable;
 use Src\Access\Enums\GitGrantEnum;
 use Src\Packages\ValueObject\ValueObject;
+use Src\Prompt\Contracts\AttachmentRepositoryContract;
 use Src\Prompt\Enums\PromptStatusEnum;
 
 /**
@@ -14,6 +15,11 @@ use Src\Prompt\Enums\PromptStatusEnum;
  */
 class PromptRunEntity extends ValueObject
 {
+	/**
+	 * Where the block with the paths of the attachments begins in a message.
+	 */
+	private const ATTACHMENTS_OPENING = "\n\n```attachments\n";
+
 	public function __construct(
 		public readonly PromptRunId $promptRunId,
 		public readonly string $card,
@@ -77,7 +83,44 @@ class PromptRunEntity extends ValueObject
 	 */
 	public function hasLongPrompt(): bool
 	{
-		return mb_strlen($this->prompt) > 600 || substr_count($this->prompt, "\n") > 10;
+		return mb_strlen($this->message()) > 600 || substr_count($this->message(), "\n") > 10;
+	}
+
+	/**
+	 * What was written in the message, without the block that lists its attachments.
+	 */
+	public function message(): string
+	{
+		return rtrim(explode(self::ATTACHMENTS_OPENING, $this->prompt, 2)[0]);
+	}
+
+	/**
+	 * The files sent along with the message.
+	 *
+	 * @return list<AttachmentObject>
+	 */
+	public function attachments(): array
+	{
+		$block = explode(self::ATTACHMENTS_OPENING, $this->prompt, 2)[1] ?? null;
+
+		if ($block === null) {
+			return [];
+		}
+
+		return array_values(array_filter(array_map(
+			fn (string $path): ?AttachmentObject => $path === '' ? null : resolve(AttachmentRepositoryContract::class)->fromPath($path),
+			array_map('trim', explode("\n", explode('```', $block, 2)[0])),
+		)));
+	}
+
+	/**
+	 * A message with the full paths of its attachments in a block of their own, as the agent reads it.
+	 *
+	 * @param  list<string>  $paths
+	 */
+	public static function withAttachments(string $message, array $paths): string
+	{
+		return $paths === [] ? $message : $message . self::ATTACHMENTS_OPENING . implode("\n", $paths) . "\n```";
 	}
 
 	public function costLabel(): ?string

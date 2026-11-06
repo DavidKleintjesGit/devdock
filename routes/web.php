@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\AgentAssetController;
+use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\LocaleController;
 use App\Livewire\Access;
 use App\Livewire\Board;
@@ -25,3 +26,8 @@ Route::get('/taal/{locale}', [LocaleController::class, 'update'])->name('locale'
 Route::get('/agent/{run}/public/{path}', [AgentAssetController::class, 'show'])
 	->where(['run' => '[0-9]+', 'path' => '.*'])
 	->name('agent.asset');
+
+Route::post('/bijlagen', [AttachmentController::class, 'store'])->name('attachment.store');
+Route::get('/bijlagen/{path}', [AttachmentController::class, 'show'])
+	->where(['path' => '.*'])
+	->name('attachment.show');

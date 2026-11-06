@@ -37,6 +37,8 @@ class DescribeChatAction extends Command
 			'- <answer>',
 			'- <answer>',
 			'```',
+			'',
+			__('- Een attachments-blok onder mijn bericht noemt de bestanden die ik meestuur, één volledig pad per regel. Lees ze met de Read-tool voor je antwoordt; een afbeelding of pdf zie je dan zoals ik hem zie.'),
 		]);
 	}
 }

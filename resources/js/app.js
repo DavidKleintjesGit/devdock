@@ -355,3 +355,90 @@ document.addEventListener('alpine:init', () => {
 		},
 	}));
 });
+
+// Bestanden die op het chatveld vallen, geplakt worden of via de paperclip
+// komen, gaan in stukken naar DevDock: Herd neemt geen verzoek boven 2 MB aan.
+// Is een bestand heel, dan zet de lade het naast het bericht.
+document.addEventListener('alpine:init', () => {
+	const chunkBytes = 1.5 * 1024 * 1024;
+	const maxBytes = 20 * 1024 * 1024;
+
+	Alpine.data('attachmentDrop', (storeUrl, messages) => ({
+		dropping: false,
+		uploading: 0,
+		failure: null,
+
+		dragEnter(event) {
+			if ([...(event.dataTransfer?.types ?? [])].includes('Files')) {
+				this.dropping = true;
+			}
+		},
+
+		drop(event) {
+			this.dropping = false;
+			this.send([...(event.dataTransfer?.files ?? [])]);
+		},
+
+		paste(event) {
+			const files = [...(event.clipboardData?.files ?? [])];
+
+			// only a paste with files is ours; plain text goes into the field as usual
+			if (files.length > 0) {
+				event.preventDefault();
+				this.send(files);
+			}
+		},
+
+		pick(event) {
+			this.send([...event.target.files]);
+			event.target.value = '';
+		},
+
+		async send(files) {
+			this.failure = null;
+
+			for (const file of files) {
+				if (file.size > maxBytes) {
+					this.failure = messages.tooLarge.replace(':name', file.name);
+
+					continue;
+				}
+
+				this.uploading++;
+
+				try {
+					const upload = [...crypto.getRandomValues(new Uint8Array(16))].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+					const chunks = Math.max(1, Math.ceil(file.size / chunkBytes));
+					// a pasted screenshot has no name of its own
+					const name = file.name && file.name !== 'image.png' ? file.name : `screenshot-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`;
+
+					for (let chunk = 0; chunk < chunks; chunk++) {
+						const response = await fetch(storeUrl, {
+							method: 'POST',
+							headers: {
+								'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+								'X-Upload': upload,
+								'X-Chunk': String(chunk),
+								'X-Chunks': String(chunks),
+								'X-File-Name': encodeURIComponent(name),
+								'Content-Type': 'application/octet-stream',
+								'Accept': 'application/json',
+							},
+							body: file.slice(chunk * chunkBytes, (chunk + 1) * chunkBytes),
+						});
+
+						if (! response.ok) {
+							throw new Error((await response.json().catch(() => ({}))).message ?? messages.notArrived.replace(':name', name));
+						}
+					}
+
+					await this.$wire.addAttachment(upload);
+				} catch (error) {
+					this.failure = error.message;
+				} finally {
+					this.uploading--;
+				}
+			}
+		},
+	}));
+});

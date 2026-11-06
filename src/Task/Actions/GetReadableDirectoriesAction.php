@@ -6,6 +6,7 @@ namespace Src\Task\Actions;
 
 use Src\Packages\Cqrs\Command;
 use Src\Project\Actions\GetProjectsAction;
+use Src\Prompt\Contracts\AttachmentRepositoryContract;
 use Src\Task\Contracts\TaskRepositoryContract;
 use Src\Task\Enums\TaskLinkKindEnum;
 
@@ -28,12 +29,13 @@ class GetReadableDirectoriesAction extends Command
 	public function handle(TaskRepositoryContract $taskRepository): array
 	{
 		$names = $taskRepository->getByKey($this->card)?->valuesFor(TaskLinkKindEnum::READABLE_PROJECT) ?? [];
+		$attachments = resolve(AttachmentRepositoryContract::class)->folderFor($this->card);
+		// the files sent with the messages of this card
+		$directories = $attachments === null ? [] : [$attachments];
 
 		if ($names === []) {
-			return [];
+			return $directories;
 		}
-
-		$directories = [];
 
 		foreach (GetProjectsAction::execute()->toArray() as $projectEntity) {
 			if (in_array($projectEntity->name, $names, true)) {

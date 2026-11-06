@@ -26,7 +26,18 @@
 			<div class="chat">
 				@foreach ($conversation as $exchange)
 					<div class="chat-turn you" wire:key="turn-you-{{ $exchange->run->promptRunId->id }}" x-data="{ folded: @js($exchange->run->hasLongPrompt()) }">
-						<div class="bubble" :class="{ folded }" title="{{ $exchange->run->startedAt?->toDisplayZone()->calendar() }}">{{ $exchange->run->prompt }}</div>
+						@if ($exchange->run->attachments() !== [])
+							<div class="chat-attachments">
+								@foreach ($exchange->run->attachments() as $attachmentObject)
+									@if ($attachmentObject->isImage())
+										<a class="chat-image" href="{{ route('attachment.show', $attachmentObject->relativePath) }}" target="_blank" title="{{ $attachmentObject->name }}"><img src="{{ route('attachment.show', $attachmentObject->relativePath) }}" alt="{{ $attachmentObject->name }}" loading="lazy"></a>
+									@else
+										<a class="attachment-chip" href="{{ route('attachment.show', $attachmentObject->relativePath) }}" target="_blank"><x-icon name="file" small/><span class="name">{{ $attachmentObject->name }}</span><span class="muted">{{ $attachmentObject->sizeLabel() }}</span></a>
+									@endif
+								@endforeach
+							</div>
+						@endif
+						<div class="bubble" :class="{ folded }" title="{{ $exchange->run->startedAt?->toDisplayZone()->calendar() }}">{{ $exchange->run->message() }}</div>
 						@if ($exchange->run->startedAt)<span class="chat-time">{{ $exchange->run->startedAt->toDisplayZone()->isToday() ? $exchange->run->startedAt->toDisplayZone()->format('H:i') : $exchange->run->startedAt->toDisplayZone()->translatedFormat('j M H:i') }}</span>@endif
 						@if ($exchange->run->hasLongPrompt())
 							<button class="btn text xs unfold" type="button" @click="folded = ! folded" x-text="folded ? @js(__('Hele bericht tonen')) : @js(__('Inklappen'))">{{ __('Hele bericht tonen') }}</button>
@@ -134,7 +145,8 @@
 </div>
 
 @if ($claudeAvailable && $card->project !== null && $card->branch !== null)
-	<div class="composer">
+	<div class="composer" :class="{ dropping, uploading: uploading > 0, failed: failure !== null }" x-data="attachmentDrop(@js(route('attachment.store')), @js(['tooLarge' => __(':name is groter dan 20 MB.'), 'notArrived' => __(':name kwam niet aan. Probeer het nog eens.')]))" @dragenter.prevent="dragEnter($event)" @dragover.prevent @dragleave="if (! $el.contains($event.relatedTarget)) dropping = false" @drop.prevent="drop($event)">
+		<div class="drop-hint"><x-icon name="clip" small/>{{ __('Laat los om toe te voegen · foto\'s, pdf, txt, log, csv, json') }}</div>
 		@if ($promptSources !== [])
 			@if ($composing)
 				<div class="sources">
@@ -169,12 +181,30 @@
 
 		<div class="boxwrap">
 			<label class="sr" for="prompt-text">{{ __('Bericht aan de agent') }}</label>
-			<textarea id="prompt-text" class="textarea" data-send-on-enter wire:model="prompt" placeholder="{{ __('Wat is de volgende stap?') }}" @disabled($run?->isRunning())></textarea>
+			@if ($attachments !== [])
+				<div class="attachment-chips">
+					@foreach ($attachments as $attachment)
+						<span class="attachment-chip" wire:key="attachment-{{ $attachment['upload'] }}">
+							<span class="thumb"><x-icon name="{{ $attachment['isImage'] ? 'image' : 'file' }}" small/></span>
+							<span class="name">{{ $attachment['name'] }}</span>
+							<span class="muted">{{ $attachment['size'] }}</span>
+							<button class="icon-btn" type="button" wire:click="removeAttachment('{{ $attachment['upload'] }}')" aria-label="{{ __('Weghalen') }}"><x-icon name="x" small/></button>
+						</span>
+					@endforeach
+				</div>
+			@endif
+			<span class="attachment-busy hint"><span class="dot amber pulse"></span>{{ __('Bijlage wordt toegevoegd…') }}</span>
+			<label class="clip" title="{{ __('Bestand toevoegen') }}">
+				<input type="file" multiple class="sr" @change="pick($event)" accept="image/*,.pdf,.txt,.log,.csv,.json,.md,.xml,.html,.sql">
+				<x-icon name="clip" small/><span class="sr">{{ __('Bestand toevoegen') }}</span>
+			</label>
+			<textarea id="prompt-text" class="textarea" data-send-on-enter wire:model="prompt" @paste="paste($event)" placeholder="{{ __('Wat is de volgende stap? Sleep of plak er een bestand bij.') }}" @disabled($run?->isRunning())></textarea>
 			<button class="btn primary send" type="button" wire:click="send" wire:target="send" wire:loading.attr="disabled" aria-label="{{ __('Versturen') }}" @disabled($run?->isRunning())>
 				<span wire:loading.remove wire:target="send"><x-icon name="send" small/></span>
 				<span wire:loading wire:target="send" class="dot amber pulse"></span>
 			</button>
 		</div>
 		@error('prompt')<span class="field"><span class="err">{{ $message }}</span></span>@enderror
+		<span class="field attachment-failure"><span class="err" x-text="failure"></span></span>
 	</div>
 @endif

@@ -1603,5 +1603,16 @@
     ":upstream heeft :count commit die hier niet staat en niet uit een rebase komt: :subjects. Overschrijven gooit die weg.|:upstream heeft :count commits die hier niet staan en niet uit een rebase komen: :subjects. Overschrijven gooit die weg.": ":upstream has :count commit that is not here and does not come from a rebase: :subjects. Overwriting throws it away.|:upstream has :count commits that are not here and do not come from a rebase: :subjects. Overwriting throws them away.",
     "Gerebased. Op :upstream staat nog de versie van vóór de rebase; deze :count commit komt ervoor in de plaats en er gaat geen werk verloren.|Gerebased. Op :upstream staat nog de versie van vóór de rebase; deze :count commits komen ervoor in de plaats en er gaat geen werk verloren.": "Rebased. :upstream still holds the version from before the rebase; this :count commit takes its place and no work is lost.|Rebased. :upstream still holds the version from before the rebase; these :count commits take its place and no work is lost.",
     "DevDock laat je Jira, Bitbucket, CircleCI en GitHub alleen lezen: :command schrijft daar. Zet in je verslag wat er moet gebeuren; David doet het of geeft er een knop voor.": "DevDock lets you only read Jira, Bitbucket, CircleCI and GitHub: :command writes there. Say in your report what needs to happen; David does it or gives a button for it.",
-    "Processen die nog in de werkkopie draaien, zoals een queue of een testrun; die worden eerst gestopt": "Processes still running in the working copy, such as a queue or a test run; they are stopped first"
+    "Processen die nog in de werkkopie draaien, zoals een queue of een testrun; die worden eerst gestopt": "Processes still running in the working copy, such as a queue or a test run; they are stopped first",
+    ":name is groter dan 20 MB.": ":name is larger than 20 MB.",
+    ":name kwam niet aan. Probeer het nog eens.": ":name did not arrive. Try again.",
+    "Laat los om toe te voegen · foto's, pdf, txt, log, csv, json": "Drop to add · photos, pdf, txt, log, csv, json",
+    "Bijlage wordt toegevoegd…": "Adding the attachment…",
+    "Bestand toevoegen": "Add a file",
+    "Wat is de volgende stap? Sleep of plak er een bestand bij.": "What is the next step? Drop or paste a file to add it.",
+    "Een bericht neemt hoogstens :count bijlagen mee.": "A message takes at most :count attachments.",
+    "Dit stuk van de upload klopt niet.": "This piece of the upload is not right.",
+    "Het begin van deze upload ontbreekt. Sleep het bestand nog een keer.": "The start of this upload is missing. Drop the file again.",
+    "Een bijlage mag hoogstens 20 MB zijn.": "An attachment can be 20 MB at most.",
+    "- Een attachments-blok onder mijn bericht noemt de bestanden die ik meestuur, één volledig pad per regel. Lees ze met de Read-tool voor je antwoordt; een afbeelding of pdf zie je dan zoals ik hem zie.": "- An attachments block under my message names the files I send along, one full path per line. Read them with the Read tool before you answer; an image or pdf then shows as I see it."
 }
