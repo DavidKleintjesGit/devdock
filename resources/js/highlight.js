@@ -1,5 +1,5 @@
-// Kleurt de code in een diff, regel voor regel, met de klassieke kleuren van
-// een editor. Alleen de talen die in de projecten voorkomen gaan mee, zodat
+// Kleurt de code in een diff, regel voor regel, en de codeblokken in de chat
+// en de rapporten, met de klassieke kleuren van een editor. Alleen de talen die in de projecten voorkomen gaan mee, zodat
 // het pakket klein blijft.
 import hljs from 'highlight.js/lib/core';
 import bash from 'highlight.js/lib/languages/bash';
@@ -112,10 +112,35 @@ function markChangedParts(root) {
 	}
 }
 
-document.addEventListener('DOMContentLoaded', () => highlightDiffs());
+// A code block in the chat or a report is coloured in the language its
+// backticks name, or in the language that fits it best when they name none.
+const BLOCK_LANGUAGES = { js: 'javascript', ts: 'typescript', sh: 'bash', shell: 'bash', html: 'xml', blade: 'xml', vue: 'xml', yml: 'yaml', md: 'markdown' };
+
+function highlightBlocks(root = document) {
+	for (const block of root.querySelectorAll('.md .code:not([data-lit])')) {
+		const text = block.textContent;
+		const named = BLOCK_LANGUAGES[block.dataset.language] ?? block.dataset.language;
+		block.dataset.lit = '';
+
+		if (text.length > MAX_LIT_CHARACTERS * 20) {
+			continue;
+		}
+
+		block.innerHTML = named && hljs.getLanguage(named)
+			? hljs.highlight(text, { language: named, ignoreIllegals: true }).value
+			: hljs.highlightAuto(text).value;
+	}
+}
+
+function highlightAll(root = document) {
+	highlightDiffs(root);
+	highlightBlocks(root);
+}
+
+document.addEventListener('DOMContentLoaded', () => highlightAll());
 
 // Livewire zet bij een nieuwe weergave de platte tekst terug; daarna kleurt het opnieuw
 document.addEventListener('livewire:init', () => {
-	Livewire.hook('morphed', ({ el }) => highlightDiffs(el));
-	Livewire.hook('commit', ({ succeed }) => succeed(() => requestAnimationFrame(() => highlightDiffs())));
+	Livewire.hook('morphed', ({ el }) => highlightAll(el));
+	Livewire.hook('commit', ({ succeed }) => succeed(() => requestAnimationFrame(() => highlightAll())));
 });

@@ -664,7 +664,20 @@ button.filerow:hover{background:var(--surface-2)}
 .md-p{margin:0 0 10px;color:var(--fg-2);line-height:1.6}
 .md-li{margin:0 0 6px 18px;color:var(--fg-2);line-height:1.55}
 .md-q{margin:0 0 10px;padding-left:12px;border-left:2px solid var(--line-strong);color:var(--muted);font-size:13px}
-.md .code{margin:0 0 10px;padding:12px 14px;border-radius:10px;background:var(--sunken);font-family:var(--mono);font-size:12px;white-space:pre;overflow-x:auto}
+.md .code{margin:0 0 10px;padding:14px 16px;border-radius:10px;background:#1E1F22;color:#BCBEC4;font-family:var(--mono);font-size:12.5px;line-height:1.6;white-space:pre;tab-size:4;overflow-x:auto}
+/* the dark theme of PhpStorm, in light and dark mode alike */
+.md .code .hljs-keyword,.md .code .hljs-built_in,.md .code .hljs-literal,.md .code .hljs-selector-tag{color:#CF8E6D}
+.md .code .hljs-string,.md .code .hljs-regexp,.md .code .hljs-template-variable{color:#6AAB73}
+.md .code .hljs-comment,.md .code .hljs-quote{color:#7A7E85;font-style:italic}
+.md .code .hljs-number,.md .code .hljs-symbol{color:#2AACB8}
+.md .code .hljs-title.function_,.md .code .hljs-title.function_.invoke__{color:#56A8F5}
+.md .code .hljs-variable,.md .code .hljs-property,.md .code .hljs-params{color:#C77DBB}
+.md .code .hljs-title,.md .code .hljs-title.class_,.md .code .hljs-type{color:#BCBEC4}
+.md .code .hljs-name,.md .code .hljs-tag{color:#D5B778}
+.md .code .hljs-attr,.md .code .hljs-attribute,.md .code .hljs-selector-class,.md .code .hljs-selector-id{color:#BABABA}
+.md .code .hljs-meta,.md .code .hljs-doctag,.md .code .hljs-section{color:#B3AE60}
+.md .code .hljs-deletion{color:#F75464}
+.md .code .hljs-addition{color:#6AAB73}
 .diff{border:1px solid var(--line);border-radius:10px;overflow-x:auto;background:var(--surface);font-family:var(--mono);font-size:12px;line-height:1.7}
 .diff .hunk{padding:4px 12px;background:var(--sunken);color:var(--muted)}
 /* een regel staat zoals hij in het bestand staat: lange regels scrollen opzij, de regelnummers blijven staan */

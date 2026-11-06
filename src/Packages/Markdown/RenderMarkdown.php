@@ -17,6 +17,7 @@ class RenderMarkdown
 		$buffer = [];
 		$rows = [];
 		$fenced = false;
+		$language = '';
 
 		foreach (explode("\n", trim($text)) as $line) {
 			if (! $fenced && str_starts_with(trim($line), '|')) {
@@ -32,10 +33,12 @@ class RenderMarkdown
 
 			if (str_starts_with(trim($line), '```')) {
 				if ($fenced) {
-					$blocks[] = '<div class="code light mono">' . e(implode("\n", $buffer)) . '</div>';
+					$blocks[] = $this->codeBlock($buffer, $language);
 					$buffer = [];
 				}
 
+				// the word after the opening backticks names the language the block is coloured in
+				$language = $fenced ? '' : strtolower(trim(substr(trim($line), 3)));
 				$fenced = ! $fenced;
 
 				continue;
@@ -56,10 +59,22 @@ class RenderMarkdown
 		}
 
 		if ($fenced && $buffer !== []) {
-			$blocks[] = '<div class="code light mono">' . e(implode("\n", $buffer)) . '</div>';
+			$blocks[] = $this->codeBlock($buffer, $language);
 		}
 
 		return '<div class="md">' . implode('', array_filter($blocks)) . '</div>';
+	}
+
+	/**
+	 * A fenced block of code, with the language it is coloured in when one was named.
+	 *
+	 * @param  array<int, string>  $lines
+	 */
+	private function codeBlock(array $lines, string $language): string
+	{
+		$language = (string) preg_replace('/[^a-z0-9+#-]/', '', $language);
+
+		return '<div class="code mono" data-language="' . e($language) . '">' . e(implode("\n", $lines)) . '</div>';
 	}
 
 	/**

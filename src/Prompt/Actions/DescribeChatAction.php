@@ -38,7 +38,7 @@ class DescribeChatAction extends Command
 			'- <answer>',
 			'```',
 			'',
-			__('- Een attachments-blok onder mijn bericht noemt de bestanden die ik meestuur, één volledig pad per regel. Lees ze met de Read-tool voor je antwoordt; een afbeelding of pdf zie je dan zoals ik hem zie.'),
+			__('- Een attachments-blok onder mijn bericht noemt de bestanden die ik meestuur, één volledig pad per regel. Lees ze met de Read-tool voor je antwoordt; een afbeelding of pdf zie je dan zoals ik hem zie. Lees een pdf zonder de pages-parameter: die heeft pdftoppm nodig, en dat staat niet op deze machine.'),
 		]);
 	}
 }
