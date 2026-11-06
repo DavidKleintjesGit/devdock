@@ -94,6 +94,7 @@ use Src\Worktree\Actions\EnsureReadyAction;
 use Src\Worktree\Actions\GetChangesAction;
 use Src\Worktree\Actions\GetReadinessAction;
 use Src\Worktree\Actions\GetRepairStateAction;
+use Src\Worktree\Actions\GetSetupGroupsAction;
 use Src\Worktree\Actions\GetWorkingCopyTaskAction;
 use Src\Worktree\Actions\GetWorktreesAction;
 use Src\Worktree\Actions\ReadDiffAction;
@@ -105,6 +106,7 @@ use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Enums\DatabaseFillEnum;
 use Src\Worktree\Enums\DiffViewEnum;
 use Src\Worktree\Enums\SetupCheckEnum;
+use Src\Worktree\Enums\SetupPointStateEnum;
 use Src\Worktree\Enums\WorkingCopyTaskEnum;
 use Src\Worktree\Enums\WorkKindEnum;
 use Src\Worktree\Exceptions\SetupIncompleteException;
@@ -113,8 +115,10 @@ use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Src\Worktree\Objects\ChangeObject;
 use Src\Worktree\Objects\DiffHunkObjectCollection;
 use Src\Worktree\Objects\FileTreeNodeObject;
-use Src\Worktree\Objects\WorkingCopyTaskObject;
 use Src\Worktree\Objects\ReadinessObject;
+use Src\Worktree\Objects\RepairStateObject;
+use Src\Worktree\Objects\SetupPointObject;
+use Src\Worktree\Objects\WorkingCopyTaskObject;
 use Src\Worktree\Objects\WorktreeEntity;
 use Throwable;
 
@@ -1176,6 +1180,7 @@ class Drawer extends Component
 			|| ($cardObject->column === BoardColumnEnum::BUILDING && $cardObject->agent === null && $promptRunEntity === null);
 		$cardSteps = $this->cardSteps($cardObject);
 		$readiness = $worktreeEntity === null ? null : GetReadinessAction::execute($worktreeEntity->path);
+		$repairState = $worktreeEntity === null ? null : GetRepairStateAction::execute($worktreeEntity->path);
 		$diffView = $worktreeEntity === null ? DiffViewEnum::BRANCH : $this->diffViewFor($worktreeEntity);
 		$diffTree = $this->openDiffFile === null ? [] : $this->diffTree($cardObject, $diffView);
 		$diffFiles = $this->openDiffFile === null || $worktreeEntity === null ? [] : $this->stackedDiffs($worktreeEntity, $diffView, $diffTree);
@@ -1238,6 +1243,7 @@ class Drawer extends Component
 			...($tab === 'Werkkopie' ? $this->workingCopyData($cardObject, $worktreeEntity, $changes) : ['worktree' => $worktreeEntity]),
 			'workingCopyTask' => GetWorkingCopyTaskAction::execute($cardObject->id),
 			'readiness' => $readiness,
+			...($subtab === CardSubtabEnum::SETUP && $readiness !== null ? $this->setupGroupData($readiness, $repairState) : []),
 			'drawerTabs' => collect(CardTabEnum::cases())->map(fn (CardTabEnum $cardTab) => [
 				'tab' => $cardTab,
 				'unread' => $cardObject->unreadOnTab($cardTab->value),
@@ -1247,7 +1253,7 @@ class Drawer extends Component
 					default => false,
 				},
 			])->all(),
-			'repairState' => $worktreeEntity === null ? null : GetRepairStateAction::execute($worktreeEntity->path),
+			'repairState' => $repairState,
 			...(in_array($subtab, [CardSubtabEnum::CONTEXT, CardSubtabEnum::LENSES], true) ? $this->cardContextData($cardObject, $this->projectPathFor($cardObject), $worktreeEntity?->path ?? $this->projectPathFor($cardObject)) : []),
 			'branchSuggestion' => $this->newBranch,
 			'readableProjects' => $taskEntity?->valuesFor(TaskLinkKindEnum::READABLE_PROJECT) ?? [],
@@ -1763,6 +1769,24 @@ class Drawer extends Component
 			},
 			'isWaiting' => $cardSubtab === CardSubtabEnum::SETUP && $readiness !== null && ! $readiness->isReady(),
 		])->all();
+	}
+
+	/**
+	 * The checklist in its groups for the Inrichting subtab, with how many points wait on one that failed.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function setupGroupData(ReadinessObject $readiness, ?RepairStateObject $repairState): array
+	{
+		$setupGroups = GetSetupGroupsAction::execute($readiness, $repairState);
+
+		return [
+			'setupGroups' => $setupGroups,
+			'setupWaitingCount' => collect($setupGroups)
+				->flatMap(fn (array $setupGroup) => $setupGroup['points'])
+				->filter(fn (SetupPointObject $setupPointObject) => $setupPointObject->state === SetupPointStateEnum::WAITING)
+				->count(),
+		];
 	}
 
 	/**

@@ -54,6 +54,19 @@ class ReadinessObject extends ValueObject
 		return count($this->setupChecks);
 	}
 
+	public function readyCount(): int
+	{
+		return $this->totalCount() - $this->openCount();
+	}
+
+	/**
+	 * The share of the points that is in order, as a whole percentage.
+	 */
+	public function readyPercentage(): int
+	{
+		return $this->totalCount() === 0 ? 100 : (int) round($this->readyCount() / $this->totalCount() * 100);
+	}
+
 	public function canRepairAny(): bool
 	{
 		foreach ($this->setupChecks as $setupCheckObject) {

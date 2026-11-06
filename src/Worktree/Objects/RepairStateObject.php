@@ -22,6 +22,8 @@ class RepairStateObject extends ValueObject
 		public readonly ?CarbonImmutable $finishedAt,
 		public readonly ?string $failure,
 		public readonly string $logPath,
+		// why each point failed in this repair, keyed by the value of its SetupCheckEnum
+		public readonly array $failures = [],
 	) {
 		parent::__construct();
 	}
@@ -39,7 +41,16 @@ class RepairStateObject extends ValueObject
 			finishedAt: isset($data['finished_at']) ? CarbonImmutable::parse((string) $data['finished_at']) : null,
 			failure: $data['failure'] ?? null,
 			logPath: (string) ($data['log_path'] ?? ''),
+			failures: (array) ($data['failures'] ?? []),
 		);
+	}
+
+	/**
+	 * Why this point failed in this repair, or null when it did not.
+	 */
+	public function failureOf(SetupCheckEnum $setupCheck): ?string
+	{
+		return $this->failures[$setupCheck->value] ?? null;
 	}
 
 	/**

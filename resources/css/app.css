@@ -559,6 +559,49 @@ button.row{width:100%;border:0;background:transparent;text-align:left;cursor:poi
 .workspace .loop-status{min-height:52px;padding:0 16px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
 .workspace .round{border-radius:14px}
 .workspace .review-loop>.reportbar{border-radius:0 14px 14px 0}
+.panel-grid.setup-grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
+.setup-intro{flex:none;margin:0;font-size:13px;color:var(--fg-2)}
+.setup-progress{flex:none;display:flex;align-items:center;gap:20px;padding:14px 18px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.setup-count{flex:none;display:flex;flex-direction:column;gap:6px;width:200px}
+.setup-count b{font-size:20px;font-weight:600}
+.setup-count .meter{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.setup-count .meter>span{display:block;height:100%;background:var(--accent)}
+.setup-line{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left}
+.setup-line b{font-weight:600}
+.setup-line b.failed{color:var(--red)}
+.setup-group.failed{border-color:var(--red-dot)}
+.setup-group.busy{border-color:var(--amber-dot)}
+.setup-group-state{font-size:12.5px;color:var(--muted)}
+.setup-group-state.done{color:var(--green)}
+.setup-group-state.busy,.setup-group-state.open{color:var(--amber)}
+.setup-group-state.failed{color:var(--red)}
+.setup-explanation{margin:0;padding:10px 16px;font-size:12.5px;color:var(--muted)}
+.setup-point{display:flex;flex-direction:column;gap:8px;padding:9px 16px;border-top:1px solid var(--line)}
+.setup-point.busy,.setup-point.open{background:var(--amber-wash)}
+.setup-point.failed{background:color-mix(in srgb,var(--red-soft) 55%,var(--surface))}
+.setup-point-row{display:flex;align-items:center;gap:10px}
+.setup-point-row .grow{display:flex;flex-direction:column;min-width:0}
+.setup-point-row b{font-weight:600;font-size:13px}
+.setup-text{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.setup-point.busy .setup-text,.setup-point.open .setup-text{color:var(--amber)}
+.setup-point.failed .setup-text{color:var(--red)}
+.setup-mark{display:inline-flex;justify-content:center;width:16px;flex:none;color:var(--faint)}
+.setup-point.done .setup-mark{color:var(--green)}
+.setup-point.open .setup-mark{color:var(--amber)}
+.setup-point.failed .setup-mark{color:var(--red)}
+.setup-dot{width:10px;height:10px;box-sizing:border-box;border-radius:50%;border:1.5px solid var(--line-strong)}
+.setup-point.busy .setup-dot{border:0;background:var(--amber-dot);box-shadow:0 0 0 4px var(--amber-soft);animation:pulse 1.4s ease-in-out infinite}
+.setup-failure{display:flex;flex-direction:column;gap:6px;margin-left:26px;font-size:12px;color:var(--fg-2)}
+.setup-failure .mono{color:var(--red);overflow-wrap:anywhere}
+.setup-failure a{text-decoration:none}
+.setup-log{flex:none}
+.setup-log>summary{list-style:none;cursor:pointer;border-bottom:0}
+.setup-log>summary::-webkit-details-marker{display:none}
+.setup-log>summary .ic{transition:transform .15s;color:var(--muted)}
+.setup-log[open]>summary{border-bottom:1px solid var(--line)}
+.setup-log[open]>summary .ic{transform:rotate(90deg)}
+.setup-log>summary h3{margin:0;font-size:14.5px;font-weight:600}
+.setup-log-text{margin:0;max-height:240px;overflow:auto;padding:12px 16px;background:var(--code-bg);color:var(--code-fg);font-family:var(--mono);font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
 .dbar .step-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);font-size:12px;font-weight:600;white-space:nowrap;flex:none}
 .dbar .step-pill .circle{width:8px;height:8px;box-sizing:border-box;border-radius:50%;border:2px solid var(--accent)}
 .drawer.compact:not(.chat-tall):not(:has(.composer)) .card-head{display:none}
@@ -1185,6 +1228,8 @@ body.is-working .working{opacity:1}
   .card-drawer .panel-head{flex-wrap:wrap;padding:8px 14px;min-height:48px}
   .card-drawer .chat{padding:16px}
   .card-drawer .round-head{flex-wrap:wrap;row-gap:2px;padding:8px 14px}
+  .card-drawer .setup-progress{flex-wrap:wrap;gap:12px}
+  .card-drawer .setup-count{width:100%}
   .card-drawer .composer{padding:10px 12px 12px}
   .card-drawer .composer-tools .btn.soft .muted,.card-drawer .composer-note>span:last-child{display:none}
   .card-drawer .composer-tools .btn.soft{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}

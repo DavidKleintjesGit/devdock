@@ -34,6 +34,14 @@
 			<span class="notice-icon"><span class="sdot busy"></span></span>
 			<span class="notice-text"><b>{{ __('DevDock herstelt de werkkopie') }}@if ($repairState->setupCheck) · {{ $repairState->setupCheck->label() }}@endif</b><span>{{ $repairState->step ?? __('Bezig met beginnen...') }}</span></span>
 		</div>
+	@elseif ($repairState && $repairState->failures !== [] && $readiness && ! $readiness->isReady())
+		<div class="notice failed">
+			<span class="notice-icon"><x-icon name="alert" small/></span>
+			<span class="notice-text"><b>{{ trans_choice('Herstel niet helemaal gelukt · :count punt|Herstel niet helemaal gelukt · :count punten', count($repairState->failures), ['count' => count($repairState->failures)]) }}</b><span>{{ __('De rest is wel hersteld. De agent en de lenzen wachten tot de werkkopie compleet is.') }}</span></span>
+			@if (! ($tab === 'Werkkopie' && $subtab?->value === 'inrichting'))
+				<button class="btn sm primary" type="button" wire:click="openSetupChecklist">{{ __('Naar het punt') }}</button>
+			@endif
+		</div>
 	@elseif ($readiness && ! $readiness->isReady())
 		<div class="notice blocks">
 			<span class="notice-icon"><x-icon name="lock" small/></span>

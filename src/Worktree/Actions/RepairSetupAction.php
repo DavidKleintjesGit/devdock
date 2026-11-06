@@ -73,6 +73,7 @@ class RepairSetupAction extends Command
 		File::put($logPath, '');
 
 		$failures = [];
+		$reasons = [];
 		$current = null;
 
 		for ($repair = 0; $repair < self::MAX_REPAIRS; $repair++) {
@@ -84,7 +85,7 @@ class RepairSetupAction extends Command
 			}
 
 			$current = $setupCheckObject->setupCheck;
-			$this->writeState(true, $current, $setupCheckObject->repair, null);
+			$this->writeState(true, $current, $setupCheckObject->repair, null, $reasons);
 			File::append($logPath, PHP_EOL . '# ' . $current->label() . ' · ' . $setupCheckObject->repair . PHP_EOL);
 
 			$failure = $this->repair($setupCheckObject->setupCheck, $logPath, $workingCopyStateRepository, $workingCopyRepository, $worktreeDatabaseRepository, $worktreeRepository);
@@ -92,6 +93,7 @@ class RepairSetupAction extends Command
 
 			if ($failure !== null) {
 				$failures[$current->value] = $current->label() . ': ' . $failure;
+				$reasons[$current->value] = $failure;
 				File::append($logPath, PHP_EOL . $failure . PHP_EOL);
 			}
 
@@ -104,7 +106,7 @@ class RepairSetupAction extends Command
 		GetReadinessAction::forget($this->directory);
 		$worktreeRepository->forgetStatus($this->directory);
 
-		return $this->writeState(false, $current, null, $failures === [] ? null : implode("\n", $failures));
+		return $this->writeState(false, $current, null, $failures === [] ? null : implode("\n", $failures), $reasons);
 	}
 
 	/**
@@ -259,7 +261,7 @@ class RepairSetupAction extends Command
 		return $workingCopyStateRepository->runStep($path, $install, $logPath, self::INSTALL_SECONDS);
 	}
 
-	private function writeState(bool $isRunning, ?SetupCheckEnum $setupCheck, ?string $step, ?string $failure): RepairStateObject
+	private function writeState(bool $isRunning, ?SetupCheckEnum $setupCheck, ?string $step, ?string $failure, array $reasons): RepairStateObject
 	{
 		$key = self::KEY . md5(CheckReadinessAction::normalize($this->directory));
 		$standing = (array) Cache::get($key, []);
@@ -271,6 +273,7 @@ class RepairSetupAction extends Command
 			'started_at' => $standing['started_at'] ?? CarbonImmutable::now()->toIso8601String(),
 			'finished_at' => $isRunning ? null : CarbonImmutable::now()->toIso8601String(),
 			'failure' => $failure,
+			'failures' => $reasons,
 			'log_path' => self::logPath($this->directory),
 		];
 
