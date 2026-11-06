@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Livewire;
 
 use App\Livewire\Access;
+use App\Models\User;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Src\Access\Enums\AgentRoleEnum;
@@ -56,7 +57,7 @@ class AccessTest extends TestCase
 	#[Test]
 	public function access_route_shows_the_page(): void
 	{
-		$response = $this->get(route('access'));
+		$response = $this->actingAs(User::factory()->create())->get(route('access'));
 
 		$response->assertOk();
 	}
