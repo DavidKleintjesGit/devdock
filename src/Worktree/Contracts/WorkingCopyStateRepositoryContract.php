@@ -27,7 +27,8 @@ interface WorkingCopyStateRepositoryContract
 
 	/**
 	 * Runs one step of a repair in the working copy and appends what it said
-	 * to the log. Returns the output when it failed, null when it went through.
+	 * to the log. Returns the line that says what went wrong when it failed,
+	 * null when it went through.
 	 *
 	 * @param  list<string>  $command
 	 */

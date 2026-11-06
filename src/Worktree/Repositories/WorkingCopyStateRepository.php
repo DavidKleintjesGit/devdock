@@ -7,6 +7,7 @@ namespace Src\Worktree\Repositories;
 use Dotenv\Dotenv;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Str;
 use Src\Packages\Process\ProjectEnvironment;
 use Src\Project\Contracts\ProjectPhpRepositoryContract;
 use Src\Worktree\Contracts\WorkingCopyStateRepositoryContract;
@@ -17,9 +18,11 @@ use Src\Worktree\Objects\WorkingCopyStateObject;
 class WorkingCopyStateRepository implements WorkingCopyStateRepositoryContract
 {
 	/**
-	 * Lines of a failed step that come back as the reason; the rest is in the log.
+	 * Words that mark the line of a failed step that says what went wrong; the rest of the output is in the log.
 	 */
-	private const FAILURE_LINES = 12;
+	private const FAILURE_WORDS = '/error|fail|fatal|exception|denied|not recognized|could not|cannot|unable|sqlstate|fout/i';
+
+	private const FAILURE_LENGTH = 300;
 
 	public function read(string $repositoryPath, string $path, ProjectKindEnum $projectKind, array $carried, array $shared, array $ownFiles): WorkingCopyStateObject
 	{
@@ -99,9 +102,12 @@ class WorkingCopyStateRepository implements WorkingCopyStateRepositoryContract
 			return null;
 		}
 
-		$lines = preg_split('/\R/', trim($result->errorOutput() ?: $result->output())) ?: [];
+		$lines = collect(preg_split('/\R/', $result->errorOutput() . PHP_EOL . $result->output()) ?: [])
+			->map(fn (string $line): string => trim($line))
+			->filter(fn (string $line): bool => $line !== '');
+		$reason = $lines->last(fn (string $line): bool => preg_match(self::FAILURE_WORDS, $line) === 1) ?? $lines->last();
 
-		return implode("\n", array_slice($lines, -self::FAILURE_LINES)) ?: __('De stap liep vast zonder uitleg.');
+		return $reason === null ? __('De stap liep vast zonder uitleg.') : Str::limit($reason, self::FAILURE_LENGTH);
 	}
 
 	/**

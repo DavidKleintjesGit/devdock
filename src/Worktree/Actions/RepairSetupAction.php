@@ -30,8 +30,9 @@ use Src\Worktree\Objects\WorktreeEntity;
 /**
  * Repairs the open points of a working copy, one point or all of them, in
  * the order of the checklist. After every repair the list is read again, so a
- * point that waited on it is taken along. It stops at the first repair that
- * fails, with the reason in the state and everything said in the log.
+ * point that waited on it is taken along. A point that fails is passed over
+ * and the rest goes on; the state holds one reason per failed point and the
+ * log everything that was said.
  *
  * This runs in a process of its own: installing packages or copying a
  * database takes minutes.
@@ -71,12 +72,12 @@ class RepairSetupAction extends Command
 		File::ensureDirectoryExists(dirname($logPath));
 		File::put($logPath, '');
 
-		$failure = null;
+		$failures = [];
 		$current = null;
 
-		for ($repair = 0; $repair < self::MAX_REPAIRS && $failure === null; $repair++) {
+		for ($repair = 0; $repair < self::MAX_REPAIRS; $repair++) {
 			$readinessObject = CheckReadinessAction::execute($this->directory, true);
-			$setupCheckObject = $this->nextRepair($readinessObject);
+			$setupCheckObject = $this->nextRepair($readinessObject, array_keys($failures));
 
 			if ($setupCheckObject === null) {
 				break;
@@ -89,25 +90,35 @@ class RepairSetupAction extends Command
 			$failure = $this->repair($setupCheckObject->setupCheck, $logPath, $workingCopyStateRepository, $workingCopyRepository, $worktreeDatabaseRepository, $worktreeRepository);
 			CheckReadinessAction::forget($this->directory);
 
+			if ($failure !== null) {
+				$failures[$current->value] = $current->label() . ': ' . $failure;
+				File::append($logPath, PHP_EOL . $failure . PHP_EOL);
+			}
+
 			// one point asked for is one repair; the points that waited on it are left for the next
 			if ($this->setupCheck !== null) {
 				break;
 			}
 		}
 
-		if ($failure !== null) {
-			File::append($logPath, PHP_EOL . $failure . PHP_EOL);
-		}
-
 		GetReadinessAction::forget($this->directory);
 		$worktreeRepository->forgetStatus($this->directory);
 
-		return $this->writeState(false, $current, null, $failure);
+		return $this->writeState(false, $current, null, $failures === [] ? null : implode("\n", $failures));
 	}
 
-	private function nextRepair(ReadinessObject $readinessObject): ?SetupCheckObject
+	/**
+	 * The first open point that can be repaired now, leaving out the ones that failed in this run.
+	 *
+	 * @param  list<string>  $failed
+	 */
+	private function nextRepair(ReadinessObject $readinessObject, array $failed): ?SetupCheckObject
 	{
 		foreach ($readinessObject->setupChecks as $setupCheckObject) {
+			if (in_array($setupCheckObject->setupCheck->value, $failed, true)) {
+				continue;
+			}
+
 			if ($setupCheckObject->canRepair() && ($this->setupCheck === null || $this->setupCheck === $setupCheckObject->setupCheck)) {
 				return $setupCheckObject;
 			}
@@ -151,7 +162,9 @@ class RepairSetupAction extends Command
 			SetupCheckEnum::BRANCH => $workingCopyStateRepository->runStep($path, ['git', 'branch', '--unset-upstream'], $logPath, self::STEP_SECONDS),
 			SetupCheckEnum::CARRIED_FILES, SetupCheckEnum::OWN_FILES_OUT_OF_GIT => $prepare(),
 			SetupCheckEnum::SITE => $prepare() ?? $this->isolatedSite($path, $worktreeEntity->site),
-			SetupCheckEnum::PHP_PACKAGES => $this->installPackages($projectPath, $path, 'vendor', resolve(ProjectPhpRepositoryContract::class)->composerCommand($path, ['install', '--no-interaction']), $prepare, $logPath, $workingCopyStateRepository, $workingCopyRepository),
+			// skips the project's own composer scripts: they set up its main checkout, such as git hooks, and are often written for one shell
+			SetupCheckEnum::PHP_PACKAGES => $this->installPackages($projectPath, $path, 'vendor', resolve(ProjectPhpRepositoryContract::class)->composerCommand($path, ['install', '--no-interaction', '--no-scripts']), $prepare, $logPath, $workingCopyStateRepository, $workingCopyRepository)
+				?? $this->discoverPackages($path, $php, $logPath, $workingCopyStateRepository),
 			SetupCheckEnum::JS_PACKAGES => $this->installPackages($projectPath, $path, 'node_modules', is_file($path . '/package-lock.json') ? ['npm', 'ci'] : ['npm', 'install'], $prepare, $logPath, $workingCopyStateRepository, $workingCopyRepository),
 			SetupCheckEnum::ASSETS => $workingCopyStateRepository->runStep($path, ['npm', 'run', (string) ProjectKindEnum::of($path)->assetScript()], $logPath, self::STEP_SECONDS),
 			SetupCheckEnum::APP_KEY => $workingCopyStateRepository->runStep($path, [$php, 'artisan', 'key:generate', '--force'], $logPath, self::STEP_SECONDS),
@@ -175,12 +188,6 @@ class RepairSetupAction extends Command
 	}
 
 	/**
-	 * Borrows the packages again when the lock file matches the project;
-	 * otherwise gives back what was borrowed and installs them for this copy.
-	 *
-	 * @param  list<string>  $install
-	 */
-	/**
 	 * Has Herd serve the site with the PHP of the project, unless an agent or
 	 * lens is at work: Herd restarts that PHP, and their processes stop with it.
 	 */
@@ -202,6 +209,24 @@ class RepairSetupAction extends Command
 		return null;
 	}
 
+	/**
+	 * Has Laravel find the service providers of the installed packages.
+	 */
+	private function discoverPackages(string $path, string $php, string $logPath, WorkingCopyStateRepositoryContract $workingCopyStateRepository): ?string
+	{
+		if (! ProjectKindEnum::of($path)->isLaravel() || ! is_file($path . '/vendor/autoload.php')) {
+			return null;
+		}
+
+		return $workingCopyStateRepository->runStep($path, [$php, 'artisan', 'package:discover'], $logPath, self::STEP_SECONDS);
+	}
+
+	/**
+	 * Borrows the packages again when the lock file matches the project;
+	 * otherwise gives back what was borrowed and installs them for this copy.
+	 *
+	 * @param  list<string>  $install
+	 */
 	private function installPackages(
 		string $projectPath,
 		string $path,
