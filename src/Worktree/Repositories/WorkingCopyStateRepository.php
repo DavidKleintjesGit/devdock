@@ -58,12 +58,12 @@ class WorkingCopyStateRepository implements WorkingCopyStateRepositoryContract
 		);
 	}
 
-	public function countPendingMigrations(string $path): MigrationCountObject
+	public function countPendingMigrations(string $path, bool $isTesting = false): MigrationCountObject
 	{
 		$result = Process::path($path)
 			->env([...ProjectEnvironment::withoutDevDock(), ...ProjectEnvironment::withPhpFirst(resolve(ProjectPhpRepositoryContract::class)->binaryFor($path))])
 			->timeout(120)
-			->run([resolve(ProjectPhpRepositoryContract::class)->binaryFor($path), 'artisan', 'migrate:status', '--no-ansi']);
+			->run([resolve(ProjectPhpRepositoryContract::class)->binaryFor($path), 'artisan', 'migrate:status', '--no-ansi', ...($isTesting ? ['--env=testing'] : [])]);
 
 		$output = $result->output() . $result->errorOutput();
 

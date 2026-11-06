@@ -21,9 +21,9 @@ interface WorkingCopyStateRepositoryContract
 
 	/**
 	 * How many migrations have not run on the database of the working copy, or
-	 * why artisan could not tell.
+	 * on its test database, or why artisan could not tell.
 	 */
-	public function countPendingMigrations(string $path): MigrationCountObject;
+	public function countPendingMigrations(string $path, bool $isTesting = false): MigrationCountObject;
 
 	/**
 	 * Runs one step of a repair in the working copy and appends what it said

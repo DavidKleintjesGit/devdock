@@ -21,6 +21,7 @@ enum SetupCheckEnum: string
 	case OWN_DATABASE = 'own_database';
 	case OWN_TEST_DATABASE = 'own_test_database';
 	case MIGRATIONS = 'migrations';
+	case TEST_MIGRATIONS = 'test_migrations';
 	case STORAGE_LINK = 'storage_link';
 	case SITE = 'site';
 
@@ -38,6 +39,7 @@ enum SetupCheckEnum: string
 			self::OWN_DATABASE => 'Eigen database',
 			self::OWN_TEST_DATABASE => 'Eigen testdatabase',
 			self::MIGRATIONS => 'Migraties',
+			self::TEST_MIGRATIONS => 'Migraties van de testdatabase',
 			self::STORAGE_LINK => 'Storage-link',
 			self::SITE => 'Site',
 		});
@@ -54,6 +56,7 @@ enum SetupCheckEnum: string
 			self::ASSETS => [self::JS_PACKAGES],
 			self::APP_KEY, self::STORAGE_LINK => [self::CARRIED_FILES, self::PHP_PACKAGES],
 			self::MIGRATIONS => [self::PHP_PACKAGES, self::OWN_DATABASE],
+			self::TEST_MIGRATIONS => [self::PHP_PACKAGES, self::OWN_TEST_DATABASE],
 			default => [],
 		};
 	}

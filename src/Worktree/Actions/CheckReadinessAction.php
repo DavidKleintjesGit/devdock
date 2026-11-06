@@ -45,6 +45,7 @@ class CheckReadinessAction extends Command
 	public static function forget(string $directory): void
 	{
 		Cache::forget(self::MIGRATIONS_KEY . md5(self::normalize($directory)));
+		Cache::forget(self::MIGRATIONS_KEY . 'testing.' . md5(self::normalize($directory)));
 	}
 
 	public static function normalize(string $directory): string
@@ -110,6 +111,10 @@ class CheckReadinessAction extends Command
 			$projectKind->isLaravel() ? $this->appKey($workingCopyStateObject) : null,
 			...$databaseChecks,
 			$projectKind->isLaravel() ? $this->migrations($workingCopyStateRepository, $worktreeEntity->path, $canCountMigrations) : null,
+			// a test database of its own falls behind like the other one, and then the tests of an agent or lens stop at once
+			$projectKind->isLaravel() && ($databaseChecks[1] ?? null)?->isReady() === true && $worktreeDatabaseRepository->describeTesting($projectEntity->path, $worktreeEntity->path) !== null
+				? $this->migrations($workingCopyStateRepository, $worktreeEntity->path, $canCountMigrations, isTesting: true)
+				: null,
 			$projectKind->isLaravel() && $workingCopyStateObject->needsStorageLink ? $this->storageLink($workingCopyStateObject) : null,
 			$this->site($workingCopyRepository, $worktreeEntity, $workingCopyStateObject),
 		]);
@@ -293,10 +298,11 @@ class CheckReadinessAction extends Command
 		];
 	}
 
-	private function migrations(WorkingCopyStateRepositoryContract $workingCopyStateRepository, string $path, bool $canCount): SetupCheckObject
+	private function migrations(WorkingCopyStateRepositoryContract $workingCopyStateRepository, string $path, bool $canCount, bool $isTesting = false): SetupCheckObject
 	{
-		$key = self::MIGRATIONS_KEY . md5(self::normalize($path));
-		$fingerprint = $this->migrationsFingerprint($path);
+		$key = self::MIGRATIONS_KEY . ($isTesting ? 'testing.' : '') . md5(self::normalize($path));
+		$fingerprint = $this->migrationsFingerprint($path, $isTesting ? '.env.testing' : '.env');
+		$setupCheck = $isTesting ? SetupCheckEnum::TEST_MIGRATIONS : SetupCheckEnum::MIGRATIONS;
 		$kept = Cache::get($key);
 
 		$isKept = is_array($kept) && ($kept['fingerprint'] ?? null) === $fingerprint && ! $this->isThorough;
@@ -304,21 +310,21 @@ class CheckReadinessAction extends Command
 		$failure = $isKept ? ($kept['failure'] ?? null) : null;
 
 		if (! $isKept && $this->isThorough && $canCount) {
-			$migrationCountObject = $workingCopyStateRepository->countPendingMigrations($path);
+			$migrationCountObject = $workingCopyStateRepository->countPendingMigrations($path, $isTesting);
 			$pending = $migrationCountObject->pending;
 			$failure = $migrationCountObject->failure;
 			Cache::forever($key, ['fingerprint' => $fingerprint, 'pending' => $pending, 'failure' => $failure]);
 		}
 
 		return match (true) {
-			$failure !== null => new SetupCheckObject(SetupCheckEnum::MIGRATIONS, CheckStateEnum::OPEN, __('Artisan start niet in deze werkkopie: :failure', ['failure' => $failure])),
-			$pending === null => new SetupCheckObject(SetupCheckEnum::MIGRATIONS, CheckStateEnum::UNCHECKED, __('Nog niet nagekeken. DevDock kijkt het na voor een agent of lens begint.')),
-			$pending === 0 => new SetupCheckObject(SetupCheckEnum::MIGRATIONS, CheckStateEnum::READY, __('Alle migraties hebben gedraaid.')),
+			$failure !== null => new SetupCheckObject($setupCheck, CheckStateEnum::OPEN, __('Artisan start niet in deze werkkopie: :failure', ['failure' => $failure])),
+			$pending === null => new SetupCheckObject($setupCheck, CheckStateEnum::UNCHECKED, __('Nog niet nagekeken. DevDock kijkt het na voor een agent of lens begint.')),
+			$pending === 0 => new SetupCheckObject($setupCheck, CheckStateEnum::READY, __('Alle migraties hebben gedraaid.')),
 			default => new SetupCheckObject(
-				SetupCheckEnum::MIGRATIONS,
+				$setupCheck,
 				CheckStateEnum::OPEN,
 				trans_choice(':count migratie heeft nog niet gedraaid.|:count migraties hebben nog niet gedraaid.', $pending, ['count' => $pending]),
-				'php artisan migrate',
+				$isTesting ? 'php artisan migrate --env=testing' : 'php artisan migrate',
 			),
 		};
 	}
@@ -327,10 +333,10 @@ class CheckReadinessAction extends Command
 	 * The migration files and the database they run on: when either changes,
 	 * the count of the last thorough check no longer holds.
 	 */
-	private function migrationsFingerprint(string $path): string
+	private function migrationsFingerprint(string $path, string $envFile): string
 	{
 		$files = array_map('basename', glob($path . '/database/migrations/*.php') ?: []);
-		$environment = is_file($path . '/.env') ? md5_file($path . '/.env') : '';
+		$environment = is_file($path . '/' . $envFile) ? md5_file($path . '/' . $envFile) : '';
 
 		return md5(implode('|', $files) . '|' . $environment);
 	}

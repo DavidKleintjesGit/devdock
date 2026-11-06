@@ -161,6 +161,9 @@ class RepairSetupAction extends Command
 			SetupCheckEnum::MIGRATIONS => $worktreeDatabaseRepository->describe($projectPath, $path)->isShared
 				? __('DevDock migreert nooit de database van het project.')
 				: $workingCopyStateRepository->runStep($path, [$php, 'artisan', 'migrate', '--force'], $logPath, self::STEP_SECONDS),
+			SetupCheckEnum::TEST_MIGRATIONS => $worktreeDatabaseRepository->ownTestDatabase($projectPath, $path) === null
+				? __('DevDock migreert nooit de testdatabase van het project.')
+				: $workingCopyStateRepository->runStep($path, [$php, 'artisan', 'migrate', '--force', '--env=testing'], $logPath, self::STEP_SECONDS),
 			SetupCheckEnum::STORAGE_LINK => $workingCopyStateRepository->runStep($path, [$php, 'artisan', 'storage:link'], $logPath, self::STEP_SECONDS),
 			SetupCheckEnum::WORKING_COPY => $worktreeEntity->card === null
 				? __('Een werkkopie koppel je op de tab Werkkopie.')
