@@ -82,7 +82,8 @@ return [
 
     'locale' => env('APP_LOCALE', 'en'),
 
-    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
+    // keeps a text without a translation in Dutch, the language the code is written in
+    'fallback_locale' => 'nl',
 
     'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
 
