@@ -52,16 +52,30 @@ class ProjectPhpRepository implements ProjectPhpRepositoryContract
 			: ['composer', ...$arguments, ...$ignored];
 	}
 
+	public function siteVersion(string $site): ?string
+	{
+		$herdBin = $this->herdBin();
+
+		if ($herdBin === null) {
+			return null;
+		}
+
+		$serverBlock = (string) @file_get_contents(dirname($herdBin) . '/config/valet/Nginx/' . $site . '.conf');
+
+		return preg_match('/ISOLATED_PHP_VERSION=(\d+\.\d+)/', $serverBlock, $parts) === 1 ? $parts[1] : $this->herdDefaultVersion();
+	}
+
 	public function isolateSite(string $path, string $site): void
 	{
 		$version = $this->versionFor($path);
 		$herd = $this->herdBin() === null ? null : $this->herdBin() . '/herd.phar';
 
-		if ($version === null || $herd === null || ! is_file($herd) || $version === $this->herdDefaultVersion()) {
+		if ($version === null || $herd === null || ! is_file($herd) || $version === $this->siteVersion($site)) {
 			return;
 		}
 
-		Process::timeout(120)->run([$this->binaryOf($version), $herd, 'isolate', '--site=' . $site, $version]);
+		// herd isolate takes the name without the top-level domain
+		Process::timeout(120)->run([$this->binaryOf($version), $herd, 'isolate', '--site=' . preg_replace('/\.[a-z]+$/', '', $site), $version]);
 	}
 
 	/**

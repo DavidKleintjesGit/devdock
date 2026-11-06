@@ -28,8 +28,13 @@ interface ProjectPhpRepositoryContract
 	public function composerCommand(string $path, array $arguments): array;
 
 	/**
-	 * Has Herd serve a site with the PHP of its folder when that is not the
-	 * PHP Herd serves by default.
+	 * The PHP version Herd serves a site with, as major.minor; null without Herd.
+	 */
+	public function siteVersion(string $site): ?string;
+
+	/**
+	 * Has Herd serve a site with the PHP of its folder. Herd restarts that PHP
+	 * to do so, which stops every process running on it, agents and lenses too.
 	 */
 	public function isolateSite(string $path, string $site): void;
 }

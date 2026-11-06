@@ -7,7 +7,6 @@ namespace Src\Worktree\Repositories;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
-use Src\Project\Contracts\ProjectPhpRepositoryContract;
 use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
 use Src\Worktree\Exceptions\NotAWorkingCopyException;
 use Src\Worktree\Objects\SiteName;
@@ -52,6 +51,13 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 
 			if ($sites !== null) {
 				$this->drop($sites . '/' . $this->nameOf($site));
+			}
+
+			// a site Herd served with a PHP of its own leaves its server block behind otherwise
+			$herdConfig = $this->herdConfigFile();
+
+			if ($herdConfig !== null) {
+				@unlink(dirname($herdConfig) . '/Nginx/' . $this->nameOf($site) . '.' . $this->tld() . '.conf');
 			}
 		}
 	}
@@ -511,13 +517,8 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 
 		$link = $sites . '/' . $siteName->name;
 
-		if (! file_exists($link)) {
-			if (! $this->link($path, $link)) {
-				return null;
-			}
-
-			// a new site gets the PHP its project asks for, not the one Herd serves by default
-			resolve(ProjectPhpRepositoryContract::class)->isolateSite($path, $siteName->name);
+		if (! file_exists($link) && ! $this->link($path, $link)) {
+			return null;
 		}
 
 		return $siteName->name . '.' . $this->tld();

@@ -9,9 +9,11 @@ use Closure;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Src\Packages\Cqrs\Command;
-use Src\Project\Contracts\ProjectPhpRepositoryContract;
 use Src\Project\Actions\GetProjectsAction;
+use Src\Project\Contracts\ProjectPhpRepositoryContract;
 use Src\Project\Objects\ProjectEntity;
+use Src\Prompt\Contracts\PromptRunRepositoryContract;
+use Src\Review\Contracts\ReviewRoundRepositoryContract;
 use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
 use Src\Worktree\Contracts\WorkingCopyStateRepositoryContract;
 use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
@@ -147,7 +149,8 @@ class RepairSetupAction extends Command
 
 		return match ($setupCheck) {
 			SetupCheckEnum::BRANCH => $workingCopyStateRepository->runStep($path, ['git', 'branch', '--unset-upstream'], $logPath, self::STEP_SECONDS),
-			SetupCheckEnum::CARRIED_FILES, SetupCheckEnum::OWN_FILES_OUT_OF_GIT, SetupCheckEnum::SITE => $prepare(),
+			SetupCheckEnum::CARRIED_FILES, SetupCheckEnum::OWN_FILES_OUT_OF_GIT => $prepare(),
+			SetupCheckEnum::SITE => $prepare() ?? $this->isolatedSite($path, $worktreeEntity->site),
 			SetupCheckEnum::PHP_PACKAGES => $this->installPackages($projectPath, $path, 'vendor', resolve(ProjectPhpRepositoryContract::class)->composerCommand($path, ['install', '--no-interaction']), $prepare, $logPath, $workingCopyStateRepository, $workingCopyRepository),
 			SetupCheckEnum::JS_PACKAGES => $this->installPackages($projectPath, $path, 'node_modules', is_file($path . '/package-lock.json') ? ['npm', 'ci'] : ['npm', 'install'], $prepare, $logPath, $workingCopyStateRepository, $workingCopyRepository),
 			SetupCheckEnum::ASSETS => $workingCopyStateRepository->runStep($path, ['npm', 'run', (string) ProjectKindEnum::of($path)->assetScript()], $logPath, self::STEP_SECONDS),
@@ -177,6 +180,28 @@ class RepairSetupAction extends Command
 	 *
 	 * @param  list<string>  $install
 	 */
+	/**
+	 * Has Herd serve the site with the PHP of the project, unless an agent or
+	 * lens is at work: Herd restarts that PHP, and their processes stop with it.
+	 */
+	private function isolatedSite(string $path, ?string $site): ?string
+	{
+		if ($site === null) {
+			return null;
+		}
+
+		$isBusy = resolve(PromptRunRepositoryContract::class)->getRunningSince(CarbonImmutable::now()->subDay())->toArray() !== []
+			|| resolve(ReviewRoundRepositoryContract::class)->getRunning()->toArray() !== [];
+
+		if ($isBusy) {
+			return __('Er loopt nog een agent of lens. Herd herstart PHP om de site om te zetten, en dan stopt die mee; probeer het als ze klaar zijn.');
+		}
+
+		resolve(ProjectPhpRepositoryContract::class)->isolateSite($path, $site);
+
+		return null;
+	}
+
 	private function installPackages(
 		string $projectPath,
 		string $path,

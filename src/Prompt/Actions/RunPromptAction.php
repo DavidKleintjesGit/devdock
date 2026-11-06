@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Prompt\Actions;
 
+use Illuminate\Support\Facades\File;
 use Src\Access\Actions\GetRoleAccessAction;
 use Src\Access\Enums\AgentRoleEnum;
 use Src\Packages\Cqrs\Command;
@@ -50,6 +51,11 @@ class RunPromptAction extends Command
 		if ($promptRunEntity === null) {
 			abort(404);
 		}
+
+		// the process that runs the turn, so a turn whose process died can be told from one that is thinking
+		$processFile = GetLatestPromptRunAction::processFile($promptRunRepository->logPath($this->promptRunId));
+		File::ensureDirectoryExists(dirname($processFile));
+		File::put($processFile, (string) getmypid());
 
 		$directory = $promptRunEntity->directory !== null && is_dir($promptRunEntity->directory) ? $promptRunEntity->directory : null;
 

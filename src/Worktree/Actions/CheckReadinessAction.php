@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Src\Packages\Cqrs\Command;
 use Src\Project\Actions\GetProjectsAction;
+use Src\Project\Contracts\ProjectPhpRepositoryContract;
 use Src\Project\Objects\ProjectEntity;
 use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
 use Src\Worktree\Contracts\WorkingCopyStateRepositoryContract;
@@ -360,6 +361,19 @@ class CheckReadinessAction extends Command
 		$isPublished = $isPublished && $worktreeEntity->site !== null;
 
 		$pointsHere = $workingCopyStateObject->appUrl === null || rtrim($workingCopyStateObject->appUrl, '/') === 'http://' . $worktreeEntity->site;
+
+		$projectPhpRepository = resolve(ProjectPhpRepositoryContract::class);
+		$wantedVersion = $isPublished ? $projectPhpRepository->versionFor($worktreeEntity->path) : null;
+		$servedVersion = $wantedVersion === null ? null : $projectPhpRepository->siteVersion((string) $worktreeEntity->site);
+
+		if ($isPublished && $pointsHere && $servedVersion !== null && $servedVersion !== $wantedVersion) {
+			return new SetupCheckObject(
+				SetupCheckEnum::SITE,
+				CheckStateEnum::OPEN,
+				__('Herd serveert :site met PHP :served, het project vraagt :wanted. Omzetten herstart PHP :wanted bij Herd; dat kan alleen als er geen agent of lens loopt.', ['site' => $worktreeEntity->site, 'served' => $servedVersion, 'wanted' => $wantedVersion]),
+				__('PHP :version', ['version' => $wantedVersion]),
+			);
+		}
 
 		return $isPublished && $pointsHere
 			? new SetupCheckObject(SetupCheckEnum::SITE, CheckStateEnum::READY, __(':site, en APP_URL wijst ernaar.', ['site' => $worktreeEntity->site]))
