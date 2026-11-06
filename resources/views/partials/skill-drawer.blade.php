@@ -1,5 +1,5 @@
 <div class="scrim" wire:click="closeDrawer"></div>
-<aside class="drawer" role="dialog" aria-labelledby="skill-title">
+<aside class="drawer panel-drawer" role="dialog" aria-labelledby="skill-title">
 	<div class="dbar">
 		<span class="kind">{{ __('Skill') }} · {{ $skill->project ?? $skill->scope->label() }}</span>
 		@if ($skill->isEditable())

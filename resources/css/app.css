@@ -612,6 +612,27 @@ button.row{width:100%;border:0;background:transparent;text-align:left;cursor:poi
 .dbar .compact-title b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-size:15px}
 .drawer.compact:not(.chat-tall):not(:has(.composer)) .dbar .kind{display:none}
 
+/* de andere zijpanelen in de stijl van de kaart: grijze werkruimte, witte panelen */
+.panel-drawer{--workspace:color-mix(in srgb,var(--sunken) 45%,var(--bg))}
+.panel-drawer>.dhead{padding:18px 24px 16px;border-bottom:1px solid var(--line)}
+.panel-drawer>.dhead h2{font-size:21px}
+.panel-drawer>.tabs{margin-top:0 !important;gap:4px;padding:0 10px}
+.panel-drawer>.tabs [role=tab]{display:inline-flex;align-items:center;height:48px;padding:0 14px;font-size:14px;color:var(--fg-2)}
+.panel-drawer>.tabs [aria-selected="true"]{box-shadow:inset 0 -3px 0 var(--accent);color:var(--accent-ink)}
+.panel-drawer>.dbody{gap:14px;padding:16px 24px 20px;background:var(--workspace)}
+.panel-drawer>.dbody>.dsec{flex:none;gap:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.panel-drawer>.dbody>.dsec+.dsec{padding-top:0}
+.panel-drawer>.dbody>.dsec>.eyebrow:first-child,.panel-drawer>.dbody>.dsec>.headrow:first-child{display:flex;align-items:center;gap:10px;min-height:52px;margin:0;padding:0 16px;border-bottom:1px solid var(--line);font-size:14.5px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--fg)}
+.panel-drawer>.dbody>.dsec>.headrow:first-child .eyebrow{font-size:14.5px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--fg)}
+.panel-drawer>.dbody>.dsec>:not(.eyebrow):not(.headrow):not(.list){margin:14px 16px}
+.panel-drawer>.dbody>.dsec>.list{border:0;border-radius:0}
+.panel-drawer>.dbody>.dsec>.eyebrow:not(:first-child),.panel-drawer>.dbody>.dsec>.list>.eyebrow{margin:14px 16px 0}
+.panel-drawer>.dbody>.dsec>.card{border:0;box-shadow:none;padding:0}
+.panel-drawer>.dbody>.alert,.panel-drawer>.dbody>.banner{flex:none;border-radius:14px}
+.panel-drawer .facts{display:grid;grid-template-columns:128px 1fr;gap:10px 14px;font-size:13.5px}
+.panel-drawer .facts dd{margin:0}
+.panel-drawer>.dfoot{background:var(--surface);box-shadow:0 -4px 14px rgba(22,24,27,.04)}
+
 /* gesprek met de agent */
 .talk{display:flex;flex-direction:column;gap:14px;padding:20px 24px}
 .say{display:flex;flex-direction:column;gap:6px;max-width:92%}

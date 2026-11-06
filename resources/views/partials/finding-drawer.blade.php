@@ -1,4 +1,4 @@
-<aside class="drawer" role="dialog" aria-labelledby="finding-title">
+<aside class="drawer panel-drawer" role="dialog" aria-labelledby="finding-title">
 	<div class="dbar">
 		@if ($previous)
 			<button class="back kind" type="button" wire:click="back"><x-icon name="back" small/>{{ $previous }}</button>

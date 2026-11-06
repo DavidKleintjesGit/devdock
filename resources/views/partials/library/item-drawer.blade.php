@@ -1,5 +1,5 @@
 <div class="scrim" wire:click="closeLibraryItem"></div>
-<aside class="drawer wide" role="dialog" aria-labelledby="item-title">
+<aside class="drawer wide panel-drawer" role="dialog" aria-labelledby="item-title">
 	<div class="dbar">
 		<span class="kind">{{ $kindLabel }} · {{ $library->name }}</span>
 		<button class="icon-btn" type="button" wire:click="closeLibraryItem" aria-label="{{ __('Sluiten') }}"><x-icon name="x"/></button>

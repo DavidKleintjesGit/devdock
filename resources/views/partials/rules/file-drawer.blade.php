@@ -1,5 +1,5 @@
 <div class="scrim" wire:click="closeFile"></div>
-<aside class="drawer wide" role="dialog" aria-labelledby="file-title">
+<aside class="drawer wide panel-drawer" role="dialog" aria-labelledby="file-title">
 	<div class="dbar">
 		<span class="kind">{{ __('Regelbestand') }} · {{ $project }}</span>
 		<details class="menu" x-data="{ open: false }" :open="open" @click.outside="open = false">

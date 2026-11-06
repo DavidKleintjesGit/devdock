@@ -1697,5 +1697,6 @@
     "Is deze kopie compleet om in te werken? DevDock kijkt na of alles erin staat wat de app nodig heeft. Pas als alles in orde is, gaan de agent en de lenzen aan de slag. Het meeste herstelt DevDock zelf.": "Is this copy complete enough to work in? DevDock checks that it holds everything the app needs. Only when all is in order do the agent and the lenses start. DevDock repairs most of it itself.",
     "Herstel niet helemaal gelukt · :count punt|Herstel niet helemaal gelukt · :count punten": "Repair did not fully work · :count point|Repair did not fully work · :count points",
     "De rest is wel hersteld. De agent en de lenzen wachten tot de werkkopie compleet is.": "The rest is repaired. The agent and the lenses wait until the working copy is complete.",
-    "Naar het punt": "Go to the point"
+    "Naar het punt": "Go to the point",
+    "Over deze sessie": "About this session"
 }

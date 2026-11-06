@@ -1,4 +1,4 @@
-<aside class="drawer" role="dialog" aria-labelledby="session-title">
+<aside class="drawer panel-drawer" role="dialog" aria-labelledby="session-title">
 	<div class="dbar">
 		@if ($previous ?? null)
 			<button class="back kind" type="button" wire:click="back"><x-icon name="back" small/>{{ $previous }}</button>
@@ -16,39 +16,41 @@
 		<button class="icon-btn" type="button" wire:click="closeDrawer" aria-label="{{ __('Sluiten') }}"><x-icon name="x"/></button>
 	</div>
 
-	<div class="dhead" style="padding-bottom:16px">
+	<div class="dhead">
 		<h2 id="session-title">{{ $session->name() }}</h2>
 		<span class="sub">{{ $session->project ?? __('geen project') }} · {{ $session->branch ?? __('geen branch') }} · {{ $session->ticketKey() ?? __('geen ticket') }}</span>
 	</div>
 
-	<div class="dbody" style="gap:20px;padding:0 24px 24px">
-		<div class="banner {{ $verdict['tone'] }}" style="border-radius:12px;padding:16px 18px">
-			<div class="grow" style="display:flex;flex-direction:column;gap:2px;min-width:200px">
-				<b style="font-size:15px">{{ $verdict['title'] }}</b>
-				<span>{{ $verdict['text'] }}</span>
-			</div>
-		</div>
+	<div class="notice {{ $verdict['tone'] }}">
+		<span class="notice-icon"><x-icon name="info" small/></span>
+		<span class="notice-text"><b>{{ $verdict['title'] }}</b><span>{{ $verdict['text'] }}</span></span>
+	</div>
 
-		@if ($traits !== [])
-			<div class="list" style="border-radius:12px">
-				@foreach ($traits as $trait)
-					<div class="row" style="min-height:42px;padding:0 14px">
-						<span style="flex:none;width:150px"><span @class(['label', 'green' => $trait->protects()])>{{ $trait->label() }}</span></span>
-						<span class="hint" style="font-size:13px">{{ $trait->explanation() }}</span>
-					</div>
-				@endforeach
-			</div>
-		@endif
+	<div class="dbody">
+		<section class="dsec">
+			<h3 class="eyebrow">{{ __('Over deze sessie') }}</h3>
 
-		<dl style="margin:0;display:grid;grid-template-columns:128px 1fr;gap:10px 14px;font-size:13.5px">
-			<dt class="muted">{{ __('Laatst actief') }}</dt><dd style="margin:0">{{ $session->lastActiveLabel() }} · {{ trans_choice(':count dag gebruikt|:count dagen gebruikt', $session->activeDays, ['count' => $session->activeDays]) }}</dd>
-			<dt class="muted">{{ __('Omvang') }}</dt><dd style="margin:0">{{ trans_choice(':count bericht|:count berichten', $session->promptCount, ['count' => $session->promptCount]) }} · {{ __(':size op schijf', ['size' => $size]) }}</dd>
-			<dt class="muted">{{ __('Opgeleverd') }}</dt><dd style="margin:0">{{ $session->hasCommit ? __('minstens één commit') : __('geen enkele commit') }}</dd>
-			<dt class="muted">{{ __('Map') }}</dt><dd style="margin:0" class="mono">{{ $session->cwd ?? __('onbekend') }}</dd>
-		</dl>
+			@if ($traits !== [])
+				<div class="list">
+					@foreach ($traits as $trait)
+						<div class="row" style="min-height:42px;padding:0 14px">
+							<span style="flex:none;width:150px"><span @class(['label', 'green' => $trait->protects()])>{{ $trait->label() }}</span></span>
+							<span class="hint" style="font-size:13px">{{ $trait->explanation() }}</span>
+						</div>
+					@endforeach
+				</div>
+			@endif
 
-		<section style="display:flex;flex-direction:column;gap:14px">
-			<div style="display:flex;align-items:center;gap:10px">
+			<dl class="facts">
+				<dt class="muted">{{ __('Laatst actief') }}</dt><dd style="margin:0">{{ $session->lastActiveLabel() }} · {{ trans_choice(':count dag gebruikt|:count dagen gebruikt', $session->activeDays, ['count' => $session->activeDays]) }}</dd>
+				<dt class="muted">{{ __('Omvang') }}</dt><dd style="margin:0">{{ trans_choice(':count bericht|:count berichten', $session->promptCount, ['count' => $session->promptCount]) }} · {{ __(':size op schijf', ['size' => $size]) }}</dd>
+				<dt class="muted">{{ __('Opgeleverd') }}</dt><dd style="margin:0">{{ $session->hasCommit ? __('minstens één commit') : __('geen enkele commit') }}</dd>
+				<dt class="muted">{{ __('Map') }}</dt><dd style="margin:0" class="mono">{{ $session->cwd ?? __('onbekend') }}</dd>
+			</dl>
+		</section>
+
+		<section class="dsec">
+			<div class="headrow">
 				<h3 class="eyebrow grow">{{ __('Het gesprek') }}</h3>
 				@if ($hiddenTurns > 0)
 					<button class="btn text xs" type="button" wire:click="$set('wholeTranscript', true)">{{ __('Alles tonen') }}</button>

@@ -1,5 +1,5 @@
 <div class="scrim" wire:click="closeLens"></div>
-<aside class="drawer" role="dialog" aria-labelledby="lens-title">
+<aside class="drawer panel-drawer" role="dialog" aria-labelledby="lens-title">
 	<div class="dbar">
 		<span class="kind">{{ __('Lens') }} · {{ $project ?: __('standaard') }}</span>
 		<button class="icon-btn" type="button" wire:click="closeLens" aria-label="{{ __('Sluiten') }}"><x-icon name="x"/></button>
