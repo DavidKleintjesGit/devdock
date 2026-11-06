@@ -1647,5 +1647,13 @@
     "Ook je telefoon en elk ander onthouden apparaat. Voor als je telefoon kwijt is.": "Your phone and every other remembered device too. For when your phone is lost.",
     "Daarna ga je verder op de kaart die open stond.": "Then you continue on the card that was open.",
     "Niet gelukt bij de laatste herstelactie": "Did not work in the last repair",
-    "Het hele verslag staat in het log hieronder.": "The full account is in the log below."
+    "Het hele verslag staat in het log hieronder.": "The full account is in the log below.",
+    "Chat": "Chat",
+    "Inrichting": "Setup",
+    "Rondes": "Rounds",
+    "Wacht op jou": "Waiting for you",
+    "Antwoord in de chat; daarna gaat hij verder.": "Answer in the chat; then it carries on.",
+    "Naar de vraag": "Go to the question",
+    "Chat over de hele hoogte": "Chat at full height",
+    ":step · stap :number van :total": ":step · step :number of :total"
 }

@@ -1,5 +1,5 @@
 <div class="dbody tab-skeleton" aria-busy="true" aria-label="{{ __('Laden') }}">
-	<template x-if="pendingTab === 'Agent'">
+	<template x-if="pendingTab === 'Agent' && ! pendingSubtab">
 		<div class="skeleton chat-skeleton">
 			<span class="bone bubble" style="width:58%"></span>
 			<span class="bone line" style="width:24%;height:8px"></span>
@@ -12,7 +12,7 @@
 		</div>
 	</template>
 
-	<template x-if="pendingTab === 'Werkkopie'">
+	<template x-if="pendingTab === 'Werkkopie' && ! pendingSubtab">
 		<div class="skeleton">
 			<span class="bone line" style="width:30%"></span>
 			@foreach ([1, 2, 3] as $row)
@@ -25,7 +25,7 @@
 		</div>
 	</template>
 
-	<template x-if="pendingTab && pendingTab !== 'Agent' && pendingTab !== 'Werkkopie'">
+	<template x-if="pendingSubtab || (pendingTab && pendingTab !== 'Agent' && pendingTab !== 'Werkkopie')">
 		@include('partials.skeletons.lines')
 	</template>
 </div>

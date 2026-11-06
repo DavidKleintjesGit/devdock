@@ -26,6 +26,8 @@ use Src\Board\Actions\PlanTodoLaterAction;
 use Src\Board\Contracts\CardViewRepositoryContract;
 use Src\Board\Enums\BoardColumnEnum;
 use Src\Board\Enums\CardStatusEnum;
+use Src\Board\Enums\CardSubtabEnum;
+use Src\Board\Enums\CardTabEnum;
 use Src\Board\Enums\PromptSourceEnum;
 use Src\Board\Enums\UnreadSourceEnum;
 use Src\Board\Objects\CardObject;
@@ -159,6 +161,10 @@ class Drawer extends Component
 	#[Url(as: 'tab', except: 'Overzicht')]
 	public string $openTab = 'Overzicht';
 
+	/** The subtab of the open tab; a CardSubtabEnum value, or empty for the first one. */
+	#[Url(as: 'sub', except: '')]
+	public string $openSubtab = '';
+
 	public string $prompt = '';
 
 	/**
@@ -233,6 +239,11 @@ class Drawer extends Component
 
 	public function mount(): void
 	{
+		if ($this->openTab === 'Context') {
+			$this->openTab = CardTabEnum::CHAT->value;
+			$this->openSubtab = CardSubtabEnum::CONTEXT->value;
+		}
+
 		// a link with ?card=... opens that panel at once
 		if ($this->openCard !== null) {
 			$cardObject = $this->cardById($this->board(), $this->openCard);
@@ -283,6 +294,7 @@ class Drawer extends Component
 		$this->commitMessage = $this->suggestedCommitMessage($card);
 		$this->commitBody = '';
 		$this->openTab = 'Overzicht';
+		$this->openSubtab = '';
 		$this->diffView = null;
 
 		$cardObject = $this->cardById($this->board(), $card);
@@ -307,6 +319,7 @@ class Drawer extends Component
 
 		$this->openCard = null;
 		$this->openTab = 'Overzicht';
+		$this->openSubtab = '';
 		$this->drawerStack = [];
 		$this->renaming = false;
 		$this->closeActions();
@@ -1143,6 +1156,7 @@ class Drawer extends Component
 		}
 
 		$tab = $top['tab'];
+		$subtab = CardTabEnum::tryFrom($tab)?->subtab($this->openSubtab);
 		$taskEntity = resolve(TaskRepositoryContract::class)->getByKey($cardObject->id);
 		$reviewCommentEntities = $this->reviewCommentsOn($cardObject);
 		$promptRunEntity = GetLatestPromptRunAction::execute($cardObject->id);
@@ -1155,6 +1169,8 @@ class Drawer extends Component
 		// a task with a working copy but without an agent is not set up yet: the panel stays until all three steps are done
 		$isSetup = in_array($cardObject->column, [BoardColumnEnum::TO_DO, BoardColumnEnum::LATER], true)
 			|| ($cardObject->column === BoardColumnEnum::BUILDING && $cardObject->agent === null && $promptRunEntity === null);
+		$cardSteps = $this->cardSteps($cardObject);
+		$readiness = $worktreeEntity === null ? null : GetReadinessAction::execute($worktreeEntity->path);
 		$diffView = $worktreeEntity === null ? DiffViewEnum::BRANCH : $this->diffViewFor($worktreeEntity);
 		$diffTree = $this->openDiffFile === null ? [] : $this->diffTree($cardObject, $diffView);
 		$diffFiles = $this->openDiffFile === null || $worktreeEntity === null ? [] : $this->stackedDiffs($worktreeEntity, $diffView, $diffTree);
@@ -1169,9 +1185,12 @@ class Drawer extends Component
 			'card' => $cardObject,
 			'task' => $taskEntity,
 			'tab' => $isSetup ? 'Inrichten' : $tab,
+			'subtab' => $subtab,
 			'isSetup' => $isSetup,
 			'previous' => $previousLabel,
-			'cardSteps' => $this->cardSteps($cardObject),
+			'cardSteps' => $cardSteps,
+			'currentStep' => collect($cardSteps)->firstWhere('state', 'now'),
+			'tabSubtabs' => CardTabEnum::tryFrom($tab)?->subtabs() ?? [],
 			'nextStep' => $this->nextStep($cardObject, $worktreeEntity, $latestRound),
 			...($isSetup ? $this->setupData($cardObject, $worktreeEntity) : []),
 			'databaseSuggestion' => $worktreeEntity === null && ($isSetup || $tab === 'Werkkopie') ? $this->databaseSuggestionFor($cardObject) : null,
@@ -1213,9 +1232,18 @@ class Drawer extends Component
 			'claudeAvailable' => resolve(ClaudeProcessRepositoryContract::class)->isAvailable(),
 			...($tab === 'Werkkopie' ? $this->workingCopyData($cardObject, $worktreeEntity, $changes) : ['worktree' => $worktreeEntity]),
 			'workingCopyTask' => GetWorkingCopyTaskAction::execute($cardObject->id),
-			'readiness' => $worktreeEntity === null ? null : GetReadinessAction::execute($worktreeEntity->path),
+			'readiness' => $readiness,
+			'drawerTabs' => collect(CardTabEnum::cases())->map(fn (CardTabEnum $cardTab) => [
+				'tab' => $cardTab,
+				'unread' => $cardObject->unreadOnTab($cardTab->value),
+				'isWaiting' => match ($cardTab) {
+					CardTabEnum::CHAT => $cardObject->hasUnreadQuestion,
+					CardTabEnum::WORKING_COPY => $readiness !== null && ! $readiness->isReady(),
+					default => false,
+				},
+			])->all(),
 			'repairState' => $worktreeEntity === null ? null : GetRepairStateAction::execute($worktreeEntity->path),
-			...($tab === 'Context' ? $this->cardContextData($cardObject, $this->projectPathFor($cardObject), $worktreeEntity?->path ?? $this->projectPathFor($cardObject)) : []),
+			...($subtab === CardSubtabEnum::CONTEXT ? $this->cardContextData($cardObject, $this->projectPathFor($cardObject), $worktreeEntity?->path ?? $this->projectPathFor($cardObject)) : []),
 			'branchSuggestion' => $this->newBranch,
 			'readableProjects' => $taskEntity?->valuesFor(TaskLinkKindEnum::READABLE_PROJECT) ?? [],
 			'projectChoices' => GetProjectsAction::execute()->pluck('name')->sort()->values(),
@@ -1694,12 +1722,36 @@ class Drawer extends Component
 	 */
 	public function setDrawerTab(string $tab): void
 	{
+		$this->openSubtab = '';
+
+		if ($tab === 'Context') {
+			$tab = CardTabEnum::CHAT->value;
+			$this->openSubtab = CardSubtabEnum::CONTEXT->value;
+		}
+
 		if ($this->openCard !== null) {
 			$this->markTabSeen($this->openCard, $this->openTab);
 			$this->markTabSeen($this->openCard, $tab);
 		}
 
 		$this->switchDrawerTab($tab);
+	}
+
+	/**
+	 * Opens a subtab of the open tab.
+	 */
+	public function setDrawerSubtab(string $subtab): void
+	{
+		$this->openSubtab = CardSubtabEnum::from($subtab)->value;
+	}
+
+	/**
+	 * Opens the setup checklist of the working copy.
+	 */
+	public function openSetupChecklist(): void
+	{
+		$this->setDrawerTab(CardTabEnum::WORKING_COPY->value);
+		$this->openSubtab = CardSubtabEnum::SETUP->value;
 	}
 
 	/**
