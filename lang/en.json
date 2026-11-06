@@ -1655,5 +1655,10 @@
     "Antwoord in de chat; daarna gaat hij verder.": "Answer in the chat; then it carries on.",
     "Naar de vraag": "Go to the question",
     "Chat over de hele hoogte": "Chat at full height",
-    ":step · stap :number van :total": ":step · step :number of :total"
+    ":step · stap :number van :total": ":step · step :number of :total",
+    "Wat er moet gebeuren": "What needs to happen",
+    "Feedback uit Bitbucket": "Feedback from Bitbucket",
+    "Eigen map naast het project, waar de agent en de lenzen werken.": "Its own folder next to the project, where the agent and the lenses work.",
+    "Werkt in deze werkkopie. Wisselen doe je in de chat.": "Works in this working copy. You switch agents in the chat.",
+    "Naar de chat": "Go to the chat"
 }

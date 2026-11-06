@@ -17,6 +17,18 @@
 
 	@include('partials.card.taak-balk')
 
+	@if ($tab === 'Overzicht')
+		<div class="notice {{ $nextStep['tone'] }}">
+			<span class="notice-icon"><x-icon name="arrow" small/></span>
+			<span class="notice-text"><b>{{ $nextStep['title'] }}</b><span>{{ $nextStep['text'] }}</span></span>
+			@if ($nextStep['tab'])
+				<button class="btn sm primary" type="button" wire:click="setDrawerTab('{{ $nextStep['tab'] }}')" title="{{ $nextStep['hint'] }}">{{ $nextStep['button'] }}<x-icon name="arrow" small/></button>
+			@elseif ($nextStep['url'])
+				<a class="btn sm primary" href="{{ $nextStep['url'] }}" target="_blank" rel="noopener" title="{{ $nextStep['hint'] }}">{{ __('Openen in Bitbucket') }}<x-icon name="external" small/></a>
+			@endif
+		</div>
+	@endif
+
 	@if ($repairState?->isRunning)
 		<div class="notice running" wire:poll.3s>
 			<span class="notice-icon"><span class="sdot busy"></span></span>
