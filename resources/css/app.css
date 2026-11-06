@@ -555,6 +555,10 @@ button.row{width:100%;border:0;background:transparent;text-align:left;cursor:poi
 .setup-workspace .panel .dsec>.headrow{min-height:52px;padding:0 16px;border-bottom:1px solid var(--line)}
 .setup-workspace .panel .dsec>.list{border:0;border-radius:0}
 .setup-workspace .panel .dsec>.alert,.setup-workspace .panel .dsec>.fold{margin:12px 16px}
+.workspace .review-loop{padding:0;gap:14px}
+.workspace .loop-status{min-height:52px;padding:0 16px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.workspace .round{border-radius:14px}
+.workspace .review-loop>.reportbar{border-radius:0 14px 14px 0}
 .dbar .step-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);font-size:12px;font-weight:600;white-space:nowrap;flex:none}
 .dbar .step-pill .circle{width:8px;height:8px;box-sizing:border-box;border-radius:50%;border:2px solid var(--accent)}
 .drawer.compact:not(.chat-tall) .card-head{display:none}

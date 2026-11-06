@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use Src\Board\Enums\CardSubtabEnum;
 use Src\Board\Objects\CardObject;
 use Src\Packages\Markdown\RenderMarkdown;
 use Src\Review\Actions\GetContextFilesAction;
@@ -34,6 +35,25 @@ trait WithContext
 	public function openContextFile(string $key): void
 	{
 		$this->contextFile = $key;
+	}
+
+	/**
+	 * Picks the agent on the Context subtab of Chat and a lens on the Lenzen subtab of Review.
+	 */
+	private function fitContextChoice(?string $project, ?CardSubtabEnum $cardSubtab): void
+	{
+		$isLensChoice = str_starts_with($this->contextChoice, 'lens:');
+
+		if ($cardSubtab === CardSubtabEnum::CONTEXT && $isLensChoice) {
+			$this->contextChoice = 'agent';
+			$this->contextFile = null;
+		}
+
+		if ($cardSubtab === CardSubtabEnum::LENSES && ! $isLensChoice) {
+			$lensEntity = GetLensesAction::execute($project)->first(fn (LensEntity $lensEntity) => $lensEntity->isEnabled);
+			$this->contextChoice = $lensEntity === null ? 'agent' : 'lens:' . $lensEntity->name;
+			$this->contextFile = null;
+		}
 	}
 
 	/**

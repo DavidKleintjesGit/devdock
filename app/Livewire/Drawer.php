@@ -51,6 +51,7 @@ use Src\PullRequest\Actions\BuildReviewPromptAction;
 use Src\PullRequest\Actions\GetReviewCommentsAction;
 use Src\PullRequest\Objects\PullRequestEntity;
 use Src\PullRequest\Objects\ReviewCommentEntity;
+use Src\Review\Actions\GetLensesAction;
 use Src\Review\Actions\GetLoopStatusAction;
 use Src\Review\Actions\GetRoundsAction;
 use Src\Review\Actions\GetRoundTurnsAction;
@@ -67,6 +68,7 @@ use Src\Review\Enums\FindingStatusEnum;
 use Src\Review\Enums\RoundStatusEnum;
 use Src\Review\Enums\WorkflowStepEnum;
 use Src\Review\Exceptions\RoundNotStartedException;
+use Src\Review\Objects\LensEntity;
 use Src\Review\Objects\LensId;
 use Src\Review\Objects\ReviewFindingEntity;
 use Src\Review\Objects\ReviewFindingId;
@@ -253,6 +255,7 @@ class Drawer extends Component
 			$this->newBranch = $this->branchSuggestion($cardObject);
 			$this->renameBranch = (string) $this->renameSuggestion($cardObject);
 			$this->resetSetup($cardObject);
+			$this->fitContextChoice($cardObject?->project, CardSubtabEnum::tryFrom($this->openSubtab));
 			$this->replaceDrawer('card', $this->openCard, $this->openTab);
 			$this->markTabSeen($this->openCard, $this->openTab);
 		}
@@ -1192,7 +1195,7 @@ class Drawer extends Component
 			'previous' => $previousLabel,
 			'cardSteps' => $cardSteps,
 			'currentStep' => collect($cardSteps)->firstWhere('state', 'now'),
-			'tabSubtabs' => $subtab === null ? [] : $this->subtabRows(CardTabEnum::from($tab), $worktreeEntity, $readiness),
+			'tabSubtabs' => $subtab === null ? [] : $this->subtabRows(CardTabEnum::from($tab), $worktreeEntity, $readiness, $rounds->count()),
 			'nextStep' => $this->nextStep($cardObject, $worktreeEntity, $latestRound),
 			...($isSetup ? $this->setupData($cardObject, $worktreeEntity) : []),
 			'databaseSuggestion' => $worktreeEntity === null && ($isSetup || $tab === 'Werkkopie') ? $this->databaseSuggestionFor($cardObject) : null,
@@ -1245,7 +1248,7 @@ class Drawer extends Component
 				},
 			])->all(),
 			'repairState' => $worktreeEntity === null ? null : GetRepairStateAction::execute($worktreeEntity->path),
-			...($subtab === CardSubtabEnum::CONTEXT ? $this->cardContextData($cardObject, $this->projectPathFor($cardObject), $worktreeEntity?->path ?? $this->projectPathFor($cardObject)) : []),
+			...(in_array($subtab, [CardSubtabEnum::CONTEXT, CardSubtabEnum::LENSES], true) ? $this->cardContextData($cardObject, $this->projectPathFor($cardObject), $worktreeEntity?->path ?? $this->projectPathFor($cardObject)) : []),
 			'branchSuggestion' => $this->newBranch,
 			'readableProjects' => $taskEntity?->valuesFor(TaskLinkKindEnum::READABLE_PROJECT) ?? [],
 			'projectChoices' => GetProjectsAction::execute()->pluck('name')->sort()->values(),
@@ -1744,14 +1747,18 @@ class Drawer extends Component
 	 *
 	 * @return list<array{subtab: CardSubtabEnum, note: string, isWaiting: bool}>
 	 */
-	private function subtabRows(CardTabEnum $cardTab, ?WorktreeEntity $worktreeEntity, ?ReadinessObject $readiness): array
+	private function subtabRows(CardTabEnum $cardTab, ?WorktreeEntity $worktreeEntity, ?ReadinessObject $readiness, int $roundCount): array
 	{
+		$lensCount = $cardTab === CardTabEnum::REVIEW ? GetLensesAction::execute($worktreeEntity?->project)->filter(fn (LensEntity $lensEntity) => $lensEntity->isEnabled)->count() : 0;
+
 		return collect($cardTab->subtabs())->map(fn (CardSubtabEnum $cardSubtab) => [
 			'subtab' => $cardSubtab,
 			'note' => match ($cardSubtab) {
 				CardSubtabEnum::CHANGES => $worktreeEntity?->changedFiles ? (string) $worktreeEntity->changedFiles : '',
 				CardSubtabEnum::BRANCH => $worktreeEntity?->behind ? __(':count achter', ['count' => $worktreeEntity->behind]) : '',
 				CardSubtabEnum::SETUP => $readiness === null ? '' : ($readiness->isReady() ? __('in orde') : __(':count open', ['count' => $readiness->openCount()])),
+				CardSubtabEnum::ROUNDS => $roundCount > 0 ? (string) $roundCount : '',
+				CardSubtabEnum::LENSES => $lensCount > 0 ? (string) $lensCount : '',
 				default => '',
 			},
 			'isWaiting' => $cardSubtab === CardSubtabEnum::SETUP && $readiness !== null && ! $readiness->isReady(),
@@ -1764,6 +1771,7 @@ class Drawer extends Component
 	public function setDrawerSubtab(string $subtab): void
 	{
 		$this->openSubtab = CardSubtabEnum::from($subtab)->value;
+		$this->fitContextChoice($this->cardById($this->board(), (string) $this->openCard)?->project, CardSubtabEnum::from($subtab));
 	}
 
 	/**
