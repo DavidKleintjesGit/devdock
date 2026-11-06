@@ -52,7 +52,7 @@ trait WithWorkingCopy
 	/** @var array<int, string> the changed files that stay out of the next commit */
 	public array $skippedFiles = [];
 
-	public bool $pushAfterCommit = true;
+	public bool $pushAfterCommit = false;
 
 	public bool $showAllChanges = false;
 
@@ -209,7 +209,9 @@ trait WithWorkingCopy
 		$this->commitBody = '';
 		$this->skippedFiles = [];
 
+		// pushing along is chosen per commit; the switch is off again for the next one
 		if ($this->pushAfterCommit) {
+			$this->pushAfterCommit = false;
 			$this->pushBranch();
 		}
 	}
