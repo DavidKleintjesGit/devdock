@@ -1698,5 +1698,9 @@
     "Herstel niet helemaal gelukt · :count punt|Herstel niet helemaal gelukt · :count punten": "Repair did not fully work · :count point|Repair did not fully work · :count points",
     "De rest is wel hersteld. De agent en de lenzen wachten tot de werkkopie compleet is.": "The rest is repaired. The agent and the lenses wait until the working copy is complete.",
     "Naar het punt": "Go to the point",
-    "Over deze sessie": "About this session"
+    "Over deze sessie": "About this session",
+    "Klaarzetten lukte niet": "Setting up did not work",
+    "Bij stap 2 staat wat er misging en wat je kunt doen.": "Step 2 shows what went wrong and what you can do.",
+    "Kies hierboven een andere branch of database, of los het op in de map die genoemd wordt. Daarna zet je hem opnieuw klaar.": "Pick another branch or database above, or solve it in the folder that is named. Then set it up again.",
+    "Opnieuw klaarzetten": "Set up again"
 }

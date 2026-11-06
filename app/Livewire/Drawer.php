@@ -1179,6 +1179,7 @@ class Drawer extends Component
 		$isSetup = in_array($cardObject->column, [BoardColumnEnum::TO_DO, BoardColumnEnum::LATER], true)
 			|| ($cardObject->column === BoardColumnEnum::BUILDING && $cardObject->agent === null && $promptRunEntity === null);
 		$cardSteps = $this->cardSteps($cardObject);
+		$workingCopyTask = GetWorkingCopyTaskAction::execute($cardObject->id);
 		$readiness = $worktreeEntity === null ? null : GetReadinessAction::execute($worktreeEntity->path);
 		$repairState = $worktreeEntity === null ? null : GetRepairStateAction::execute($worktreeEntity->path);
 		$diffView = $worktreeEntity === null ? DiffViewEnum::BRANCH : $this->diffViewFor($worktreeEntity);
@@ -1241,7 +1242,9 @@ class Drawer extends Component
 			)),
 			'claudeAvailable' => resolve(ClaudeProcessRepositoryContract::class)->isAvailable(),
 			...($tab === 'Werkkopie' ? $this->workingCopyData($cardObject, $worktreeEntity, $changes) : ['worktree' => $worktreeEntity]),
-			'workingCopyTask' => GetWorkingCopyTaskAction::execute($cardObject->id),
+			'workingCopyTask' => $workingCopyTask,
+			// a working copy that could not be set up, shown at the step where it can be solved
+			'setupRefusal' => $isSetup && $worktreeEntity === null && $cardObject->project !== null ? $this->failure ?? ($workingCopyTask?->isRunning ? null : $workingCopyTask?->failure) : null,
 			'readiness' => $readiness,
 			...($subtab === CardSubtabEnum::SETUP && $readiness !== null ? $this->setupGroupData($readiness, $repairState) : []),
 			'drawerTabs' => collect(CardTabEnum::cases())->map(fn (CardTabEnum $cardTab) => [

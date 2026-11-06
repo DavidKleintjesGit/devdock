@@ -3,7 +3,7 @@
 		<span class="notice-icon"><span class="sdot busy"></span></span>
 		<span class="notice-text"><b>{{ $workingCopyTask->task->busyLabel() }}</b><span>{{ __('Dit loopt in de achtergrond; je kunt intussen gewoon verder.') }}</span></span>
 	</div>
-@elseif ($workingCopyTask?->failure)
+@elseif ($workingCopyTask?->failure && ! $isSetup)
 	<div class="notice failed">
 		<span class="notice-icon"><x-icon name="alert" small/></span>
 		<span class="notice-text"><b>{{ $workingCopyTask->task->failedLabel() }}</b><span>{{ $workingCopyTask->failure }}</span></span>

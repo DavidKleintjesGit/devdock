@@ -1,5 +1,10 @@
 <div class="dbody">
-	@if ($failure)
+	@if ($setupRefusal)
+		<div class="notice failed" role="alert">
+			<span class="notice-icon"><x-icon name="alert" small/></span>
+			<span class="notice-text"><b>{{ __('Klaarzetten lukte niet') }}</b><span>{{ __('Bij stap 2 staat wat er misging en wat je kunt doen.') }}</span></span>
+		</div>
+	@elseif ($failure)
 		<div class="alert red dfail"><x-icon name="alert" small/><span class="grow">{{ $failure }}</span></div>
 	@endif
 
@@ -63,11 +68,18 @@
 									</label>
 								@endif
 								<span class="setup-plan">
-									<span @class(['plan-text', 'warn' => $preparePlan['isProject']])>
-										<x-icon :name="$preparePlan['icon']" small/>
-										<span>{{ $preparePlan['text'] }}</span>
-									</span>
-									<x-busy-button action="prepareWorkingCopy" class="btn primary sm" :busy="__('Bezig...')">{{ __('Klaarzetten') }}</x-busy-button>
+									@if ($setupRefusal)
+										<span class="setup-refusal" role="alert">
+											<x-icon name="alert" small/>
+											<span><b>{{ __('Klaarzetten lukte niet') }}</b><span class="reason">{{ $setupRefusal }}</span><span class="hint">{{ __('Kies hierboven een andere branch of database, of los het op in de map die genoemd wordt. Daarna zet je hem opnieuw klaar.') }}</span></span>
+										</span>
+									@else
+										<span @class(['plan-text', 'warn' => $preparePlan['isProject']])>
+											<x-icon :name="$preparePlan['icon']" small/>
+											<span>{{ $preparePlan['text'] }}</span>
+										</span>
+									@endif
+									<x-busy-button action="prepareWorkingCopy" class="btn primary sm" :busy="__('Bezig...')">{{ $setupRefusal ? __('Opnieuw klaarzetten') : __('Klaarzetten') }}</x-busy-button>
 								</span>
 								<span class="hint" wire:loading wire:target="prepareWorkingCopy">{{ $preparePlan['isNew'] ? __('De werkkopie wordt gemaakt; de database en de rest volgen in de achtergrond.') : __('De werkkopie wordt gekoppeld.') }}</span>
 							</span>

@@ -1129,6 +1129,13 @@ body.is-working .working{opacity:1}
 .plan-text.warn{background:var(--amber-soft);color:var(--amber)}
 .plan-text.warn .ic{color:inherit}
 .plan-text .btn.text{padding:0;height:auto;color:inherit;text-decoration:underline}
+.setup-refusal{flex:1;min-width:0;display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--red-dot);border-radius:10px;background:color-mix(in srgb,var(--red-soft) 60%,var(--surface));color:var(--red)}
+.setup-refusal>.ic{margin-top:2px}
+.setup-refusal>span{display:flex;flex-direction:column;gap:4px;min-width:0}
+.setup-refusal b{font-weight:600}
+.setup-refusal .reason{font-size:13px;color:var(--fg-2);overflow-wrap:anywhere}
+.setup-refusal .hint{font-size:12.5px}
+.setup-plan:has(.setup-refusal){align-items:flex-end;flex-wrap:wrap}
 .agent-badge{flex:none;width:28px;height:28px;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink);display:grid;place-items:center;font-size:12px;font-weight:600}
 .cleanup{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:2px;font-size:12.5px;color:var(--fg-2)}
 .followchip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);font-size:13px;font-weight:500}
