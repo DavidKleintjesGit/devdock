@@ -70,7 +70,7 @@ class GetStandingsAction extends Command
 					standing: $standing,
 					onVersion: $onVersion,
 					path: $landing->pathFor($itemEntity->name, $folder),
-					lines: $contents === null ? null : substr_count($contents, "\n") + 1,
+					lines: $contents === null ? null : LibraryVersionEntity::lineCountOf($contents),
 				);
 			}
 		}

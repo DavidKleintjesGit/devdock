@@ -247,14 +247,29 @@ class Board extends Component
 	 */
 	private function visible(Collection $cardObjects): Collection
 	{
+		return $this->inView($cardObjects)
+			->when(filled($this->attention), fn (Collection $all) => $all->filter(
+				fn (CardObject $card) => BoardSignalEnum::from($this->attention)->matches($card),
+			))
+			->values();
+	}
+
+	/**
+	 * The cards the board shows before a signal filter: in a shown column, in the picked projects and matching the search.
+	 *
+	 * @param  Collection<int, CardObject>  $cardObjects
+	 * @return Collection<int, CardObject>
+	 */
+	private function inView(Collection $cardObjects): Collection
+	{
 		return $cardObjects
+			->filter(fn (CardObject $card) => $card->column === BoardColumnEnum::LATER
+				? $this->showBacklog
+				: in_array($card->column->value, $this->shownColumns, true))
 			// filter je op een project, dan hoort een taak zonder project er niet
 			// bij: die hoort nergens bij
 			->when($this->hasProjectFilter(), fn (Collection $all) => $all->filter(
 				fn (CardObject $card) => in_array($card->project, $this->projects, true),
-			))
-			->when(filled($this->attention), fn (Collection $all) => $all->filter(
-				fn (CardObject $card) => BoardSignalEnum::from($this->attention)->matches($card),
 			))
 			->when(filled($this->query), fn (Collection $all) => $all->filter(
 				fn (CardObject $card) => $card->matches($this->query),
@@ -336,10 +351,10 @@ class Board extends Component
 				'total' => $cardObjects->filter(fn (CardObject $card) => $card->column === $column)->count(),
 				'isShown' => in_array($column->value, $this->shownColumns, true),
 			]),
-			'shownCount' => count($this->shownColumns) + ($this->showBacklog ? 1 : 0),
+			'shownCount' => collect(BoardColumnEnum::sprint())->filter(fn (BoardColumnEnum $column) => in_array($column->value, $this->shownColumns, true))->count(),
 			'projectOptions' => $this->projectOptions($this->countsByProject($cardObjects)),
 			'projectTotal' => $cardObjects->count(),
-			'signals' => $this->signals($cardObjects),
+			'signals' => $this->signals($this->inView($cardObjects)),
 			'allProjectNames' => GetProjectsAction::execute()->pluck('name')->sort()->values(),
 			'backlogCount' => $cardObjects->filter(fn (CardObject $card) => $card->column === BoardColumnEnum::LATER)->count(),
 			'summary' => $this->summary($cardObjects),

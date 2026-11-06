@@ -94,17 +94,17 @@
 								<span class="mark"></span>
 							</label>
 						@endif
-						<button class="row grow" type="button" style="padding:0;min-height:66px;gap:14px" wire:click="open('{{ $row['session']->uuid }}')">
+						<button class="row grow session-row" type="button" wire:click="open('{{ $row['session']->uuid }}')">
 							<span class="sdot {{ $row['canGo'] ? 'red' : 'quiet' }}"></span>
-							<span class="title" style="flex:1 1 220px">
+							<span class="title session-name">
 								<b class="ellipsis">{{ $row['session']->name() }}</b>
 								<small class="mono ellipsis">{{ $row['session']->project ?? __('geen project') }}{{ $row['session']->branch ? ' · ' . $row['session']->branch : '' }}</small>
 							</span>
-							<span class="chips" style="flex:1 1 260px">
+							<span class="chips session-traits">
 								@foreach ($row['traits'] as $trait)<span class="label">{{ $trait->label() }}</span>@endforeach
 								@if ($row['moreTraits'] > 0)<span class="label muted">+{{ $row['moreTraits'] }}</span>@endif
 							</span>
-							<span style="flex:none;width:210px;display:flex;justify-content:flex-end;gap:14px;font-size:12.5px;color:var(--muted)">
+							<span class="session-stats">
 								<span>{{ trans_choice(':count bericht|:count berichten', $row['session']->promptCount, ['count' => $row['session']->promptCount]) }}</span>
 								<span class="mono" style="font-size:12px">{{ $row['session']->sizeLabel() }}</span>
 								<span>{{ $row['age'] }}</span>
@@ -117,7 +117,7 @@
 	</main>
 
 	@if ($selected !== [])
-		<div style="position:sticky;bottom:0;z-index:15;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px var(--gutter);background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(0,0,0,.05)">
+		<div class="selection-bar">
 			<button class="btn danger" type="button" wire:click="deleteSelected">{{ $confirmingDelete ? __('Zeker weten? Verwijderen') : __('Verwijderen') }}</button>
 			<button class="btn text" type="button" style="color:var(--fg-2)" wire:click="clearSelection">{{ __('Selectie wissen') }}</button>
 			<span class="hint" style="font-size:13px">{{ $pickedLine }}</span>

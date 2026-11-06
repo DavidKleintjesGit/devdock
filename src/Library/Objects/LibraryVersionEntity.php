@@ -41,6 +41,17 @@ class LibraryVersionEntity extends ValueObject
 
 	public function lines(): int
 	{
-		return substr_count($this->contents, "\n") + 1;
+		return self::lineCountOf($this->contents);
+	}
+
+	/**
+	 * The lines of a rule, or of the SKILL.md of a skill, whose version holds all its files packed as JSON.
+	 */
+	public static function lineCountOf(string $contents): int
+	{
+		$files = json_decode($contents, true);
+		$text = is_array($files) && is_string($files['SKILL.md'] ?? null) ? $files['SKILL.md'] : $contents;
+
+		return substr_count($text, "\n") + 1;
 	}
 }
