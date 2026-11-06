@@ -1,4 +1,4 @@
-<aside class="drawer card-drawer" role="dialog" aria-labelledby="drawer-title" x-data="{ tall: $persist(false).as('devdock.chat-tall'), pendingTab: null, pendingSubtab: false, compact: false }" :class="{ 'chat-tall': tall, switching: pendingTab || pendingSubtab, compact }" @drawer-card.window="pendingTab = null; pendingSubtab = false" @scroll.capture="if ($event.target.classList?.contains('dbody')) compact = $event.target.scrollTop > 48 ? true : ($event.target.scrollTop < 4 ? false : compact)">
+<aside class="drawer card-drawer" role="dialog" aria-labelledby="drawer-title" x-data="{ tall: $persist(false).as('devdock.chat-tall'), pendingTab: null, pendingView: null, compact: false }" :class="{ 'chat-tall': tall, switching: pendingView, 'switching-tab': pendingTab, compact }" @drawer-card.window="pendingTab = null; pendingView = null" @scroll.capture="if ($event.target.classList?.contains('dbody') && ! $el.querySelector('.composer')) compact = $event.target.scrollTop > 48 ? true : ($event.target.scrollTop < 4 ? false : compact)">
 	<div class="dbar">
 		@if ($previous)
 			<button class="back kind" type="button" wire:click="back"><x-icon name="back" small/>{{ $previous }}</button>
@@ -69,7 +69,7 @@
 	@else
 		<nav class="tabs card-tabs" role="tablist" aria-label="{{ __('Panelen') }}">
 			@foreach ($drawerTabs as $drawerTab)
-				<button type="button" role="tab" aria-selected="{{ $tab === $drawerTab['tab']->value ? 'true' : 'false' }}" :aria-selected="(pendingTab ?? @js($tab)) === @js($drawerTab['tab']->value)" @click="if (@js($tab) !== @js($drawerTab['tab']->value)) { pendingTab = @js($drawerTab['tab']->value); compact = false }" wire:click="setDrawerTab('{{ $drawerTab['tab']->value }}')" aria-label="{{ $drawerTab['tab']->label() }}">
+				<button type="button" role="tab" aria-selected="{{ $tab === $drawerTab['tab']->value ? 'true' : 'false' }}" :aria-selected="(pendingTab ?? @js($tab)) === @js($drawerTab['tab']->value)" @click="if (@js($tab) !== @js($drawerTab['tab']->value)) { pendingTab = @js($drawerTab['tab']->value); pendingView = pendingTab; compact = false }" wire:click="setDrawerTab('{{ $drawerTab['tab']->value }}')" aria-label="{{ $drawerTab['tab']->label() }}">
 					<x-icon :name="$drawerTab['tab']->icon()"/>
 					<span class="tab-label">{{ $drawerTab['tab']->label() }}</span>
 					@if ($drawerTab['isWaiting'])
@@ -87,7 +87,7 @@
 			<div class="subbar">
 				<nav class="segmented" aria-label="{{ __($tab) }}">
 					@foreach ($tabSubtabs as $subtabRow)
-						<button type="button" @if ($subtab === $subtabRow['subtab']) aria-current="page" @endif @click="if (@js($subtab->value) !== @js($subtabRow['subtab']->value)) { pendingSubtab = true; compact = false }" wire:click="setDrawerSubtab('{{ $subtabRow['subtab']->value }}')">
+						<button type="button" @if ($subtab === $subtabRow['subtab']) aria-current="page" @endif @click="if (@js($subtab->value) !== @js($subtabRow['subtab']->value)) { pendingView = @js($tab . ':' . $subtabRow['subtab']->value); compact = false }" wire:click="setDrawerSubtab('{{ $subtabRow['subtab']->value }}')">
 							@if ($subtabRow['isWaiting'])<span class="waits" title="{{ __('Wacht op jou') }}"></span>@endif
 							{{ $subtabRow['subtab']->label() }}
 							@if ($subtabRow['note'] !== '')<span class="note">{{ $subtabRow['note'] }}</span>@endif
