@@ -48,7 +48,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 		$claude = escapeshellarg($this->claudeBinary());
 		$resume = $sessionUuid === null ? '' : ' --resume ' . escapeshellarg($sessionUuid);
 
-		foreach ([...$this->alsoReads($alsoReads), ...$this->accessArguments($roleAccessObject)] as $argument) {
+		foreach ([...$this->alsoReads($alsoReads), ...$this->accessArguments($roleAccessObject, null, $directory)] as $argument) {
 			$claude .= ' ' . escapeshellarg($argument);
 		}
 
@@ -120,7 +120,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 		// which cuts it off past 8191 characters, and a long prompt then arrives empty
 		$arguments = [
 			...$this->alsoReads($alsoReads),
-			...$this->accessArguments($roleAccessObject, $promptRunEntity->gitGrant),
+			...$this->accessArguments($roleAccessObject, $promptRunEntity->gitGrant, $directory),
 			'-p',
 			'--output-format',
 			'stream-json',
@@ -239,7 +239,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 				[
 					$this->claudeBinary(),
 					...$this->alsoReads($alsoReads),
-					...$this->accessArguments($roleAccessObject),
+					...$this->accessArguments($roleAccessObject, null, $directory),
 					'-p',
 					'--output-format',
 					'stream-json',
@@ -282,7 +282,7 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 
 	public function ask(RoleAccessObject $roleAccessObject, string $directory, ?string $sessionUuid, string $question): ?string
 	{
-		$arguments = [...$this->accessArguments($roleAccessObject), '-p', '--output-format', 'json'];
+		$arguments = [...$this->accessArguments($roleAccessObject, null, $directory), '-p', '--output-format', 'json'];
 
 		if (filled($sessionUuid)) {
 			$arguments = ['--resume', $sessionUuid, ...$arguments];
@@ -310,13 +310,13 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 *
 	 * @return list<string>
 	 */
-	private function accessArguments(RoleAccessObject $roleAccessObject, ?GitGrantEnum $gitGrant = null): array
+	private function accessArguments(RoleAccessObject $roleAccessObject, ?GitGrantEnum $gitGrant, string $directory): array
 	{
 		$arguments = $roleAccessObject->deniedTools === []
 			? []
 			: ['--disallowedTools', implode(',', $roleAccessObject->deniedTools)];
 
-		return [...$arguments, '--settings', $this->guardSettings($roleAccessObject, $gitGrant)];
+		return [...$arguments, '--settings', $this->guardSettings($roleAccessObject, $gitGrant, $directory)];
 	}
 
 	/**
@@ -324,10 +324,11 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 * devdock:guard-git in front of every shell command, and devdock:guard-write
 	 * in front of every executeWrite when the role may still write through it.
 	 */
-	private function guardSettings(RoleAccessObject $roleAccessObject, ?GitGrantEnum $gitGrant): string
+	private function guardSettings(RoleAccessObject $roleAccessObject, ?GitGrantEnum $gitGrant, string $directory): string
 	{
-		// a turn with a grant reads a settings file of its own, so every other turn keeps git read only
-		$path = storage_path('app/claude/' . $roleAccessObject->agentRole->value . ($gitGrant === null ? '' : '-' . $gitGrant->value) . '-settings.json');
+		// a turn with a grant reads a settings file of its own, so every other turn keeps git read only;
+		// each folder has its own, since what it leaves out depends on the folder
+		$path = storage_path('app/claude/' . $roleAccessObject->agentRole->value . ($gitGrant === null ? '' : '-' . $gitGrant->value) . '-' . substr(md5($directory), 0, 12) . '-settings.json');
 
 		$guards = [[
 			'matcher' => 'Bash|PowerShell',
@@ -341,10 +342,38 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 			];
 		}
 
+		$settings = ['hooks' => ['PreToolUse' => $guards]];
+		$shadowed = $this->shadowedInstructions($directory);
+
+		if ($shadowed !== []) {
+			$settings['claudeMdExcludes'] = $shadowed;
+		}
+
 		File::ensureDirectoryExists(dirname($path));
-		File::put($path, (string) json_encode(['hooks' => ['PreToolUse' => $guards]], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+		File::put($path, (string) json_encode($settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
 		return $path;
+	}
+
+	/**
+	 * The instruction files of the checkout a working copy lives in, when the
+	 * working copy has its own: Claude Code walks up from the folder and would
+	 * read both, the checkout's from the main branch and the copy's from its own.
+	 *
+	 * @return list<string>
+	 */
+	private function shadowedInstructions(string $directory): array
+	{
+		$folder = str_replace('\\', '/', $directory);
+
+		if (preg_match('#^(.+)/\.worktrees/[^/]+$#', $folder, $found) !== 1) {
+			return [];
+		}
+
+		return array_values(array_filter(
+			array_map(fn (string $file): string => $found[1] . '/' . $file, ['CLAUDE.md', 'CLAUDE.local.md']),
+			fn (string $checkoutFile): bool => is_file($checkoutFile) && is_file($folder . '/' . basename($checkoutFile)),
+		));
 	}
 
 	private function artisanCommand(string $command): string

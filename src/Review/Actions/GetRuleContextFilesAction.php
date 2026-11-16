@@ -40,16 +40,19 @@ class GetRuleContextFilesAction extends Command
 			return $files;
 		}
 
-		// Claude Code walks up from a working copy and reads the instructions of the checkout around it too
+		$folderFiles = $ruleFileSystemRepository->getLoadedFiles($folder);
+
+		// Claude Code walks up from a working copy and reads the instructions of the checkout around it too,
+		// unless the working copy has its own of the same name: DevDock tells Claude Code to leave those out
 		if ($this->projectPath !== null && $folder !== $this->projectPath && str_starts_with($folder, $this->projectPath . '/')) {
 			foreach ($ruleFileSystemRepository->getLoadedFiles($this->projectPath) as $path => $contents) {
-				if (! str_contains($path, '/')) {
+				if (! str_contains($path, '/') && ! isset($folderFiles[$path])) {
 					$files[] = new ContextFileObject(key: 'checkout:' . $path, name: $path, group: __('Uit de checkout eromheen'), path: $path, contents: $contents);
 				}
 			}
 		}
 
-		$projectFiles = collect($ruleFileSystemRepository->getLoadedFiles($folder))
+		$projectFiles = collect($folderFiles)
 			->map(fn (string $contents, string $path) => new ContextFileObject(
 				key: 'project:' . $path,
 				name: str_starts_with($path, '.claude/rules/') ? substr($path, strlen('.claude/rules/')) : $path,
