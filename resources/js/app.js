@@ -548,3 +548,29 @@ document.addEventListener('livewire:init', () => {
 		}
 	});
 });
+
+// Shows the outline of the next page the moment you click to it; the page
+// itself takes its place once it arrived.
+const skeletonFor = (path) => {
+	if (path === '/' || path === '') {
+		return 'skeleton-board';
+	}
+
+	return ['/sessies', '/toegang'].includes(path) ? 'skeleton-page' : 'skeleton-split';
+};
+
+document.addEventListener('livewire:navigate', (event) => {
+	const url = new URL(event.detail?.url ?? window.location.href, window.location.origin);
+	const page = document.querySelector('.shell > :not(.side):not(.tabbar)');
+	const template = document.getElementById(skeletonFor(url.pathname));
+
+	if (page === null || template === null || url.pathname === window.location.pathname) {
+		return;
+	}
+
+	page.replaceWith(template.content.firstElementChild.cloneNode(true));
+
+	document.querySelectorAll('.side .nav a, .tabbar a').forEach((link) => {
+		new URL(link.href).pathname === url.pathname ? link.setAttribute('aria-current', 'page') : link.removeAttribute('aria-current');
+	});
+});

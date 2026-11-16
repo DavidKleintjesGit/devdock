@@ -1358,3 +1358,15 @@ body.drawer-closing :is(.drawer, .scrim){display:none}
 body.window{margin:0;background:var(--surface)}
 .changes-window{height:100vh;height:100dvh;display:flex;flex-direction:column;background:var(--surface)}
 .icon-btn.is-busy{opacity:.5}
+
+/* the outline of a page while it is on its way */
+.sk .bone{display:block;background:var(--sunken);border-radius:6px;animation:bone 1.4s ease-in-out infinite}
+.sk-head{display:flex;align-items:center;gap:12px;padding:22px 32px;border-bottom:1px solid var(--line)}
+.sk-columns{flex:1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;padding:20px 32px;align-items:start}
+.sk-column{display:flex;flex-direction:column;gap:10px}
+.sk .sk-card{height:86px;border-radius:12px}
+.sk-index{display:flex;flex-direction:column;gap:14px;padding:20px 18px}
+.sk-phead{display:flex;flex-direction:column;gap:10px;padding:24px 44px 22px;border-bottom:1px solid var(--line)}
+.sk-body{display:flex;flex-direction:column;gap:10px;padding:28px 44px;max-width:var(--content)}
+.sk .sk-row{height:52px;border-radius:12px}
+@media (max-width:760px){.sk-columns{grid-template-columns:minmax(0,1fr)}.sk-phead,.sk-body,.sk-head{padding-left:16px;padding-right:16px}}

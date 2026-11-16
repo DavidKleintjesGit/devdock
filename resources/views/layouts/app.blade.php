@@ -14,17 +14,18 @@
 <body>
 <div class="working" aria-hidden="true"><span></span></div>
 @include('partials.icons')
+@include('partials.skeletons.pages')
 
 <div class="shell">
 	<aside class="side" aria-label="DevDock">
-		<a class="brand" href="{{ route('board') }}">
+		<a class="brand" href="{{ route('board') }}" wire:navigate.hover>
 			<x-mark/>
 			<span class="wordmark">Dev<span>Dock</span></span>
 		</a>
 
 		<nav class="nav" aria-label="{{ __('Hoofdmenu') }}">
 			@foreach ($navigation as $route => $item)
-				<a href="{{ route($route) }}"@if (request()->routeIs($route)) aria-current="page"@endif>
+				<a href="{{ route($route) }}" wire:navigate.hover @if (request()->routeIs($route)) aria-current="page"@endif>
 					<x-icon :name="$item['icon']"/>
 					<span class="nav-label">{{ __($item['label']) }}</span>
 					@if ($item['pill'])<span class="pill" title="{{ trans_choice(':count taak is jouw beurt|:count taken zijn jouw beurt', $item['pill'], ['count' => $item['pill']]) }}">{{ $item['pill'] }}</span>@endif
@@ -73,7 +74,7 @@
 
 	<nav class="tabbar" aria-label="{{ __('Hoofdmenu') }}">
 		@foreach ($navigation as $route => $item)
-			<a href="{{ route($route) }}"@if (request()->routeIs($route)) aria-current="page"@endif>
+			<a href="{{ route($route) }}" wire:navigate.hover @if (request()->routeIs($route)) aria-current="page"@endif>
 				<x-icon :name="$item['icon']"/>{{ __($item['label']) }}
 				@if ($item['pill'])<span class="pill">{{ $item['pill'] }}</span>@endif
 			</a>
