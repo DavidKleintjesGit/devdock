@@ -1,4 +1,25 @@
-<aside class="drawer card-drawer" role="dialog" aria-labelledby="drawer-title" x-data="{ tall: $persist(false).as('devdock.chat-tall'), pendingTab: null, pendingView: null, compact: false }" :class="{ 'chat-tall': tall, switching: pendingView, 'switching-tab': pendingTab, compact }" @drawer-card.window="pendingTab = null; pendingView = null" @scroll.capture="if ($event.target.classList?.contains('dbody') && ! $el.querySelector('.composer')) compact = $event.target.scrollTop > 48 ? true : ($event.target.scrollTop < 4 ? false : compact)">
+<aside class="drawer card-drawer" role="dialog" aria-labelledby="drawer-title" x-data="{
+	tall: $persist(false).as('devdock.chat-tall'),
+	pendingTab: null,
+	pendingView: null,
+	compact: false,
+	// folds the card head away while you read further down; it only folds when the body stays scrollable without it, or folding and unfolding would trigger each other
+	follow(body) {
+		if (! body.classList?.contains('dbody') || this.$el.querySelector('.composer')) {
+			return;
+		}
+
+		if (this.compact) {
+			this.compact = body.scrollTop >= 4;
+
+			return;
+		}
+
+		const headHeight = this.$el.querySelector('.card-head')?.offsetHeight ?? 0;
+
+		this.compact = body.scrollTop > 48 && body.scrollHeight - body.clientHeight > headHeight + 48;
+	},
+}" :class="{ 'chat-tall': tall, switching: pendingView, 'switching-tab': pendingTab, compact }" @drawer-card.window="pendingTab = null; pendingView = null" @scroll.capture="follow($event.target)">
 	<div class="dbar">
 		@if ($previous)
 			<button class="back kind" type="button" wire:click="back"><x-icon name="back" small/>{{ $previous }}</button>
