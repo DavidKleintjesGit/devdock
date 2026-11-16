@@ -2,39 +2,12 @@
 	@include('partials.card.context')
 @else
 	<div class="dbody workspace" @if ($latestRound?->isRunning() || $loopStatus === \Src\Review\Enums\LoopStatusEnum::AGENT) wire:poll.3s="followProgress" @endif>
-		@if ($isExpired)
-			<div class="alert amber" style="align-items:flex-start">
-				<div class="grow" style="display:flex;flex-direction:column;gap:2px;min-width:200px">
-					<b style="font-size:15px">{{ __('Deze ronde is verlopen') }}</b>
-					<span>{{ __('Het werk veranderde nadat ronde :number klaar was.', ['number' => $latestRound->number]) }}</span>
-				</div>
-			</div>
-		@endif
-
 		<div class="review-loop">
 			<div class="loop-status">
 				<span class="sdot {{ $loopStatus->tone() }}"></span>
 				<b>{{ $loopStatus->label($latestRound?->positionInSeries() ?? 0, $maxRounds, $latestRound?->findingsSummary() ?? '') }}</b>
 				<span class="hint">{{ __('automatisch · hoogstens :max rondes', ['max' => $maxRounds]) }}</span>
 			</div>
-
-			@if ($loopStatus->needsYou())
-				<div class="reportbar amber">
-					@if ($loopStatus === \Src\Review\Enums\LoopStatusEnum::NEXT_ROUND)
-						<p class="question">{{ __('De agent meldde dat hij klaar is, maar de lenzen gingen er niet vanzelf weer over, bijvoorbeeld omdat de werkkopie nog bezig was of er niets veranderde.') }}</p>
-						<div class="reportbar-actions">
-							<button class="btn sm" type="button" wire:click="setDrawerTab('Agent')">{{ __('Naar de agent') }}</button>
-							<x-busy-button action="startRound" class="btn sm primary" :busy="__('Lenzen oproepen...')">{{ __('Volgende ronde starten') }}</x-busy-button>
-						</div>
-					@else
-					<p class="question">{{ $loopStatus === \Src\Review\Enums\LoopStatusEnum::AGENT_ASKS ? __('De agent stelde een vraag of liet bevindingen open. Geef antwoord bij de agent en start de loop daarna opnieuw.') : __('Kijk de rondes na, geef de agent aanwijzingen en start de loop opnieuw.') }}</p>
-					<div class="reportbar-actions">
-						<button class="btn sm" type="button" wire:click="setDrawerTab('Agent')">{{ __('Naar de agent') }}</button>
-						<x-busy-button action="restartLoop" class="btn sm primary" :busy="__('Lenzen oproepen...')">{{ trans_choice('Loop opnieuw starten · :count ronde|Loop opnieuw starten · :count rondes', $maxRounds, ['count' => $maxRounds]) }}</x-busy-button>
-					</div>
-					@endif
-				</div>
-			@endif
 
 			@forelse ($roundRows as $roundRow)
 				<details class="round" wire:ignore.self wire:key="round-{{ $roundRow['round']->reviewRoundId->id }}" @if ($loop->first) open @endif>

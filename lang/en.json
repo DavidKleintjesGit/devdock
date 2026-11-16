@@ -1771,5 +1771,10 @@
     "Vast in DevDock zelf: de ene regel die de lens naar zijn opdracht wijst.": "Fixed in DevDock itself: the one line that points the lens to its assignment.",
     "Ingesteld in Workflows.": "Set in Workflows.",
     "Door DevDock meegegeven.": "Given by DevDock.",
-    "Er botst iets": "Something clashes"
+    "Er botst iets": "Something clashes",
+    "De lenzen gingen er niet vanzelf weer over": "The lenses did not take another look on their own",
+    "De agent meldde dat hij klaar is, maar de werkkopie was nog bezig of er veranderde niets.": "The agent said it was done, but the working copy was still busy or nothing changed.",
+    "De agent stelde een vraag of liet bevindingen open": "The agent asked something or left findings open",
+    "Geef antwoord bij de agent en start de loop daarna opnieuw.": "Answer the agent, then start the loop again.",
+    "De loop is klaar en wacht op jou": "The loop is done and waits on you"
 }

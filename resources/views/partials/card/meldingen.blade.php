@@ -22,6 +22,30 @@
 
 	@include('partials.card.taak-balk')
 
+	@if ($tab === 'Review' && $subtab?->value !== 'lenzen')
+		@if ($loopStatus?->needsYou())
+			<div class="notice blocks">
+				<span class="notice-icon"><x-icon name="arrow" small/></span>
+				@if ($loopStatus === \Src\Review\Enums\LoopStatusEnum::NEXT_ROUND)
+					<span class="notice-text"><b>{{ __('De lenzen gingen er niet vanzelf weer over') }}</b><span>{{ __('De agent meldde dat hij klaar is, maar de werkkopie was nog bezig of er veranderde niets.') }}</span></span>
+					<button class="btn sm" type="button" wire:click="setDrawerTab('Agent')">{{ __('Naar de agent') }}</button>
+					<x-busy-button action="startRound" class="btn sm primary" :busy="__('Lenzen oproepen...')">{{ __('Volgende ronde starten') }}</x-busy-button>
+				@else
+					<span class="notice-text"><b>{{ $loopStatus === \Src\Review\Enums\LoopStatusEnum::AGENT_ASKS ? __('De agent stelde een vraag of liet bevindingen open') : __('De loop is klaar en wacht op jou') }}</b><span>{{ $loopStatus === \Src\Review\Enums\LoopStatusEnum::AGENT_ASKS ? __('Geef antwoord bij de agent en start de loop daarna opnieuw.') : __('Kijk de rondes na, geef de agent aanwijzingen en start de loop opnieuw.') }}</span></span>
+					<button class="btn sm" type="button" wire:click="setDrawerTab('Agent')">{{ __('Naar de agent') }}</button>
+					<x-busy-button action="restartLoop" class="btn sm primary" :busy="__('Lenzen oproepen...')">{{ trans_choice('Loop opnieuw starten · :count ronde|Loop opnieuw starten · :count rondes', $maxRounds, ['count' => $maxRounds]) }}</x-busy-button>
+				@endif
+			</div>
+		@endif
+
+		@if ($isExpired)
+			<div class="notice blocks">
+				<span class="notice-icon"><x-icon name="alert" small/></span>
+				<span class="notice-text"><b>{{ __('Deze ronde is verlopen') }}</b><span>{{ __('Het werk veranderde nadat ronde :number klaar was.', ['number' => $latestRound->number]) }}</span></span>
+			</div>
+		@endif
+	@endif
+
 	@if ($tab === 'Overzicht')
 		<div class="notice {{ $nextStep['tone'] }}">
 			<span class="notice-icon"><x-icon name="arrow" small/></span>
