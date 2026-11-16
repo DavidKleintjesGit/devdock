@@ -81,7 +81,7 @@
 		<div class="skeleton-page">
 			@if ($worktree)
 				<div class="skeleton-workspace">
-					<div @class(['panel-grid', 'fill-grid', 'changes-grid' => $worktree->changedFiles > 0])>
+					<div @class(['panel-grid', 'equal-grid', 'changes-grid' => $worktree->changedFiles > 0])>
 						<div class="bone-panel">
 							<div class="bone-head"><span class="bone line" style="width:90px"></span><span class="grow"></span><span class="bone line" style="width:280px;height:30px;border-radius:9px"></span></div>
 							<div class="bone-body"><span class="bone line" style="width:62%"></span></div>
@@ -90,9 +90,9 @@
 							@endforeach
 						</div>
 						@if ($worktree->changedFiles > 0)
-							<div class="bone-panel fit">
+							<div class="bone-panel">
 								<div class="bone-head"><span class="bone line" style="width:70px"></span><span class="grow"></span><span class="bone line" style="width:130px"></span></div>
-								<div class="bone-body"><span class="bone line" style="width:24%"></span><span class="bone block" style="height:40px"></span><span class="bone line" style="width:28%;margin-top:6px"></span><span class="bone block" style="height:176px"></span></div>
+								<div class="bone-body"><span class="bone line" style="width:24%"></span><span class="bone block" style="height:40px"></span><span class="bone line" style="width:28%;margin-top:6px"></span><span class="bone block grow" style="min-height:120px"></span></div>
 							</div>
 						@endif
 					</div>
