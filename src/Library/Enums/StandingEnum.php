@@ -45,6 +45,16 @@ enum StandingEnum: string
 	}
 
 	/**
+	 * Whether bringing the project up to date writes this file: a file that is
+	 * behind or missing takes the newest version, a file changed in the project
+	 * is left for you to compare first.
+	 */
+	public function isUpdatedFromLibrary(): bool
+	{
+		return $this === self::BEHIND || $this === self::MISSING;
+	}
+
+	/**
 	 * Whether this file asks for something to be done.
 	 */
 	public function deviates(): bool

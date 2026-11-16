@@ -54,7 +54,7 @@
 
 			@foreach ($groups as $group)
 				<section class="section" wire:key="group-{{ $group['library']->id }}">
-					<div class="section-head"><h2>{{ __('Uit :library', ['library' => $group['library']->name]) }}</h2><span class="note">{{ __(':present van de :total', ['present' => $group['present'], 'total' => $group['standings']->count()]) }}{{ $group['deviating'] ? ' · ' . trans_choice(':count wijkt af|:count wijken af', $group['deviating'], ['count' => $group['deviating']]) : '' }}</span></div>
+					<div class="section-head"><h2>{{ __('Uit :library', ['library' => $group['library']->name]) }}</h2><span class="note">{{ __(':present van de :total', ['present' => $group['present'], 'total' => $group['standings']->count()]) }}{{ $group['deviating'] ? ' · ' . trans_choice(':count wijkt af|:count wijken af', $group['deviating'], ['count' => $group['deviating']]) : '' }}</span>@if ($group['updatable'] > 0)<x-busy-button action="updateAllFromLibrary({{ $group['library']->id }})" class="btn sm primary" :busy="__('Bijwerken...')">{{ trans_choice(':count bijwerken|Alle :count bijwerken', $group['updatable'], ['count' => $group['updatable']]) }}</x-busy-button>@endif</div>
 					<div class="list">
 						@foreach ($group['standings'] as $standing)
 							<button @class(['frow', 'warm' => $standing->standing->deviates()]) type="button" wire:click="openFile('{{ $standing->path }}')" wire:key="st-{{ $standing->item->id }}" @disabled(! $standing->isPresent())>

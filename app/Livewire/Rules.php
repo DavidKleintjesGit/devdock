@@ -186,6 +186,25 @@ class Rules extends Component
 	}
 
 	/**
+	 * Puts the newest version of every rule of the library that is behind or
+	 * missing in the project down there. What stood there is kept first.
+	 */
+	public function updateAllFromLibrary(int $library): void
+	{
+		$libraryEntity = collect(GetLibrariesAction::execute())->first(fn (LibraryEntity $libraryEntity) => $libraryEntity->id === $library);
+
+		if ($libraryEntity === null || $this->project === '') {
+			return;
+		}
+
+		$written = collect(GetStandingsAction::execute($libraryEntity, [$this->project]))
+			->filter(fn (StandingObject $standingObject) => $standingObject->item->kind === LibraryItemKindEnum::RULE && $standingObject->standing->isUpdatedFromLibrary())
+			->sum(fn (StandingObject $standingObject) => RollOutAction::execute($standingObject->item, [$this->project]));
+
+		$this->libraryDone = trans_choice(':count regel bijgewerkt vanuit :library. Committen doe je zelf.|:count regels bijgewerkt vanuit :library. Committen doe je zelf.', $written, ['count' => $written, 'library' => $libraryEntity->name]);
+	}
+
+	/**
 	 * Puts the newest library version over the open file of the project.
 	 */
 	public function updateFile(): void
@@ -422,6 +441,7 @@ class Rules extends Component
 				'standings' => $standings,
 				'present' => $standings->reject(fn (StandingObject $standingObject) => $standingObject->standing === StandingEnum::MISSING)->count(),
 				'deviating' => $standings->filter(fn (StandingObject $standingObject) => $standingObject->standing->deviates())->count(),
+				'updatable' => $standings->filter(fn (StandingObject $standingObject) => $standingObject->standing->isUpdatedFromLibrary())->count(),
 			];
 		});
 
