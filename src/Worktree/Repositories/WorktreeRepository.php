@@ -1832,6 +1832,11 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		[$behind, $aheadOfMain] = array_map('intval', preg_split('/\s+/', trim($sides->output())) ?: [0, 0]) + [0, 0];
 		$lastCommit = $this->lastCommitAt($path);
 
+		// git status also lists a file whose only change is its line endings; the count follows the content, as the list of changes does
+		if ($changedFiles > 0) {
+			$changedFiles = count($this->readChangesSince($path, 'HEAD'));
+		}
+
 		return [
 			'changed_files' => $changedFiles,
 
