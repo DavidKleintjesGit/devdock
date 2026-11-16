@@ -15,6 +15,7 @@ class Ticket extends Model
 		'status',
 		'type',
 		'priority',
+		'labels',
 		'sprint',
 		'sprint_ends_at',
 		'url',
@@ -24,6 +25,7 @@ class Ticket extends Model
 	protected function casts(): array
 	{
 		return [
+			'labels' => 'array',
 			'changed_at' => 'immutable_datetime',
 			'sprint_ends_at' => 'immutable_datetime',
 		];

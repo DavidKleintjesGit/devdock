@@ -29,6 +29,11 @@ return [
 		// Jira Cloud keeps the sprint in a custom field whose id differs per site;
 		// left empty, DevDock looks it up itself
 		'sprint_field' => env('JIRA_SPRINT_FIELD'),
+
+		// a ticket without a branch finds its project through its Jira label: a
+		// label carrying the project's name links by itself (PartnerPortal finds
+		// partner.consumind); a label that does not goes here, as label => project
+		'label_projects' => [],
 	],
 
 	'bitbucket' => [

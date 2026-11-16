@@ -40,6 +40,8 @@ use Src\Task\Objects\TaskEntity;
 use Src\Ticket\Actions\GetTicketsAction;
 use Src\Ticket\Objects\TicketEntity;
 use Src\Ticket\Objects\TicketKey;
+use Src\Ticket\Objects\TicketProjectFactsObject;
+use Src\Ticket\Policies\TicketProjectPolicy;
 use Src\Worktree\Actions\GetWorktreesAction;
 use Src\Worktree\Contracts\BranchStandingRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
@@ -98,6 +100,13 @@ class BuildBoardAction extends Command
 	/** @var Collection<string, ProjectEntity> */
 	private Collection $projectsByName;
 
+	/**
+	 * The project each ticket without a branch or pull request belongs to, by its labels.
+	 *
+	 * @var array<string, ?string>
+	 */
+	private array $projectsByTicket = [];
+
 	/** @var array<string, array<string, CarbonImmutable>> */
 	private array $seenAt = [];
 
@@ -126,6 +135,7 @@ class BuildBoardAction extends Command
 			->values();
 
 		$this->projectsByName = $projectEntities->keyBy('name');
+		$this->projectsByTicket = $this->projectsByTicket($projectEntities);
 		$this->seenAt = resolve(CardViewRepositoryContract::class)->getSeenAt();
 		$this->readUntil = resolve(CardViewRepositoryContract::class)->getReadUntil();
 		$this->finishedTurns = resolve(PromptRunRepositoryContract::class)->getFinishedSince($this->readUntil);
@@ -328,7 +338,8 @@ class BuildBoardAction extends Command
 		$project = $taskEntity?->project()
 			?? $this->projectNameFor($pullRequestEntities->first()?->repository)
 			?? $projectEntity?->name
-			?? $workingCopy?->project;
+			?? $workingCopy?->project
+			?? ($ticketEntity === null ? null : $this->projectsByTicket[$ticketEntity->key] ?? null);
 		$sessionEntities = $this->sessionsFor($key, $branch);
 		$worktreeEntity = $this->worktreeFor($project, $branch);
 		$latestRound = $this->roundsByCard[$key] ?? null;
@@ -804,6 +815,27 @@ class BuildBoardAction extends Command
 		}
 
 		return $pinned;
+	}
+
+	/**
+	 * The project per ticket, read off its Jira labels, so a ticket you have not
+	 * started on still lands with its project.
+	 *
+	 * @param  Collection<int, ProjectEntity>  $projectEntities
+	 * @return array<string, ?string>
+	 */
+	private function projectsByTicket(Collection $projectEntities): array
+	{
+		$projectNames = $projectEntities->pluck('name')->values()->all();
+		$labelProjects = (array) config('devdock.jira.label_projects');
+
+		return $this->ticketsByKey
+			->map(fn (TicketEntity $ticketEntity): ?string => resolve(TicketProjectPolicy::class)->decide(new TicketProjectFactsObject(
+				labels: $ticketEntity->labels,
+				projectNames: $projectNames,
+				labelProjects: $labelProjects,
+			))->project)
+			->all();
 	}
 
 	/**

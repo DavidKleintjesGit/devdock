@@ -17,6 +17,8 @@
 					:options="$projectOptions"
 					:selected="$projects"
 					:total="$projectTotal"
+					:without-project="$withoutProject"
+					:without-project-count="$withoutProjectCount"
 					:query="$projectQuery"
 					query-property="projectQuery"
 					toggle="toggleProject"

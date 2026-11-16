@@ -19,6 +19,8 @@ class TicketObject extends ValueObject
 		public readonly ?string $status,
 		public readonly ?string $type,
 		public readonly ?string $priority,
+		/** @var list<string> */
+		public readonly array $labels,
 		public readonly ?string $sprint,
 		public readonly ?CarbonImmutable $sprintEndsAt,
 		public readonly ?string $url,
@@ -39,6 +41,7 @@ class TicketObject extends ValueObject
 			status: $fields['status']['name'] ?? null,
 			type: $fields['issuetype']['name'] ?? null,
 			priority: $fields['priority']['name'] ?? null,
+			labels: array_values(array_map('strval', (array) ($fields['labels'] ?? []))),
 			sprint: $sprint['name'] ?? null,
 			sprintEndsAt: isset($sprint['endDate']) ? CarbonImmutable::parse($sprint['endDate']) : null,
 			url: $data['url'] ?? null,

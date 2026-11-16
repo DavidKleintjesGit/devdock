@@ -370,8 +370,17 @@ button.row{width:100%;border:0;background:transparent;text-align:left;cursor:poi
 .picker-search{display:flex;align-items:center;gap:10px;height:50px;flex:none;padding:0 14px;border-bottom:1px solid var(--line);color:var(--muted)}
 .picker-search input{border:0;outline:0;background:transparent;width:100%;min-width:0;font-size:14px;color:var(--fg)}
 .picker-list{list-style:none;margin:0;padding:6px;max-height:min(380px,55vh);overflow-y:auto;overscroll-behavior:contain}
-.popt{display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:center;gap:10px;min-height:38px;padding:0 10px;border-radius:8px;cursor:pointer}
+.picker-top{display:flex;align-items:center;gap:4px;padding-right:8px;border-bottom:1px solid var(--line)}
+.picker-top .picker-search{flex:1;min-width:0;border-bottom:0}
+.picker-top .btn{width:auto;min-height:0;flex:none}
+.picker-list .popt .only{width:auto;min-height:0}
+.popt{display:grid;grid-template-columns:16px minmax(0,1fr) auto auto;align-items:center;gap:10px;min-height:38px;padding:0 10px;border-radius:8px;cursor:pointer}
 .popt:hover{background:var(--sunken)}
+/* alleen dit: verschijnt op de regel waar de muis staat, en op een telefoon altijd */
+.popt .only{visibility:hidden;height:26px;padding:0 8px;border:0;border-radius:7px;background:var(--surface);color:var(--accent);font-size:12px;cursor:pointer}
+.popt:hover .only,.popt .only:focus-visible{visibility:visible}
+.popt .only:hover{background:var(--accent-soft);color:var(--accent-ink)}
+@media (hover:none){.popt .only{visibility:visible}}
 .popt .chk{color:var(--accent);display:flex}
 .popt .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .popt[aria-selected="true"] .nm{font-weight:600;color:var(--accent-ink)}

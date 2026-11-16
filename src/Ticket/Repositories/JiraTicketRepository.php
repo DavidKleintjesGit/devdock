@@ -37,7 +37,7 @@ class JiraTicketRepository implements TicketSourceRepositoryContract
 		do {
 			$result = $this->client()->get('/rest/api/3/search/jql', array_filter([
 				'jql' => 'assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC',
-				'fields' => 'summary,description,status,issuetype,priority,updated' . ($sprintField === null ? '' : ',' . $sprintField),
+				'fields' => 'summary,description,status,issuetype,priority,labels,updated' . ($sprintField === null ? '' : ',' . $sprintField),
 				'maxResults' => 100,
 				'nextPageToken' => $nextPageToken,
 			]));

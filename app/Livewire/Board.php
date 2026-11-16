@@ -266,11 +266,7 @@ class Board extends Component
 			->filter(fn (CardObject $card) => $card->column === BoardColumnEnum::LATER
 				? $this->showBacklog
 				: in_array($card->column->value, $this->shownColumns, true))
-			// filter je op een project, dan hoort een taak zonder project er niet
-			// bij: die hoort nergens bij
-			->when($this->hasProjectFilter(), fn (Collection $all) => $all->filter(
-				fn (CardObject $card) => in_array($card->project, $this->projects, true),
-			))
+			->filter(fn (CardObject $card) => $this->showsProject($card->project))
 			->when(filled($this->query), fn (Collection $all) => $all->filter(
 				fn (CardObject $card) => $card->matches($this->query),
 			))
@@ -331,7 +327,7 @@ class Board extends Component
 
 				return [
 					'case' => $column,
-					'total' => $cardObjects->filter(fn (CardObject $card) => $card->column === $column)->count(),
+					'total' => $cards->count(),
 					'yours' => $cards->filter(fn (CardObject $card) => $card->isYourTurn())->count(),
 					'conflicts' => $cards->filter(fn (CardObject $card) => $card->hasConflict())->count(),
 					'cards' => $limit === null ? $cards : $cards->take($limit),
@@ -354,6 +350,7 @@ class Board extends Component
 			'shownCount' => collect(BoardColumnEnum::sprint())->filter(fn (BoardColumnEnum $column) => in_array($column->value, $this->shownColumns, true))->count(),
 			'projectOptions' => $this->projectOptions($this->countsByProject($cardObjects)),
 			'projectTotal' => $cardObjects->count(),
+			'withoutProjectCount' => $cardObjects->filter(fn (CardObject $card) => $card->project === null)->count(),
 			'signals' => $this->signals($this->inView($cardObjects)),
 			'allProjectNames' => GetProjectsAction::execute()->pluck('name')->sort()->values(),
 			'backlogCount' => $cardObjects->filter(fn (CardObject $card) => $card->column === BoardColumnEnum::LATER)->count(),

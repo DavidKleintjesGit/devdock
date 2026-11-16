@@ -12,26 +12,53 @@ use Src\Project\Actions\GetWorkProjectsAction;
  * The project choice is one for the whole board: pick projects on the board
  * and the sessions, the rules and the skills show that same selection. That
  * is why it lives in the session and not per page.
+ *
+ * No choice at all shows everything; an empty choice shows only what has no
+ * project, or nothing when that is switched off too.
  */
 trait WithProjectFilter
 {
-	/** @var array<int, string> */
-	public array $projects = [];
+	/** @var array<int, string>|null */
+	public ?array $projects = null;
+
+	/**
+	 * Whether a task without a project stays in view while you filter on projects.
+	 */
+	public bool $withoutProject = true;
 
 	public string $projectQuery = '';
 
 	public function mountWithProjectFilter(): void
 	{
-		$this->projects = session('devdock.projects', $this->workProjectNames());
-		session(['devdock.projects' => $this->projects]);
+		$this->projects = session()->has('devdock.project-choice')
+			? session('devdock.project-choice')
+			: $this->workProjectNames();
+		$this->withoutProject = (bool) session('devdock.without-project', true);
+		$this->remember();
 	}
 
 	public function toggleProject(string $project): void
 	{
-		$this->projects = in_array($project, $this->projects, true)
-			? array_values(array_diff($this->projects, [$project]))
-			: [...$this->projects, $project];
+		$projects = $this->projects ?? [];
 
+		$this->projects = in_array($project, $projects, true)
+			? array_values(array_diff($projects, [$project]))
+			: [...$projects, $project];
+
+		$this->remember();
+	}
+
+	public function onlyProject(string $project): void
+	{
+		$this->projects = [$project];
+		$this->withoutProject = false;
+		$this->remember();
+	}
+
+	public function toggleWithoutProject(): void
+	{
+		$this->projects ??= [];
+		$this->withoutProject = ! $this->withoutProject;
 		$this->remember();
 	}
 
@@ -43,7 +70,14 @@ trait WithProjectFilter
 
 	public function clearProjects(): void
 	{
+		$this->projects = null;
+		$this->remember();
+	}
+
+	public function deselectProjects(): void
+	{
 		$this->projects = [];
+		$this->withoutProject = false;
 		$this->remember();
 	}
 
@@ -87,12 +121,24 @@ trait WithProjectFilter
 		return array_map(fn (string $name) => [
 			'label' => __('Project: :name', ['name' => $name]),
 			'filter' => 'project:' . $name,
-		], $this->projects);
+		], $this->projects ?? []);
 	}
 
 	protected function hasProjectFilter(): bool
 	{
-		return $this->projects !== [];
+		return $this->projects !== null;
+	}
+
+	/**
+	 * Whether something with this project stays in view under the current choice.
+	 */
+	protected function showsProject(?string $project): bool
+	{
+		if ($this->projects === null) {
+			return true;
+		}
+
+		return $project === null ? $this->withoutProject : in_array($project, $this->projects, true);
 	}
 
 	/**
@@ -108,6 +154,9 @@ trait WithProjectFilter
 
 	private function remember(): void
 	{
-		session(['devdock.projects' => $this->projects]);
+		session([
+			'devdock.project-choice' => $this->projects,
+			'devdock.without-project' => $this->withoutProject,
+		]);
 	}
 }

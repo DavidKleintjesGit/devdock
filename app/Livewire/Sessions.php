@@ -156,9 +156,7 @@ class Sessions extends Component
 	private function shown(Collection $all, array $traitsByUuid): Collection
 	{
 		return $all
-			->when($this->hasProjectFilter(), fn (Collection $items) => $items->filter(
-				fn (SessionEntity $sessionEntity) => in_array($sessionEntity->project, $this->projects, true),
-			))
+			->filter(fn (SessionEntity $sessionEntity) => $this->showsProject($sessionEntity->project))
 			->when(filled($this->query), fn (Collection $items) => $items->filter(
 				fn (SessionEntity $sessionEntity) => $sessionEntity->matches($this->query),
 			))

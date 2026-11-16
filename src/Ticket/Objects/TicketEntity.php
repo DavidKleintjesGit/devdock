@@ -20,6 +20,8 @@ class TicketEntity extends ValueObject
 		public readonly ?string $status,
 		public readonly ?string $type,
 		public readonly ?string $priority,
+		/** @var list<string> */
+		public readonly array $labels,
 		public readonly ?string $sprint,
 		public readonly ?CarbonImmutable $sprintEndsAt,
 		public readonly ?string $url,

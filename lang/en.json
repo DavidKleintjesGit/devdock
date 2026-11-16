@@ -1713,5 +1713,12 @@
     "Wat deze lens leest in de laatste ronde, met wie het nog meer krijgt.": "What this lens reads in the latest round, with who else is given it.",
     "Wat de agent bij elk bericht leest, met wie het nog meer krijgt.": "What the agent reads with every message, with who else is given it.",
     "lens": "lens",
-    "allebei": "both"
+    "allebei": "both",
+    "Zonder project": "Without project",
+    "Niets": "Nothing",
+    "Alles uitzetten": "Clear all",
+    "Alleen dit": "Only this",
+    "Gekoppeld via een label uit de instellingen": "Linked through a label from the settings",
+    "Gekoppeld via het Jira-label": "Linked through the Jira label",
+    "Het label past bij meer dan één project": "The label fits more than one project"
 }
