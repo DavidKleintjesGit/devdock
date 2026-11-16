@@ -1,6 +1,8 @@
 <div class="page fixed">
 	@if ($hasRunningTask)
 		<span hidden wire:key="follow-tasks" wire:poll.4s></span>
+	@else
+		<span hidden wire:key="follow-board" wire:poll.10s="followBoard"></span>
 	@endif
 	<header class="head">
 		<div class="head-inner">

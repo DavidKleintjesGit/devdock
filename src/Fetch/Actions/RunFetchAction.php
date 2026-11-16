@@ -123,7 +123,7 @@ class RunFetchAction extends Command
 		// the board the open pages redraw with once the round is done lies ready
 		// for them; it is built after the round is marked finished, since that changes it too
 		try {
-			GetBoardAction::execute();
+			GetBoardAction::execute(true);
 			// the traits of the sessions ask git about every project; a page reads them ready
 			GetSessionTraitsAction::execute(true);
 

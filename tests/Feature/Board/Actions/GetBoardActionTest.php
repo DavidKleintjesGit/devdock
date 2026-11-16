@@ -33,7 +33,7 @@ class GetBoardActionTest extends TestCase
 	{
 		Todo::factory()->create();
 		GetBoardAction::execute();
-		Cache::put('board.cards', ['version' => Cache::get('board.cards')['version'], 'board' => serialize(CardObjectCollection::fromArray([]))]);
+		Cache::put('board.cards', [...Cache::get('board.cards'), 'board' => serialize(CardObjectCollection::fromArray([]))]);
 
 		$cardObjectCollection = GetBoardAction::execute();
 
@@ -46,7 +46,7 @@ class GetBoardActionTest extends TestCase
 	{
 		Todo::factory()->create();
 		GetBoardAction::execute();
-		Cache::put('board.cards', ['version' => Cache::get('board.cards')['version'], 'board' => serialize(CardObjectCollection::fromArray([]))]);
+		Cache::put('board.cards', [...Cache::get('board.cards'), 'board' => serialize(CardObjectCollection::fromArray([]))]);
 		$todo = Todo::factory()->create();
 
 		$cardObjectCollection = GetBoardAction::execute();
@@ -59,7 +59,7 @@ class GetBoardActionTest extends TestCase
 	{
 		$todo = Todo::factory()->create();
 		GetBoardAction::execute();
-		Cache::put('board.cards', ['version' => Cache::get('board.cards')['version'], 'board' => serialize(new stdClass())]);
+		Cache::put('board.cards', [...Cache::get('board.cards'), 'board' => serialize(new stdClass())]);
 
 		$cardObjectCollection = GetBoardAction::execute();
 

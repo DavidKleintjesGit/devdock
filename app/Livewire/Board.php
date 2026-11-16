@@ -47,6 +47,19 @@ class Board extends Component
 	 */
 	private ?Collection $cardObjects = null;
 
+	/** When the board this page shows was built. */
+	public float $builtAt = 0;
+
+	/**
+	 * Draws the board again once a newer one was built on the side; otherwise the page stays as it is.
+	 */
+	public function followBoard(): void
+	{
+		if (GetBoardAction::builtAt() <= $this->builtAt) {
+			$this->skipRender();
+		}
+	}
+
 	#[Session(key: 'devdock.board.query')]
 	public string $query = '';
 
@@ -338,6 +351,7 @@ class Board extends Component
 	public function render(): View
 	{
 		$cardObjects = $this->board();
+		$this->builtAt = GetBoardAction::builtAt();
 		$visible = $this->visible($cardObjects);
 
 		$columns = collect(BoardColumnEnum::cases())
