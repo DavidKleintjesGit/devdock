@@ -1,10 +1,15 @@
 <div class="notices">
 	@if ($failure)
+		<x-notice property="failure" tone="failed">{{ $failure }}</x-notice>
+	@elseif ($setupRefusal)
 		<div class="notice failed" role="alert">
 			<span class="notice-icon"><x-icon name="alert" small/></span>
-			<span class="notice-text"><b>{{ $failure }}</b></span>
-			<button class="icon-btn" type="button" wire:click="clearFailure" aria-label="{{ __('Melding weg') }}"><x-icon name="x" small/></button>
+			<span class="notice-text"><b>{{ __('Klaarzetten lukte niet') }}</b><span>{{ __('Bij stap 2 staat wat er misging en wat je kunt doen.') }}</span></span>
 		</div>
+	@endif
+
+	@if ($committed)
+		<x-notice property="committed">{{ $committed }}</x-notice>
 	@endif
 
 	@if ($card->hasUnreadQuestion && $tab !== 'Agent')

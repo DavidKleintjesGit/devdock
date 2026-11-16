@@ -1,13 +1,4 @@
 <div class="dbody">
-	@if ($setupRefusal)
-		<div class="notice failed" role="alert">
-			<span class="notice-icon"><x-icon name="alert" small/></span>
-			<span class="notice-text"><b>{{ __('Klaarzetten lukte niet') }}</b><span>{{ __('Bij stap 2 staat wat er misging en wat je kunt doen.') }}</span></span>
-		</div>
-	@elseif ($failure)
-		<div class="alert red dfail"><x-icon name="alert" small/><span class="grow">{{ $failure }}</span></div>
-	@endif
-
 	<section class="dsec">
 		<div class="list">
 			@foreach ($setupSteps as $setupStep)

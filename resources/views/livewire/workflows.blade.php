@@ -64,6 +64,10 @@
 			</div>
 		</header>
 
+		@if ($saved)
+			<x-notice property="saved">{{ $saved }}</x-notice>
+		@endif
+
 		@if ($view === 'context')
 			<main class="pbody">
 				@include('partials.workflow-context')
@@ -71,10 +75,6 @@
 		@else
 		<main class="pbody">
 			<div class="stack">
-				@if ($saved)
-					<div class="alert green"><x-icon name="check" small/><span class="grow">{{ $saved }}</span></div>
-				@endif
-
 				@if (! $isStandard && $check['broken'] > 0)
 					<div class="alert">
 						<x-icon name="alert" small/>

@@ -56,7 +56,10 @@
 
 	<div class="page">
 		@if ($libraryDone)
-			<div class="alert green" style="margin:16px 44px 0;max-width:1000px"><x-icon name="check" small/><span class="grow">{{ $libraryDone }}</span><button class="icon-btn" type="button" style="width:26px;height:26px" wire:click="$set('libraryDone', null)" aria-label="{{ __('Melding weg') }}"><x-icon name="x" small/></button></div>
+			<x-notice property="libraryDone">{{ $libraryDone }}</x-notice>
+		@endif
+		@if ($libraryFailure)
+			<x-notice property="libraryFailure" tone="failed">{{ $libraryFailure }}</x-notice>
 		@endif
 
 		@switch ($page['kind'])

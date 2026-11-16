@@ -431,11 +431,6 @@ class Drawer extends Component
 	 * Hands this delivery to the lenses. Only the ones whose paths are touched
 	 * are called; the round holds for the commit it runs on.
 	 */
-	public function clearFailure(): void
-	{
-		$this->failure = null;
-	}
-
 	/**
 	 * Repairs one open point of the checklist of this card's working copy, or
 	 * all of them, in a process of its own.

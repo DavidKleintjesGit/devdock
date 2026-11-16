@@ -71,6 +71,8 @@ trait WithLibraries
 
 	public ?string $libraryDone = null;
 
+	public ?string $libraryFailure = null;
+
 	abstract protected function libraryKind(): LibraryItemKindEnum;
 
 	public function openLibraryItem(int $libraryId, string $name): void
@@ -199,12 +201,13 @@ trait WithLibraries
 	public function syncLibrary(int $libraryId): void
 	{
 		$libraryEntity = resolve(LibraryRepositoryContract::class)->getById($libraryId);
+		$this->libraryFailure = null;
 
 		try {
 			$added = $libraryEntity === null ? 0 : ImportFolderAction::execute($libraryId, $libraryEntity->folder, $libraryEntity->skillsFolder)
 				+ ($libraryEntity->repository === null && $libraryEntity->skillsRepository === null ? 0 : ImportRepositoryAction::execute($libraryId));
 		} catch (RuntimeException $failure) {
-			$this->libraryDone = __('De repository is nu niet te lezen: :reason', ['reason' => $failure->getMessage()]);
+			$this->libraryFailure = __('De repository is nu niet te lezen: :reason', ['reason' => $failure->getMessage()]);
 
 			return;
 		}

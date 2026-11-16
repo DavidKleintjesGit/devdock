@@ -1,8 +1,4 @@
 <div class="dbody workspace">
-	@if ($committed)
-		<div class="alert green dfail"><x-icon name="check" small/><span>{{ $committed }}</span></div>
-	@endif
-
 	<div @class(['panel-grid', 'fill-grid', 'changes-grid' => $changeCount > 0])>
 		<x-panel :title="__('Wijzigingen')">
 			<x-slot:actions>
