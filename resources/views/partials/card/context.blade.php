@@ -32,7 +32,7 @@
 									@if ($source['file']->tab) wire:click="setDrawerTab('{{ $source['file']->tab }}')" @else wire:click="openContextFile('{{ $source['file']->key }}')" @endif
 									@if ($contextOpen?->key === $source['file']->key) aria-current="true" @endif>
 									<x-icon name="file" small/>
-									<span class="grow"><span class="name">{{ $source['name'] }}</span></span>
+									<span class="grow"><span class="name" title="{{ $source['name'] }}">{{ $source['name'] }}</span></span>
 									@if ($source['audience']->value === 'both')
 										<span class="audience">{{ __('gedeeld') }}</span>
 									@elseif ($source['own'])
