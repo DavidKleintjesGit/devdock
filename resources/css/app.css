@@ -717,6 +717,11 @@ button.row{width:100%;border:0;background:transparent;text-align:left;cursor:poi
 .tab-skeleton{background:var(--workspace,var(--surface))}
 .skeleton-workspace{flex:1;display:flex;flex-direction:column;gap:14px;padding:16px 24px 20px;background:var(--workspace);overflow:hidden}
 .skeleton-workspace.fill>.bone-panel{flex:1;min-height:0}
+.skeleton-page{flex:1;min-height:0;display:flex;flex-direction:column}
+.fill-grid>.bone-panel{min-height:0}
+.fill-grid>.bone-panel.fit{align-self:start}
+.bone-foot .bone{display:block;background:var(--sunken);border-radius:6px;animation:bone 1.4s ease-in-out infinite}
+.bone-foot .bone.line{height:10px}
 .skeleton-chat{flex:1;display:flex;flex-direction:column;min-height:0;background:var(--surface)}
 .skeleton-chat>.skeleton{flex:1}
 .bone-composer .composer-box{display:flex;flex-direction:column}

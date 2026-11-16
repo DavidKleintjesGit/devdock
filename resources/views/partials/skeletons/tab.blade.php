@@ -78,20 +78,33 @@
 	</template>
 
 	<template x-if="['Werkkopie', 'Werkkopie:wijzigingen'].includes(pendingView)">
-		<div class="skeleton-workspace">
-			<div class="panel-grid changes-grid">
-				<div class="bone-panel">
-					<div class="bone-head"><span class="bone line" style="width:90px"></span><span class="grow"></span><span class="bone line" style="width:220px;height:28px;border-radius:9px"></span></div>
-					<div class="bone-body"><span class="bone line" style="width:70%"></span></div>
-					@foreach ([1, 2, 3, 4] as $row)
-						<span class="bone-row"><span class="bone dot"></span><span class="bone line grow"></span><span class="bone line" style="width:48px"></span></span>
-					@endforeach
+		<div class="skeleton-page">
+			@if ($worktree)
+				<div class="skeleton-workspace">
+					<div @class(['panel-grid', 'fill-grid', 'changes-grid' => $worktree->changedFiles > 0])>
+						<div class="bone-panel">
+							<div class="bone-head"><span class="bone line" style="width:90px"></span><span class="grow"></span><span class="bone line" style="width:280px;height:30px;border-radius:9px"></span></div>
+							<div class="bone-body"><span class="bone line" style="width:62%"></span></div>
+							@foreach ([[34, 52], [28, 18], [40, 60], [36, 44]] as [$name, $folder])
+								<span class="bone-row">@if ($worktree->changedFiles > 0)<span class="bone dot"></span>@endif<span class="grow bone-stack"><span class="bone line" style="width:{{ $name }}%"></span><span class="bone line" style="width:{{ $folder }}%;height:8px"></span></span><span class="bone line" style="width:44px"></span><span class="bone dot" style="width:10px;height:10px"></span></span>
+							@endforeach
+						</div>
+						@if ($worktree->changedFiles > 0)
+							<div class="bone-panel fit">
+								<div class="bone-head"><span class="bone line" style="width:70px"></span><span class="grow"></span><span class="bone line" style="width:130px"></span></div>
+								<div class="bone-body"><span class="bone line" style="width:24%"></span><span class="bone block" style="height:40px"></span><span class="bone line" style="width:28%;margin-top:6px"></span><span class="bone block" style="height:176px"></span></div>
+							</div>
+						@endif
+					</div>
 				</div>
-				<div class="bone-panel">
-					<div class="bone-head"><span class="bone line" style="width:70px"></span></div>
-					<div class="bone-body"><span class="bone line" style="width:30%"></span><span class="bone block" style="height:40px"></span><span class="bone line" style="width:30%"></span><span class="bone block" style="height:110px"></span></div>
+				<div class="dfoot bone-foot"><span class="bone line" style="width:180px"></span><span class="grow"></span><span class="bone line" style="width:150px;height:38px;border-radius:10px"></span></div>
+			@else
+				<div class="skeleton-workspace">
+					<div class="bone-panel">
+						<div class="bone-body"><span class="bone line" style="width:30%;height:14px"></span><span class="bone line" style="width:72%"></span></div>
+					</div>
 				</div>
-			</div>
+			@endif
 		</div>
 	</template>
 
