@@ -95,6 +95,7 @@ class CheckReadinessAction extends Command
 		);
 
 		$databaseChecks = $projectKind->isLaravel() ? $this->databases($worktreeDatabaseRepository, $projectEntity->path, $worktreeEntity->path) : [];
+		$isRebasing = $this->acceptsRebase && $workingCopyStateObject->operationInProgress === 'rebase';
 
 		// artisan only runs on packages of its own, and the database of the project is never counted
 		$canCountMigrations = $workingCopyStateObject->hasVendorAutoload
@@ -111,10 +112,10 @@ class CheckReadinessAction extends Command
 			$projectKind->assetManifest() === null ? null : $this->assets($projectKind, $workingCopyStateObject),
 			$projectKind->isLaravel() ? $this->appKey($workingCopyStateObject) : null,
 			...$databaseChecks,
-			$projectKind->isLaravel() ? $this->migrations($workingCopyStateRepository, $worktreeEntity->path, $canCountMigrations) : null,
+			$projectKind->isLaravel() ? $this->migrations($workingCopyStateRepository, $worktreeEntity->path, $canCountMigrations, isRebasing: $isRebasing) : null,
 			// a test database of its own falls behind like the other one, and then the tests of an agent or lens stop at once
 			$projectKind->isLaravel() && ($databaseChecks[1] ?? null)?->isReady() === true && $worktreeDatabaseRepository->describeTesting($projectEntity->path, $worktreeEntity->path) !== null
-				? $this->migrations($workingCopyStateRepository, $worktreeEntity->path, $canCountMigrations, isTesting: true)
+				? $this->migrations($workingCopyStateRepository, $worktreeEntity->path, $canCountMigrations, isTesting: true, isRebasing: $isRebasing)
 				: null,
 			$projectKind->isLaravel() && $workingCopyStateObject->needsStorageLink ? $this->storageLink($workingCopyStateObject) : null,
 			$this->site($workingCopyRepository, $worktreeEntity, $workingCopyStateObject),
@@ -299,11 +300,16 @@ class CheckReadinessAction extends Command
 		];
 	}
 
-	private function migrations(WorkingCopyStateRepositoryContract $workingCopyStateRepository, string $path, bool $canCount, bool $isTesting = false): SetupCheckObject
+	private function migrations(WorkingCopyStateRepositoryContract $workingCopyStateRepository, string $path, bool $canCount, bool $isTesting = false, bool $isRebasing = false): SetupCheckObject
 	{
 		$key = self::MIGRATIONS_KEY . ($isTesting ? 'testing.' : '') . md5(self::normalize($path));
 		$fingerprint = $this->migrationsFingerprint($path, $isTesting ? '.env.testing' : '.env');
 		$setupCheck = $isTesting ? SetupCheckEnum::TEST_MIGRATIONS : SetupCheckEnum::MIGRATIONS;
+
+		// halfway through a rebase the migrations of the target are in the files but the branch is not whole yet; they run once the rebase is done
+		if ($isRebasing) {
+			return new SetupCheckObject($setupCheck, CheckStateEnum::READY, __('Draait na de rebase; DevDock zet de migraties daarna zelf bij.'));
+		}
 		$kept = Cache::get($key);
 
 		$isKept = is_array($kept) && ($kept['fingerprint'] ?? null) === $fingerprint && ! $this->isThorough;

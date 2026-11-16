@@ -7,6 +7,7 @@ namespace Src\Prompt\Actions;
 use Illuminate\Support\Facades\File;
 use Src\Access\Actions\GetRoleAccessAction;
 use Src\Access\Enums\AgentRoleEnum;
+use Src\Access\Enums\GitGrantEnum;
 use Src\Packages\Cqrs\Command;
 use Src\Prompt\Contracts\ClaudeProcessRepositoryContract;
 use Src\Prompt\Contracts\PromptRunRepositoryContract;
@@ -22,10 +23,14 @@ use Src\Session\Contracts\SessionFileRepositoryContract;
 use Src\Session\Objects\SessionEntity;
 use Src\Task\Actions\GetReadableDirectoriesAction;
 use Src\Task\Contracts\TaskRepositoryContract;
+use Src\Worktree\Actions\CheckReadinessAction;
+use Src\Worktree\Actions\StartRepairAction;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
+use Src\Worktree\Enums\SetupCheckEnum;
 use Src\Worktree\Exceptions\SetupIncompleteException;
 use Src\Worktree\Exceptions\WorkingCopyBusyException;
 use Src\Worktree\Exceptions\WorktreeNotPossibleException;
+use Src\Worktree\Objects\SetupCheckObject;
 use Throwable;
 
 /**
@@ -101,6 +106,11 @@ class RunPromptAction extends Command
 			$worktreeRepository->forgetStatus($promptRunEntity->directory);
 		}
 
+		// a finished rebase brought the target's migrations along; DevDock runs them, so the copy is ready again
+		if ($promptRunEntity->gitGrant === GitGrantEnum::REBASE && $promptRunEntity->directory !== null) {
+			$this->repairAfterRebase($promptRunEntity->directory);
+		}
+
 		// a turn on a round sends the lenses back over the work, but only when the
 		// agent reports it done; a question or open points wait for you
 		if ($promptRunEntity->reviewRoundId !== null && ReadReportAction::execute($promptRunEntity->output)?->status === ReportStatusEnum::DONE) {
@@ -119,6 +129,22 @@ class RunPromptAction extends Command
 		$this->nameAfterTicket($promptRunEntity);
 
 		return $promptRunEntity;
+	}
+
+	/**
+	 * Starts the repair of the open points once the rebase is through. While the
+	 * rebase still stands open, or the agent broke it off on a conflict it could
+	 * not solve, the branch point is open and the copy is left as it is.
+	 */
+	private function repairAfterRebase(string $directory): void
+	{
+		$readinessObject = CheckReadinessAction::execute($directory, true);
+		$isRebaseOpen = collect($readinessObject->openChecks())
+			->contains(fn (SetupCheckObject $setupCheckObject): bool => $setupCheckObject->setupCheck === SetupCheckEnum::BRANCH);
+
+		if (! $isRebaseOpen && ! $readinessObject->isReady()) {
+			StartRepairAction::execute($directory);
+		}
 	}
 
 	/**

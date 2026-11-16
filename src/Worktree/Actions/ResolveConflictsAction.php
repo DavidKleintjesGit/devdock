@@ -72,7 +72,7 @@ class ResolveConflictsAction extends Command
 			$situation,
 			$rebaseOutcomeObject->conflictedFiles === [] ? null : __('Nog niet opgelost: :files', ['files' => implode(', ', $rebaseOutcomeObject->conflictedFiles)]),
 			__('Je hebt voor deze beurt toestemming om die rebase af te maken: los elk conflict op, zet het bestand klaar met git add of git rm, en ga verder met git rebase --continue tot de rebase klaar is. Andere git-acties en pushen blijven verboden.'),
-			__('Draai daarna de tests van wat je aanraakte en zeg wanneer het klaar is. Lukt het niet, breek dan af met git rebase --abort en leg uit waarom.'),
+			__('Draai in deze beurt geen tests: de migraties die de rebase meebracht staan nog niet in de database, en DevDock zet ze bij zodra de rebase klaar is. Zeg wat je per conflict hebt gekozen en wanneer de rebase klaar is. Lukt het niet, breek dan af met git rebase --abort en leg uit waarom.'),
 		]));
 	}
 }

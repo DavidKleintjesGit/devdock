@@ -1753,5 +1753,7 @@
     "Bron voor regels": "Source for rules",
     "Een map op deze computer of een map in een repository op Bitbucket of GitHub, zoals https://bitbucket.org/team/repo/src/main/rules. Leeg: DevDock is de bron.": "A folder on this computer or a folder in a repository on Bitbucket or GitHub, such as https://bitbucket.org/team/repo/src/main/rules. Empty: DevDock is the source.",
     "Bron voor skills": "Source for skills",
-    "Bron:": "Source:"
+    "Bron:": "Source:",
+    "Draait na de rebase; DevDock zet de migraties daarna zelf bij.": "Runs after the rebase; DevDock brings the migrations up to date itself then.",
+    "Draai in deze beurt geen tests: de migraties die de rebase meebracht staan nog niet in de database, en DevDock zet ze bij zodra de rebase klaar is. Zeg wat je per conflict hebt gekozen en wanneer de rebase klaar is. Lukt het niet, breek dan af met git rebase --abort en leg uit waarom.": "Run no tests in this turn: the migrations the rebase brought along are not in the database yet, and DevDock runs them as soon as the rebase is done. Say what you chose per conflict and when the rebase is done. If it does not work out, abort with git rebase --abort and explain why."
 }
