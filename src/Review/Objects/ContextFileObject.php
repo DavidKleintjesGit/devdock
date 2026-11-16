@@ -30,12 +30,48 @@ class ContextFileObject extends ValueObject
 	 */
 	public function settingsRoute(): ?string
 	{
+		$key = $this->baseKey();
+
 		return match (true) {
-			str_starts_with($this->key, 'global:'), str_starts_with($this->key, 'checkout:'), str_starts_with($this->key, 'project:') => 'rules',
-			str_starts_with($this->key, 'skill:') => 'skills',
-			str_starts_with($this->key, 'step:'), in_array($this->key, ['standing', 'chat', 'project', 'definition', 'assignment', 'instruction'], true) => 'workflows',
+			str_starts_with($key, 'global:'), str_starts_with($key, 'checkout:'), str_starts_with($key, 'project:') => 'rules',
+			str_starts_with($key, 'skill:') => 'skills',
+			str_starts_with($key, 'step:'), in_array($key, ['standing', 'task', 'project', 'definition', 'assignment'], true) => 'workflows',
 			default => null,
 		};
+	}
+
+	/**
+	 * Where this piece is kept and how it comes about, so you know what to change to change it.
+	 */
+	public function origin(): string
+	{
+		$key = $this->baseKey();
+
+		return match (true) {
+			str_starts_with($key, 'global:') => __('Een bestand in jouw map ~/.claude. Het geldt voor elk project op deze computer.'),
+			str_starts_with($key, 'checkout:') => __('Een bestand in de checkout van het project. Claude leest het ook in de werkkopie, omdat die erbinnen staat.'),
+			str_starts_with($key, 'project:') => __('Een bestand in de werkkopie, uit de repository van het project.'),
+			str_starts_with($key, 'skill:') => __('Een skill op deze computer. Claude krijgt de omschrijving mee en leest de rest pas als hij de skill gebruikt.'),
+			str_starts_with($key, 'step:'), $key === 'standing' => __('Een blok uit Workflows, dat DevDock in het taakbestand zet.'),
+			$key === 'memory' => __('Het geheugen dat Claude Code voor dit project bijhoudt, in jouw map ~/.claude.'),
+			$key === 'task' => __('Door DevDock opgesteld uit de taak, het ticket en de blokken in Workflows, en in de werkkopie gezet als .devdock/agent.md.'),
+			$key === 'work', $key === 'chat' => __('Vast in DevDock zelf, voor elke taak gelijk. Het staat in de code, niet in een instelling.'),
+			$key === 'last-turn' => __('De opdracht die bij de laatste beurt werd verstuurd.'),
+			$key === 'conversation' => __('De sessie van Claude Code, die elke beurt wordt hervat.'),
+			$key === 'assignment' => __('Door DevDock opgesteld uit de lens in Workflows en de bestanden die deze ronde raakt, en in de werkkopie gezet onder .devdock/lens.'),
+			$key === 'report' => __('Wat deze lens in de vorige ronde vond; hij krijgt het mee om te zien wat er sindsdien veranderde.'),
+			$key === 'instruction' => __('Vast in DevDock zelf: de ene regel die de lens naar zijn opdracht wijst.'),
+			$key === 'project', $key === 'definition' => __('Ingesteld in Workflows.'),
+			default => __('Door DevDock meegegeven.'),
+		};
+	}
+
+	/**
+	 * The key without the lens it belongs to, when sources of several lenses stand side by side.
+	 */
+	private function baseKey(): string
+	{
+		return preg_match('/^lens:[^:]+:(.+)$/', $this->key, $found) === 1 ? $found[1] : $this->key;
 	}
 
 	/**

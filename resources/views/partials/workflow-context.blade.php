@@ -32,7 +32,7 @@
 		@if ($contextOpen)
 			<article class="context-reader" aria-label="{{ $contextOpen->name }}">
 				<div class="context-reader-head">
-					<span class="grow"><b>{{ $contextOpen->name }}</b>@if ($contextOpen->path)<span class="mono hint">{{ $contextOpen->path }}</span>@endif</span>
+					<span class="grow"><b>{{ $contextOpen->name }}</b>@if ($contextOpen->path)<span class="mono hint">{{ $contextOpen->path }}</span>@endif<span class="hint">{{ $contextOpen->origin() }}</span></span>
 					<button class="btn xs" type="button" x-data @click="navigator.clipboard.writeText(@js($contextOpen->contents))">{{ __('Kopiëren') }}</button>
 				</div>
 				<div class="md">{!! $contextHtml !!}</div>

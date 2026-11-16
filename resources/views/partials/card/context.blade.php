@@ -60,6 +60,7 @@
 							<button class="btn xs" type="button" x-data @click="navigator.clipboard.writeText(@js($contextOpen->contents))">{{ __('Kopiëren') }}</button>
 						</div>
 						@if ($contextOpen->path)<span class="mono path">{{ $contextOpen->path }}</span>@endif
+						<p class="context-origin">{{ $contextOpen->origin() }}</p>
 						<div class="context-reader-meta">
 							@if ($contextOpenAudience)<span>{{ __('Krijgen') }}: <b>{{ $contextOpenAudience->label() }}</b></span>@endif
 							@if ($contextOpenTokens)<span>· {{ __('ca. :tokens tokens', ['tokens' => $contextOpenTokens]) }}</span>@endif

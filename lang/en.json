@@ -1755,5 +1755,21 @@
     "Bron voor skills": "Source for skills",
     "Bron:": "Source:",
     "Draait na de rebase; DevDock zet de migraties daarna zelf bij.": "Runs after the rebase; DevDock brings the migrations up to date itself then.",
-    "Draai in deze beurt geen tests: de migraties die de rebase meebracht staan nog niet in de database, en DevDock zet ze bij zodra de rebase klaar is. Zeg wat je per conflict hebt gekozen en wanneer de rebase klaar is. Lukt het niet, breek dan af met git rebase --abort en leg uit waarom.": "Run no tests in this turn: the migrations the rebase brought along are not in the database yet, and DevDock runs them as soon as the rebase is done. Say what you chose per conflict and when the rebase is done. If it does not work out, abort with git rebase --abort and explain why."
+    "Draai in deze beurt geen tests: de migraties die de rebase meebracht staan nog niet in de database, en DevDock zet ze bij zodra de rebase klaar is. Zeg wat je per conflict hebt gekozen en wanneer de rebase klaar is. Lukt het niet, breek dan af met git rebase --abort en leg uit waarom.": "Run no tests in this turn: the migrations the rebase brought along are not in the database yet, and DevDock runs them as soon as the rebase is done. Say what you chose per conflict and when the rebase is done. If it does not work out, abort with git rebase --abort and explain why.",
+    "Een bestand in jouw map ~/.claude. Het geldt voor elk project op deze computer.": "A file in your folder ~/.claude. It holds for every project on this computer.",
+    "Een bestand in de checkout van het project. Claude leest het ook in de werkkopie, omdat die erbinnen staat.": "A file in the checkout of the project. Claude reads it in the working copy too, since that stands inside it.",
+    "Een bestand in de werkkopie, uit de repository van het project.": "A file in the working copy, from the repository of the project.",
+    "Een skill op deze computer. Claude krijgt de omschrijving mee en leest de rest pas als hij de skill gebruikt.": "A skill on this computer. Claude gets its description and reads the rest only when it uses the skill.",
+    "Een blok uit Workflows, dat DevDock in het taakbestand zet.": "A block from Workflows, which DevDock puts in the task file.",
+    "Het geheugen dat Claude Code voor dit project bijhoudt, in jouw map ~/.claude.": "The memory Claude Code keeps for this project, in your folder ~/.claude.",
+    "Door DevDock opgesteld uit de taak, het ticket en de blokken in Workflows, en in de werkkopie gezet als .devdock/agent.md.": "Written by DevDock from the task, the ticket and the blocks in Workflows, and put in the working copy as .devdock/agent.md.",
+    "Vast in DevDock zelf, voor elke taak gelijk. Het staat in de code, niet in een instelling.": "Fixed in DevDock itself, the same for every task. It lives in the code, not in a setting.",
+    "De opdracht die bij de laatste beurt werd verstuurd.": "The assignment sent with the latest turn.",
+    "De sessie van Claude Code, die elke beurt wordt hervat.": "The Claude Code session, resumed every turn.",
+    "Door DevDock opgesteld uit de lens in Workflows en de bestanden die deze ronde raakt, en in de werkkopie gezet onder .devdock/lens.": "Written by DevDock from the lens in Workflows and the files this round touches, and put in the working copy under .devdock/lens.",
+    "Wat deze lens in de vorige ronde vond; hij krijgt het mee om te zien wat er sindsdien veranderde.": "What this lens found in the previous round; it gets it to see what changed since.",
+    "Vast in DevDock zelf: de ene regel die de lens naar zijn opdracht wijst.": "Fixed in DevDock itself: the one line that points the lens to its assignment.",
+    "Ingesteld in Workflows.": "Set in Workflows.",
+    "Door DevDock meegegeven.": "Given by DevDock.",
+    "Er botst iets": "Something clashes"
 }
