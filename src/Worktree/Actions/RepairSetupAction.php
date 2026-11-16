@@ -243,6 +243,11 @@ class RepairSetupAction extends Command
 		$isBorrowed = collect($workingCopyRepository->getPackages($projectPath, $path))
 			->contains(fn (array $package): bool => $package['folder'] === $folder && $package['isBorrowed']);
 
+		// a borrowed vendor behind its own composer.lock is the project's vendor; it is brought up to date where it lives
+		if ($isBorrowed && $folder === 'vendor' && $workingCopyStateRepository->stalePackages($projectPath . '/composer.lock', $projectPath . '/vendor/composer/installed.json') !== []) {
+			return $workingCopyStateRepository->runStep($projectPath, resolve(ProjectPhpRepositoryContract::class)->composerCommand($projectPath, ['install', '--no-interaction', '--no-scripts']), $logPath, self::INSTALL_SECONDS);
+		}
+
 		if ($isBorrowed) {
 			$workingCopyRepository->returnBorrowed($path, $folder);
 		}

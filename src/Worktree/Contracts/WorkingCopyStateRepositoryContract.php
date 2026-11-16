@@ -26,6 +26,14 @@ interface WorkingCopyStateRepositoryContract
 	public function countPendingMigrations(string $path, bool $isTesting = false): MigrationCountObject;
 
 	/**
+	 * The packages composer.lock of a folder asks for that its vendor holds at
+	 * another version or not at all.
+	 *
+	 * @return list<string>
+	 */
+	public function stalePackages(string $lockFile, string $installedFile): array;
+
+	/**
 	 * Runs one step of a repair in the working copy and appends what it said
 	 * to the log. Returns the line that says what went wrong when it failed,
 	 * null when it went through.

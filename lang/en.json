@@ -1789,5 +1789,7 @@
     "Gewijzigd · vernieuwen": "Changed · refresh",
     "Vernieuwen": "Refresh",
     "Deze kaart heeft geen werkkopie meer.": "This card no longer has a working copy.",
-    "Nog :count sessie tonen|Nog :count sessies tonen": "Show :count more session|Show :count more sessions"
+    "Nog :count sessie tonen|Nog :count sessies tonen": "Show :count more session|Show :count more sessions",
+    "vendor loopt achter op composer.lock: :packages.|vendor loopt achter op composer.lock: :packages.": "vendor is behind composer.lock: :packages.|vendor is behind composer.lock: :packages.",
+    "composer install in het project": "composer install in the project"
 }

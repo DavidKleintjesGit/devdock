@@ -47,6 +47,7 @@ class WorkingCopyStateRepository implements WorkingCopyStateRepositoryContract
 			hasVendorAutoload: is_file($path . '/vendor/autoload.php'),
 			isVendorBorrowed: $this->isBorrowed($path . '/vendor'),
 			missingVendorPackages: $this->isBorrowed($path . '/vendor') ? $this->missingPackages($repositoryPath . '/vendor', $path . '/vendor') : [],
+			staleVendorPackages: $this->stalePackages($path . '/' . $composerLock, $path . '/vendor/composer/installed.json'),
 			isComposerLockSame: $this->isSameFile($repositoryPath . '/' . $composerLock, $path . '/' . $composerLock),
 			hasPackageJson: is_file($path . '/package.json'),
 			hasNodeModules: is_dir($path . '/node_modules'),
@@ -124,6 +125,34 @@ class WorkingCopyStateRepository implements WorkingCopyStateRepositoryContract
 			$lines,
 			fn (string $line): bool => preg_match('/^' . preg_quote($line, '/') . '\r?$/m', $standing) !== 1,
 		));
+	}
+
+	/**
+	 * The packages composer.lock asks for that vendor holds at another version
+	 * or not at all, such as after a pull that brought new packages and no
+	 * composer install since. Empty when either file is missing.
+	 *
+	 * @return list<string>
+	 */
+	public function stalePackages(string $lockFile, string $installedFile): array
+	{
+		$lock = json_decode((string) @file_get_contents($lockFile), true);
+		$installed = json_decode((string) @file_get_contents($installedFile), true);
+
+		if (! is_array($lock) || ! is_array($installed)) {
+			return [];
+		}
+
+		$versions = collect($installed['packages'] ?? $installed)
+			->filter(fn (mixed $package): bool => is_array($package) && isset($package['name']))
+			->mapWithKeys(fn (array $package): array => [$package['name'] => $package['version'] ?? null]);
+
+		return collect([...($lock['packages'] ?? []), ...($lock['packages-dev'] ?? [])])
+			->filter(fn (mixed $package): bool => is_array($package) && isset($package['name']))
+			->reject(fn (array $package): bool => $versions->get($package['name']) === ($package['version'] ?? null))
+			->pluck('name')
+			->values()
+			->all();
 	}
 
 	/**

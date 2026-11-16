@@ -212,6 +212,12 @@ class CheckReadinessAction extends Command
 				__('Geleend, maar deze pakketten ontbreken: :packages.', ['packages' => implode(', ', $workingCopyStateObject->missingVendorPackages)]),
 				__('opnieuw lenen'),
 			),
+			$workingCopyStateObject->staleVendorPackages !== [] && $workingCopyStateObject->isComposerLockSame => new SetupCheckObject(
+				SetupCheckEnum::PHP_PACKAGES,
+				CheckStateEnum::OPEN,
+				trans_choice('vendor loopt achter op composer.lock: :packages.|vendor loopt achter op composer.lock: :packages.', count($workingCopyStateObject->staleVendorPackages), ['packages' => implode(', ', array_slice($workingCopyStateObject->staleVendorPackages, 0, 5)) . (count($workingCopyStateObject->staleVendorPackages) > 5 ? ' …' : '')]),
+				$workingCopyStateObject->isVendorBorrowed ? __('composer install in het project') : 'composer install',
+			),
 			$workingCopyStateObject->isVendorBorrowed && ! $workingCopyStateObject->isComposerLockSame => new SetupCheckObject(
 				SetupCheckEnum::PHP_PACKAGES,
 				CheckStateEnum::OPEN,
