@@ -3,7 +3,7 @@
 		<div class="alert green dfail"><x-icon name="check" small/><span>{{ $committed }}</span></div>
 	@endif
 
-	<div @class(['panel-grid', 'changes-grid' => $changeCount > 0])>
+	<div @class(['panel-grid', 'fill-grid', 'changes-grid' => $changeCount > 0])>
 		<x-panel :title="__('Wijzigingen')">
 			<x-slot:actions>
 				<div class="seg counted" role="group" aria-label="{{ __('Welke wijzigingen') }}">
@@ -64,7 +64,7 @@
 					<input id="commit-title" @class(['input', 'invalid' => $errors->has('commitMessage')]) type="text" wire:model="commitMessage" x-on:input="length = $event.target.value.length" placeholder="{{ $card->suggestedCommitMessage() }}" autocomplete="off">
 					@error('commitMessage')<span class="err">{{ $message }}</span>@enderror
 				</div>
-				<div class="field">
+				<div class="field grow-field">
 					<span class="counter-row"><label for="commit-body" style="font-size:13px;font-weight:500;color:var(--fg)">{{ __('Bericht') }}</label><span>{{ __('mag leeg') }}</span></span>
 					<textarea id="commit-body" class="textarea" rows="4" wire:model="commitBody"></textarea>
 				</div>
