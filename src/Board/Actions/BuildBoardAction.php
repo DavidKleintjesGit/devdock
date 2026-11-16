@@ -23,6 +23,7 @@ use Src\Prompt\Contracts\PromptRunRepositoryContract;
 use Src\Prompt\Enums\ReportStatusEnum;
 use Src\Prompt\Objects\PromptRunEntity;
 use Src\PullRequest\Actions\GetPullRequestsAction;
+use Src\PullRequest\Contracts\PullRequestRepositoryContract;
 use Src\PullRequest\Enums\PullRequestRoleEnum;
 use Src\PullRequest\Objects\PullRequestEntity;
 use Src\PullRequest\Objects\PullRequestEntityCollection;
@@ -118,6 +119,9 @@ class BuildBoardAction extends Command
 	/** @var array<string, array<int, CarbonImmutable>> */
 	private array $finishedRounds = [];
 
+	/** @var array<int, list<CarbonImmutable>> */
+	private array $commentedByPullRequest = [];
+
 	public function handle(TodoRepositoryContract $todoRepository): CardObjectCollection
 	{
 		$projectEntities = collect(GetProjectsAction::execute());
@@ -140,6 +144,7 @@ class BuildBoardAction extends Command
 		$this->readUntil = resolve(CardViewRepositoryContract::class)->getReadUntil();
 		$this->finishedTurns = resolve(PromptRunRepositoryContract::class)->getFinishedSince($this->readUntil);
 		$this->finishedRounds = resolve(ReviewRoundRepositoryContract::class)->getFinishedSince($this->readUntil);
+		$this->commentedByPullRequest = resolve(PullRequestRepositoryContract::class)->getCommentedSince($this->readUntil);
 
 		$cardObjects = $this->pieces($projectEntities, collect($todoRepository->getAll()))
 			->groupBy('key')
@@ -161,16 +166,20 @@ class BuildBoardAction extends Command
 	}
 
 	/**
-	 * How many agent turns or review rounds finished since you last opened the
-	 * tab they belong to, per source.
+	 * How many agent turns, review rounds or remarks on a pull request came in
+	 * since you last opened the tab they belong to, per source.
 	 *
+	 * @param  Collection<int, PullRequestEntity>|null  $pullRequestEntities
 	 * @return array<string, int>
 	 */
-	private function unreadPerSource(string $card): array
+	private function unreadPerSource(string $card, ?Collection $pullRequestEntities = null): array
 	{
 		$finished = [
 			UnreadSourceEnum::AGENT->value => $this->finishedTurns[$card] ?? [],
 			UnreadSourceEnum::REVIEW->value => $this->finishedRounds[$card] ?? [],
+			UnreadSourceEnum::CONNECTIONS->value => collect($pullRequestEntities ?? [])
+				->flatMap(fn (PullRequestEntity $pullRequestEntity): array => $this->commentedByPullRequest[(int) $pullRequestEntity->pullRequestId->id] ?? [])
+				->all(),
 		];
 
 		$unread = [];
@@ -411,7 +420,7 @@ class BuildBoardAction extends Command
 			conflictedFiles: $standing?->conflictedFiles ?? [],
 			copyPlace: $column->canStall() ? $this->copyPlaceFor($project, $branch, $worktreeEntity) : null,
 			agentActiveAt: $this->agentActiveAt($promptRunEntity),
-			unreadPerSource: $this->unreadPerSource($key),
+			unreadPerSource: $this->unreadPerSource($key, $pullRequestEntities),
 			hasUnreadQuestion: $this->hasUnreadQuestion($key, $promptRunEntity),
 		);
 	}

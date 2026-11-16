@@ -12,4 +12,5 @@ enum UnreadSourceEnum: string
 {
 	case AGENT = 'Agent';
 	case REVIEW = 'Review';
+	case CONNECTIONS = 'Koppelingen';
 }

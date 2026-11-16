@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\PullRequest\Repositories;
 
+use Carbon\CarbonImmutable;
 use Src\PullRequest\Contracts\PullRequestRepositoryContract;
 use Src\PullRequest\Enums\PullRequestRoleEnum;
 use Src\PullRequest\Enums\PullRequestStateEnum;
@@ -93,6 +94,17 @@ class PullRequestRepository implements PullRequestRepositoryContract
 			->all();
 
 		return ReviewCommentEntityCollection::fromArray($reviewCommentEntities);
+	}
+
+	public function getCommentedSince(CarbonImmutable $since): array
+	{
+		return ReviewCommentEloquent::query()
+			->where('is_prompt', false)
+			->where('commented_at', '>', $since)
+			->get(['pull_request_id', 'commented_at'])
+			->groupBy('pull_request_id')
+			->map(fn ($commented) => $commented->pluck('commented_at')->all())
+			->all();
 	}
 
 	public function replaceComments(

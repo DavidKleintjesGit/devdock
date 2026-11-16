@@ -6,7 +6,7 @@ namespace Src\Board\Enums;
 
 /**
  * The colour of a hint dot beside a tab: something that clashes and blocks,
- * or something that waits on you. A tab with both shows one dot in both colours.
+ * or something that waits on you. A tab with both shows a dot of each.
  */
 enum HintToneEnum: string
 {

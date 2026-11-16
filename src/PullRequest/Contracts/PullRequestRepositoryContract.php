@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\PullRequest\Contracts;
 
+use Carbon\CarbonImmutable;
 use Src\PullRequest\Objects\PullRequestEntity;
 use Src\PullRequest\Objects\PullRequestEntityCollection;
 use Src\PullRequest\Objects\PullRequestObject;
@@ -26,6 +27,13 @@ interface PullRequestRepositoryContract
 	public function replaceAll(PullRequestObjectCollection $pullRequestObjects): PullRequestEntityCollection;
 
 	public function getComments(PullRequestId $pullRequestId): ReviewCommentEntityCollection;
+
+	/**
+	 * When the remarks people left on a pull request came in, per pull request, from this moment on.
+	 *
+	 * @return array<int, list<CarbonImmutable>>
+	 */
+	public function getCommentedSince(CarbonImmutable $since): array;
 
 	/**
 	 * Brings the stored remarks of one pull request in line with what is

@@ -32,7 +32,10 @@ use Src\Board\Enums\CardTabEnum;
 use Src\Board\Enums\PromptSourceEnum;
 use Src\Board\Enums\UnreadSourceEnum;
 use Src\Board\Objects\CardObject;
+use Src\Board\Objects\TabHintFactsObject;
+use Src\Board\Objects\TabHintsDecisionObject;
 use Src\Board\Objects\TodoId;
+use Src\Board\Policies\TabHintPolicy;
 use Src\Fetch\Actions\GetLatestFetchRunAction;
 use Src\Packages\Markdown\RenderMarkdown;
 use Src\Project\Actions\GetBranchesAction;
@@ -66,6 +69,7 @@ use Src\Review\Contracts\AgentContextRepositoryContract;
 use Src\Review\Contracts\ReviewFindingRepositoryContract;
 use Src\Review\Contracts\ReviewRoundRepositoryContract;
 use Src\Review\Enums\FindingStatusEnum;
+use Src\Review\Enums\LoopStatusEnum;
 use Src\Review\Enums\RoundStatusEnum;
 use Src\Review\Enums\WorkflowStepEnum;
 use Src\Review\Exceptions\RoundNotStartedException;
@@ -1165,7 +1169,7 @@ class Drawer extends Component
 		$promptRunEntity = GetLatestPromptRunAction::execute($cardObject->id);
 		$ticketEntity = $this->ticketFor($cardObject);
 		$latestRound = $this->latestRound($cardObject->id);
-		$roundTurns = $tab === 'Review' ? GetRoundTurnsAction::execute($cardObject->id) : [];
+		$roundTurns = GetRoundTurnsAction::execute($cardObject->id);
 		$rounds = $tab === 'Review' ? collect(GetRoundsAction::execute($cardObject->id))->reverse()->values() : collect();
 		$worktreeEntity = $this->worktreeFor($cardObject);
 		// a task without a working copy shows how to get one, not its subtabs
@@ -1182,6 +1186,8 @@ class Drawer extends Component
 		$diffTree = $this->openDiffFile === null ? [] : $this->diffTree($cardObject, $diffView);
 		$diffFiles = $this->openDiffFile === null || $worktreeEntity === null ? [] : $this->stackedDiffs($worktreeEntity, $diffView, $diffTree);
 		$workflowSetting = GetWorkflowSettingAction::execute($cardObject->project);
+		$loopStatus = GetLoopStatusAction::execute($latestRound, $latestRound === null ? null : $roundTurns[(int) $latestRound->reviewRoundId->id] ?? null, $workflowSetting->maxRounds);
+		$tabHints = $this->tabHints($cardObject, $worktreeEntity, $readiness, $latestRound, $loopStatus);
 		$promptSources = $tab === 'Agent' ? $this->promptSources($cardObject, $reviewCommentEntities) : [];
 		$pullRequests = $cardObject->pullRequests
 			->map(fn (PullRequestEntity $pullRequestEntity) => $pullRequestEntity->repository . '#' . $pullRequestEntity->number)
@@ -1197,7 +1203,7 @@ class Drawer extends Component
 			'previous' => $previousLabel,
 			'cardSteps' => $cardSteps,
 			'currentStep' => collect($cardSteps)->firstWhere('state', 'now'),
-			'tabSubtabs' => $subtab === null ? [] : $this->subtabRows(CardTabEnum::from($tab), $cardObject, $worktreeEntity, $readiness, $rounds->count()),
+			'tabSubtabs' => $subtab === null ? [] : $this->subtabRows(CardTabEnum::from($tab), $worktreeEntity, $tabHints, $rounds->count()),
 			'nextStep' => $this->nextStep($cardObject, $worktreeEntity, $latestRound),
 			...($isSetup ? $this->setupData($cardObject, $worktreeEntity) : []),
 			'databaseSuggestion' => $worktreeEntity === null && ($isSetup || $tab === 'Werkkopie') ? $this->databaseSuggestionFor($cardObject) : null,
@@ -1208,9 +1214,7 @@ class Drawer extends Component
 				'round' => $reviewRoundEntity,
 				'turn' => $roundTurns[(int) $reviewRoundEntity->reviewRoundId->id] ?? null,
 			]),
-			'loopStatus' => $tab === 'Review'
-				? GetLoopStatusAction::execute($latestRound, $latestRound === null ? null : $roundTurns[(int) $latestRound->reviewRoundId->id] ?? null, $workflowSetting->maxRounds)
-				: null,
+			'loopStatus' => $tab === 'Review' ? $loopStatus : null,
 			'isExpired' => $latestRound?->isExpiredBy($worktreeEntity === null ? null : resolve(WorktreeRepositoryContract::class)->getFingerprint($worktreeEntity->path)) ?? false,
 			'openDiffFile' => $this->openDiffFile,
 			'diffTree' => $diffTree,
@@ -1246,7 +1250,7 @@ class Drawer extends Component
 			'drawerTabs' => collect(CardTabEnum::cases())->map(fn (CardTabEnum $cardTab) => [
 				'tab' => $cardTab,
 				'unread' => $cardObject->unreadOnTab($cardTab->value),
-				'tones' => $this->tabTones($cardTab, $cardObject, $worktreeEntity, $readiness),
+				'tones' => $tabHints->forTab($cardTab),
 			])->all(),
 			'repairState' => $repairState,
 			...(in_array($subtab, [CardSubtabEnum::CONTEXT, CardSubtabEnum::LENSES], true) ? $this->cardContextData($cardObject, $this->projectPathFor($cardObject), $worktreeEntity?->path ?? $this->projectPathFor($cardObject), $subtab) : []),
@@ -1748,7 +1752,7 @@ class Drawer extends Component
 	 *
 	 * @return list<array{subtab: CardSubtabEnum, count: int, tones: list<HintToneEnum>}>
 	 */
-	private function subtabRows(CardTabEnum $cardTab, CardObject $cardObject, ?WorktreeEntity $worktreeEntity, ?ReadinessObject $readiness, int $roundCount): array
+	private function subtabRows(CardTabEnum $cardTab, ?WorktreeEntity $worktreeEntity, TabHintsDecisionObject $tabHints, int $roundCount): array
 	{
 		$lensCount = $cardTab === CardTabEnum::REVIEW ? GetLensesAction::execute($worktreeEntity?->project)->filter(fn (LensEntity $lensEntity) => $lensEntity->isEnabled)->count() : 0;
 
@@ -1760,45 +1764,30 @@ class Drawer extends Component
 				CardSubtabEnum::LENSES => $lensCount,
 				default => 0,
 			},
-			'tones' => $this->subtabTones($cardSubtab, $cardObject, $worktreeEntity, $readiness),
+			'tones' => $tabHints->forSubtab($cardSubtab),
 		])->all();
 	}
 
 	/**
-	 * The colours of the hint dot beside a subtab: red for a rebase that stands
-	 * open or a conflict with the target branch, amber for what waits on you.
-	 *
-	 * @return list<HintToneEnum>
+	 * The hint dots of a card: what it shows about itself, handed to the rule
+	 * that colours its tabs.
 	 */
-	private function subtabTones(CardSubtabEnum $cardSubtab, CardObject $cardObject, ?WorktreeEntity $worktreeEntity, ?ReadinessObject $readiness): array
+	private function tabHints(CardObject $cardObject, ?WorktreeEntity $worktreeEntity, ?ReadinessObject $readiness, ?ReviewRoundEntity $latestRound, ?LoopStatusEnum $loopStatus): TabHintsDecisionObject
 	{
-		return match ($cardSubtab) {
-			CardSubtabEnum::BRANCH => array_values(array_filter([
-				$worktreeEntity?->isRebasing === true || $cardObject->conflictedFiles !== [] ? HintToneEnum::RED : null,
-				(int) $worktreeEntity?->behind > 0 || (int) $worktreeEntity?->ahead > 0 ? HintToneEnum::AMBER : null,
-			])),
-			CardSubtabEnum::SETUP => $readiness !== null && ! $readiness->isReady() ? [HintToneEnum::AMBER] : [],
-			default => [],
-		};
-	}
-
-	/**
-	 * The colours of a main tab: what its subtabs show, gathered, so one dot says it all.
-	 *
-	 * @return list<HintToneEnum>
-	 */
-	private function tabTones(CardTabEnum $cardTab, CardObject $cardObject, ?WorktreeEntity $worktreeEntity, ?ReadinessObject $readiness): array
-	{
-		$tones = match ($cardTab) {
-			CardTabEnum::CHAT => $cardObject->hasUnreadQuestion ? [HintToneEnum::AMBER] : [],
-			CardTabEnum::WORKING_COPY => $worktreeEntity === null ? [] : [
-				...$this->subtabTones(CardSubtabEnum::BRANCH, $cardObject, $worktreeEntity, $readiness),
-				...$this->subtabTones(CardSubtabEnum::SETUP, $cardObject, $worktreeEntity, $readiness),
-			],
-			default => [],
-		};
-
-		return array_values(array_filter(HintToneEnum::cases(), fn (HintToneEnum $hintTone): bool => in_array($hintTone, $tones, true)));
+		return resolve(TabHintPolicy::class)->decide(new TabHintFactsObject(
+			hasUnreadQuestion: $cardObject->hasUnreadQuestion,
+			hasWorkingCopy: $worktreeEntity !== null,
+			uncommittedFiles: (int) $worktreeEntity?->changedFiles,
+			unpushedCommits: (int) $worktreeEntity?->ahead,
+			isRebasing: $worktreeEntity?->isRebasing === true,
+			hasConflict: $cardObject->conflictedFiles !== [],
+			behind: (int) $worktreeEntity?->behind,
+			isReady: $readiness?->isReady(),
+			loopStatus: $loopStatus,
+			openFindings: $latestRound?->openFindings() ?? 0,
+			hasChangesRequested: $cardObject->pullRequests->first(fn (PullRequestEntity $pullRequestEntity) => $pullRequestEntity->hasChangesRequested()) !== null,
+			unreadRemarks: $cardObject->unreadOnTab(CardTabEnum::LINKS->value),
+		));
 	}
 
 	/**
