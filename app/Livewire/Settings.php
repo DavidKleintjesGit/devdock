@@ -7,6 +7,7 @@ namespace App\Livewire;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use RuntimeException;
 use Src\Board\Enums\BoardColumnEnum;
 use Src\Fetch\Actions\GetLatestFetchRunAction;
 use Src\Fetch\Actions\StartFetchAction;
@@ -156,14 +157,20 @@ class Settings extends Component
 
 		$this->editingLibrary = $libraryEntity?->id;
 		$this->libraryName = (string) $libraryEntity?->name;
-		$this->libraryFolder = (string) $libraryEntity?->folder;
-		$this->librarySkillsFolder = (string) $libraryEntity?->skillsFolder;
+		$this->libraryFolder = (string) $libraryEntity?->source();
+		$this->librarySkillsFolder = (string) $libraryEntity?->skillsSource();
 	}
 
 	public function saveLibrary(): void
 	{
 		if ($this->editingLibrary !== null && trim($this->libraryName) !== '') {
-			UpdateLibraryAction::execute($this->editingLibrary, $this->libraryName, $this->libraryFolder, $this->librarySkillsFolder);
+			try {
+				UpdateLibraryAction::execute($this->editingLibrary, $this->libraryName, $this->libraryFolder, $this->librarySkillsFolder);
+			} catch (RuntimeException $failure) {
+				$this->addError('libraryFolder', __('De repository is nu niet te lezen: :reason', ['reason' => $failure->getMessage()]));
+
+				return;
+			}
 		}
 
 		$this->editingLibrary = null;

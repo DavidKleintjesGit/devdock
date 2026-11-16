@@ -20,13 +20,13 @@
 						<input type="radio" name="library-start" value="folder" wire:model.live="newLibraryStart">
 						<span class="radio"></span>
 						<span class="grow" style="display:flex;flex-direction:column;gap:8px">
-							<span><b>{{ __('De regels uit een map') }}</b></span>
+							<span><b>{{ __('De regels uit een map of repository') }}</b></span>
 							@if ($newLibraryStart === 'folder')
-								<input class="input mono" type="text" wire:model.live.debounce.500ms="newLibraryFolder" placeholder="C:\Sites\project\.claude\rules">
+								<input class="input mono" type="text" wire:model.live.debounce.500ms="newLibraryFolder" placeholder="C:\Sites\project\.claude\rules · https://bitbucket.org/team/repo/src/main/rules">
 								@if ($foundRules !== [])
 									<small>{{ trans_choice(':count regel gevonden: :names. Ze worden v1 in DevDock.|:count regels gevonden: :names. Ze worden v1 in DevDock.', count($foundRules), ['count' => count($foundRules), 'names' => $foundRuleNames]) }}</small>
 								@elseif ($newLibraryFolder !== '')
-									<small style="color:var(--amber)">{{ __('Geen regelbestanden in deze map.') }}</small>
+									<small style="color:var(--amber)">{{ __('Geen regelbestanden gevonden.') }}</small>
 								@endif
 							@endif
 						</span>
@@ -46,7 +46,7 @@
 				</div>
 
 				<div class="field">
-					<label for="library-skills">{{ __('Skills uit een map') }}</label>
+					<label for="library-skills">{{ __('Skills uit een map of repository') }}</label>
 					<span class="help">{{ __('Mag leeg blijven.') }}</span>
 					<input id="library-skills" class="input mono" type="text" wire:model.live.debounce.500ms="newLibrarySkillsFolder" placeholder="C:\Sites\project\.claude\skills">
 					@if ($foundSkills !== [])<span class="help">{{ trans_choice(':count skill gevonden.|:count skills gevonden.', count($foundSkills), ['count' => count($foundSkills)]) }}</span>@endif

@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns;
 
 use Illuminate\Support\Collection;
+use RuntimeException;
 use Src\Library\Actions\CreateLibraryAction;
 use Src\Library\Actions\DiffTextsAction;
 use Src\Library\Actions\GetLibrariesAction;
 use Src\Library\Actions\GetStandingsAction;
 use Src\Library\Actions\ImportFolderAction;
+use Src\Library\Actions\ImportRepositoryAction;
 use Src\Library\Actions\RollOutAction;
 use Src\Library\Actions\SaveVersionAction;
 use Src\Library\Actions\WriteToFolderAction;
 use Src\Library\Contracts\LibraryDiskRepositoryContract;
+use Src\Library\Contracts\LibraryRemoteRepositoryContract;
 use Src\Library\Contracts\LibraryRepositoryContract;
 use Src\Library\Enums\LibraryItemKindEnum;
 use Src\Library\Enums\StandingEnum;
@@ -196,10 +199,18 @@ trait WithLibraries
 	public function syncLibrary(int $libraryId): void
 	{
 		$libraryEntity = resolve(LibraryRepositoryContract::class)->getById($libraryId);
-		$added = $libraryEntity === null ? 0 : ImportFolderAction::execute($libraryId, $libraryEntity->folder, $libraryEntity->skillsFolder);
+
+		try {
+			$added = $libraryEntity === null ? 0 : ImportFolderAction::execute($libraryId, $libraryEntity->folder, $libraryEntity->skillsFolder)
+				+ ($libraryEntity->repository === null && $libraryEntity->skillsRepository === null ? 0 : ImportRepositoryAction::execute($libraryId));
+		} catch (RuntimeException $failure) {
+			$this->libraryDone = __('De repository is nu niet te lezen: :reason', ['reason' => $failure->getMessage()]);
+
+			return;
+		}
 
 		$this->libraryDone = $added === 0
-			? __('Niets nieuws in de gekoppelde map.')
+			? __('Niets nieuws in de gekoppelde bron.')
 			: trans_choice(':count nieuwe versie binnengehaald.|:count nieuwe versies binnengehaald.', $added, ['count' => $added]);
 	}
 
@@ -258,13 +269,13 @@ trait WithLibraries
 
 		$disk = resolve(LibraryDiskRepositoryContract::class);
 		$folder = rtrim(str_replace('\\', '/', trim($this->newLibraryFolder)), '/');
-		$found = $folder === '' ? [] : array_keys($disk->readFolder($folder, LibraryItemKindEnum::RULE));
+		$found = $folder === '' ? [] : array_keys($this->readSource($folder, LibraryItemKindEnum::RULE));
 		$skillsFolder = rtrim(str_replace('\\', '/', trim($this->newLibrarySkillsFolder)), '/');
 
 		return [
 			'foundRules' => $found,
 			'foundRuleNames' => implode(', ', array_map(fn (string $name) => pathinfo($name, PATHINFO_FILENAME), $found)),
-			'foundSkills' => $skillsFolder === '' ? [] : array_keys($disk->readFolder($skillsFolder, LibraryItemKindEnum::SKILL)),
+			'foundSkills' => $skillsFolder === '' ? [] : array_keys($this->readSource($skillsFolder, LibraryItemKindEnum::SKILL)),
 			'matchingProjects' => $found === [] ? [] : $this->projectsHolding($disk, $found),
 		];
 	}
@@ -359,6 +370,27 @@ trait WithLibraries
 	 * @param  array<int, string>  $names
 	 * @return array<string, int>
 	 */
+	/**
+	 * What a folder on disk or a folder in a repository holds, for the window
+	 * that adds a library; a repository that cannot be read shows nothing yet.
+	 *
+	 * @return array<string, string>
+	 */
+	private function readSource(string $source, LibraryItemKindEnum $kind): array
+	{
+		$remote = resolve(LibraryRemoteRepositoryContract::class);
+
+		if (! $remote->isAddress($source)) {
+			return resolve(LibraryDiskRepositoryContract::class)->readFolder($source, $kind);
+		}
+
+		try {
+			return $remote->readFolder($source, $kind);
+		} catch (RuntimeException) {
+			return [];
+		}
+	}
+
 	private function projectsHolding(LibraryDiskRepositoryContract $disk, array $names): array
 	{
 		$matches = [];

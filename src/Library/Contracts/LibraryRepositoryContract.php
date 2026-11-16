@@ -20,9 +20,9 @@ interface LibraryRepositoryContract
 
 	public function getById(int $id): ?LibraryEntity;
 
-	public function create(string $name, ?string $folder, ?string $skillsFolder): LibraryEntity;
+	public function create(string $name, ?string $folder, ?string $skillsFolder, ?string $repository = null, ?string $skillsRepository = null): LibraryEntity;
 
-	public function update(int $id, string $name, ?string $folder, ?string $skillsFolder): LibraryEntity;
+	public function update(int $id, string $name, ?string $folder, ?string $skillsFolder, ?string $repository = null, ?string $skillsRepository = null): LibraryEntity;
 
 	public function delete(int $id): void;
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Src\Library\Actions;
 
+use Src\Library\Contracts\LibraryRemoteRepositoryContract;
 use Src\Library\Contracts\LibraryRepositoryContract;
 use Src\Library\Objects\LibraryEntity;
 use Src\Packages\Cqrs\Command;
@@ -29,14 +30,28 @@ class CreateLibraryAction extends Command
 		public readonly ?array $followers = null,
 	) {}
 
-	public function handle(LibraryRepositoryContract $libraryRepository): LibraryEntity
+	public function handle(LibraryRepositoryContract $libraryRepository, LibraryRemoteRepositoryContract $libraryRemoteRepository): LibraryEntity
 	{
-		$folder = $this->cleaned($this->folder);
-		$skillsFolder = $this->cleaned($this->skillsFolder);
+		$isAddress = fn (?string $source): bool => filled($source) && $libraryRemoteRepository->isAddress((string) $source);
+		$repository = $isAddress($this->folder) ? rtrim(trim((string) $this->folder), '/') : null;
+		$skillsRepository = $isAddress($this->skillsFolder) ? rtrim(trim((string) $this->skillsFolder), '/') : null;
+		$folder = $repository === null ? $this->cleaned($this->folder) : null;
+		$skillsFolder = $skillsRepository === null ? $this->cleaned($this->skillsFolder) : null;
 
-		$libraryEntity = $libraryRepository->create($this->name, $this->keepLinked ? $folder : null, $this->keepLinked ? $skillsFolder : null);
+		// a repository stays the source; a folder only when you chose to keep it linked
+		$libraryEntity = $libraryRepository->create(
+			$this->name,
+			$this->keepLinked ? $folder : null,
+			$this->keepLinked ? $skillsFolder : null,
+			$repository,
+			$skillsRepository,
+		);
 
 		ImportFolderAction::execute($libraryEntity->id, $folder, $skillsFolder, true);
+
+		if ($repository !== null || $skillsRepository !== null) {
+			ImportRepositoryAction::execute($libraryEntity->id);
+		}
 
 		// the project the folder lives in is the source, not a follower
 		$source = GetProjectsAction::execute()

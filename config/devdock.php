@@ -36,6 +36,11 @@ return [
 		'label_projects' => [],
 	],
 
+	// a library on GitHub is read through its API; a public repository needs no token
+	'github' => [
+		'token' => env('GITHUB_TOKEN'),
+	],
+
 	'bitbucket' => [
 		'workspace' => env('BITBUCKET_WORKSPACE'),
 

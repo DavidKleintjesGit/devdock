@@ -12,6 +12,7 @@ use Src\Fetch\Contracts\FetchRunRepositoryContract;
 use Src\Fetch\Enums\FetchSourceEnum;
 use Src\Fetch\Objects\FetchRunEntity;
 use Src\Fetch\Objects\FetchRunId;
+use Src\Library\Actions\ImportLibrariesAction;
 use Src\Packages\Cqrs\Command;
 use Src\Project\Actions\ScanProjectsAction;
 use Src\PullRequest\Actions\FetchPullRequestsAction;
@@ -157,6 +158,7 @@ class RunFetchAction extends Command
 			FetchSourceEnum::SKILLS => count(ScanSkillsAction::execute()),
 			FetchSourceEnum::TICKETS => count(FetchTicketsAction::execute()),
 			FetchSourceEnum::PULL_REQUESTS => $this->fetchPullRequests(),
+			FetchSourceEnum::LIBRARIES => ImportLibrariesAction::execute(),
 		};
 	}
 
@@ -186,7 +188,7 @@ class RunFetchAction extends Command
 			FetchSourceEnum::PULL_REQUESTS => resolve(PullRequestSourceRepositoryContract::class)->isConfigured()
 				? null
 				: __('geen Atlassian-token in .env'),
-			FetchSourceEnum::SKILLS => null,
+			FetchSourceEnum::SKILLS, FetchSourceEnum::LIBRARIES => null,
 		};
 	}
 

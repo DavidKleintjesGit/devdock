@@ -22,10 +22,28 @@ class LibraryEntity extends ValueObject
 		public readonly string $name,
 		public readonly ?string $folder,
 		public readonly ?string $skillsFolder,
+		public readonly ?string $repository,
+		public readonly ?string $skillsRepository,
 		public readonly array $items,
 		public readonly array $followers,
 	) {
 		parent::__construct();
+	}
+
+	/**
+	 * Where the rules come in from: the repository when there is one, otherwise the linked folder.
+	 */
+	public function source(): ?string
+	{
+		return $this->repository ?? $this->folder;
+	}
+
+	/**
+	 * Where the skills come in from, the same way.
+	 */
+	public function skillsSource(): ?string
+	{
+		return $this->skillsRepository ?? $this->skillsFolder;
 	}
 
 	/**

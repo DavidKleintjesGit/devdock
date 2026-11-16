@@ -41,23 +41,27 @@ class LibraryRepository implements LibraryRepositoryContract
 		return $libraryEloquent === null ? null : $this->mapToEntity($libraryEloquent);
 	}
 
-	public function create(string $name, ?string $folder, ?string $skillsFolder): LibraryEntity
+	public function create(string $name, ?string $folder, ?string $skillsFolder, ?string $repository = null, ?string $skillsRepository = null): LibraryEntity
 	{
 		$libraryEloquent = LibraryEloquent::query()->create([
 			'name' => $name,
 			'folder' => $folder,
 			'skills_folder' => $skillsFolder,
+			'repository' => $repository,
+			'skills_repository' => $skillsRepository,
 		]);
 
 		return $this->getById($libraryEloquent->id);
 	}
 
-	public function update(int $id, string $name, ?string $folder, ?string $skillsFolder): LibraryEntity
+	public function update(int $id, string $name, ?string $folder, ?string $skillsFolder, ?string $repository = null, ?string $skillsRepository = null): LibraryEntity
 	{
 		LibraryEloquent::query()->whereKey($id)->update([
 			'name' => $name,
 			'folder' => $folder,
 			'skills_folder' => $skillsFolder,
+			'repository' => $repository,
+			'skills_repository' => $skillsRepository,
 		]);
 
 		return $this->getById($id);
@@ -210,6 +214,8 @@ class LibraryRepository implements LibraryRepositoryContract
 			name: (string) $libraryEloquent->name,
 			folder: $libraryEloquent->folder,
 			skillsFolder: $libraryEloquent->skills_folder,
+			repository: $libraryEloquent->repository,
+			skillsRepository: $libraryEloquent->skills_repository,
 			items: $libraryEloquent->items
 				->sortBy('name')
 				->map(fn (LibraryItemEloquent $itemEloquent) => new LibraryItemEntity(

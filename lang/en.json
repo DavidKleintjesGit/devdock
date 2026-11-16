@@ -1743,5 +1743,15 @@
     "gedeeld": "shared",
     "alleen hij": "only him",
     "Wat :subject krijgt": "What :subject gets",
-    "lens :name": "lens :name"
+    "lens :name": "lens :name",
+    "binnengehaald uit de repository van :library": "brought in from the repository of :library",
+    "De repository is nu niet te lezen: :reason": "The repository cannot be read right now: :reason",
+    "Niets nieuws in de gekoppelde bron.": "Nothing new in the linked source.",
+    "De regels uit een map of repository": "The rules from a folder or repository",
+    "Geen regelbestanden gevonden.": "No rule files found.",
+    "Skills uit een map of repository": "Skills from a folder or repository",
+    "Bron voor regels": "Source for rules",
+    "Een map op deze computer of een map in een repository op Bitbucket of GitHub, zoals https://bitbucket.org/team/repo/src/main/rules. Leeg: DevDock is de bron.": "A folder on this computer or a folder in a repository on Bitbucket or GitHub, such as https://bitbucket.org/team/repo/src/main/rules. Empty: DevDock is the source.",
+    "Bron voor skills": "Source for skills",
+    "Bron:": "Source:"
 }

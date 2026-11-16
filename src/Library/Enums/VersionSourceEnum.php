@@ -14,11 +14,13 @@ enum VersionSourceEnum: string
 	case EDIT = 'edit';
 	case PROJECT = 'project';
 	case RESTORE = 'restore';
+	case REPOSITORY = 'repository';
 
 	public function label(string $library, ?string $project): string
 	{
 		return __(match ($this) {
 			self::FOLDER => 'binnengehaald uit :library',
+			self::REPOSITORY => 'binnengehaald uit de repository van :library',
 			self::EDIT => 'bewerkt in DevDock',
 			self::PROJECT => 'teruggezet vanuit :project',
 			self::RESTORE => 'teruggehaald uit een eerdere versie',

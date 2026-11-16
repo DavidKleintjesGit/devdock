@@ -15,6 +15,8 @@ class Library extends Model
 		'name',
 		'folder',
 		'skills_folder',
+		'repository',
+		'skills_repository',
 	];
 
 	public function items(): HasMany
