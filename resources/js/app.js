@@ -463,3 +463,71 @@ document.addEventListener('alpine:init', () => {
 		},
 	}));
 });
+
+// Lets the last click win: a click that only moves to another view cancels a
+// move that is still on its way, so the panel never shows the earlier choice
+// first. Actions that change something are never cancelled.
+const VIEW_ACTIONS = new Set([
+	'$set',
+	'back',
+	'closeContextFile',
+	'closeDiff',
+	'closeFile',
+	'closeLens',
+	'closeLibraryItem',
+	'editLens',
+	'openContextFile',
+	'openDiff',
+	'openFavorite',
+	'openFile',
+	'openLibraryItem',
+	'openSetupChecklist',
+	'selectProject',
+	'setContextScope',
+	'setDiffView',
+	'setDrawerSubtab',
+	'setDrawerTab',
+	'showGlobal',
+	'showLibrary',
+	'showProject',
+	'showRule',
+	'showSection',
+	'showSkill',
+]);
+
+const VIEW_EVENTS = new Set(['open-card']);
+
+const movesView = (action) => VIEW_ACTIONS.has(action.name)
+	|| (action.name === '__dispatch' && VIEW_EVENTS.has(action.params?.[0]));
+
+document.addEventListener('livewire:init', () => {
+	const moving = new Map();
+
+	Livewire.interceptMessage(({ message, onFinish }) => {
+		const actions = Array.from(message.actions ?? []);
+
+		if (actions.length === 0 || ! actions.every(movesView)) {
+			return;
+		}
+
+		moving.set(message.component.id, message);
+		onFinish(() => {
+			if (moving.get(message.component.id) === message) {
+				moving.delete(message.component.id);
+			}
+		});
+	});
+
+	Livewire.interceptAction(({ action }) => {
+		if (action.metadata?.type === 'poll' || action.isCancelled()) {
+			return;
+		}
+
+		const earlier = moving.get(action.component.id);
+
+		if (earlier && ! earlier.isCancelled()) {
+			moving.delete(action.component.id);
+			earlier.cancel();
+		}
+	});
+});
