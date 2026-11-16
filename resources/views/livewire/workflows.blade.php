@@ -19,10 +19,9 @@
 				@endif
 			</div>
 			@foreach ($index as $item)
-				<a href="#" wire:click.prevent="selectProject('{{ $item['name'] }}')" wire:key="wf-{{ $item['name'] }}" @if ($project === $item['name']) aria-current="page" @endif>
+				<a href="#" wire:click.prevent="selectProject('{{ $item['name'] }}')" wire:key="wf-{{ $item['name'] }}" @if ($item['note']) title="{{ $item['note'] }}" @endif @if ($project === $item['name']) aria-current="page" @endif>
 					<span class="dot {{ $item['tone'] }}"></span>
 					<span class="grow ellipsis">{{ $item['name'] }}</span>
-					@if ($item['note'])<span class="side-note {{ $item['noteTone'] }}">{{ $item['note'] }}</span>@endif
 				</a>
 			@endforeach
 		</div>

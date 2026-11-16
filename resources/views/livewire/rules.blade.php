@@ -43,10 +43,9 @@
 				@endif
 			</div>
 			@foreach ($projectRows as $row)
-				<a href="#" wire:click.prevent="showProject('{{ $row['name'] }}')" wire:key="rp-{{ $row['name'] }}" @if ($project === $row['name']) aria-current="page" @endif>
+				<a href="#" wire:click.prevent="showProject('{{ $row['name'] }}')" wire:key="rp-{{ $row['name'] }}" title="{{ $row['note'] }}" @if ($project === $row['name']) aria-current="page" @endif>
 					<span class="dot {{ $row['tone'] }}"></span>
 					<span class="grow ellipsis">{{ $row['name'] }}</span>
-					<span class="side-note {{ $row['noteTone'] }}">{{ $row['note'] }}</span>
 				</a>
 			@endforeach
 			@if ($hiddenProjects > 0)

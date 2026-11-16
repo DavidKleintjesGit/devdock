@@ -25,6 +25,7 @@ use Src\Board\Actions\GetBoardAction;
 use Src\Board\Actions\PlanTodoLaterAction;
 use Src\Board\Contracts\CardViewRepositoryContract;
 use Src\Board\Enums\BoardColumnEnum;
+use Src\Board\Enums\HintToneEnum;
 use Src\Board\Enums\CardStatusEnum;
 use Src\Board\Enums\CardSubtabEnum;
 use Src\Board\Enums\CardTabEnum;
@@ -1201,7 +1202,7 @@ class Drawer extends Component
 			'previous' => $previousLabel,
 			'cardSteps' => $cardSteps,
 			'currentStep' => collect($cardSteps)->firstWhere('state', 'now'),
-			'tabSubtabs' => $subtab === null ? [] : $this->subtabRows(CardTabEnum::from($tab), $worktreeEntity, $readiness, $rounds->count()),
+			'tabSubtabs' => $subtab === null ? [] : $this->subtabRows(CardTabEnum::from($tab), $cardObject, $worktreeEntity, $readiness, $rounds->count()),
 			'nextStep' => $this->nextStep($cardObject, $worktreeEntity, $latestRound),
 			...($isSetup ? $this->setupData($cardObject, $worktreeEntity) : []),
 			'databaseSuggestion' => $worktreeEntity === null && ($isSetup || $tab === 'Werkkopie') ? $this->databaseSuggestionFor($cardObject) : null,
@@ -1250,11 +1251,7 @@ class Drawer extends Component
 			'drawerTabs' => collect(CardTabEnum::cases())->map(fn (CardTabEnum $cardTab) => [
 				'tab' => $cardTab,
 				'unread' => $cardObject->unreadOnTab($cardTab->value),
-				'isWaiting' => match ($cardTab) {
-					CardTabEnum::CHAT => $cardObject->hasUnreadQuestion,
-					CardTabEnum::WORKING_COPY => $readiness !== null && ! $readiness->isReady(),
-					default => false,
-				},
+				'tones' => $this->tabTones($cardTab, $cardObject, $worktreeEntity, $readiness),
 			])->all(),
 			'repairState' => $repairState,
 			...(in_array($subtab, [CardSubtabEnum::CONTEXT, CardSubtabEnum::LENSES], true) ? $this->cardContextData($cardObject, $this->projectPathFor($cardObject), $worktreeEntity?->path ?? $this->projectPathFor($cardObject), $subtab) : []),
@@ -1752,26 +1749,61 @@ class Drawer extends Component
 	}
 
 	/**
-	 * The subtabs of a tab, each with the short state shown next to its name.
+	 * The subtabs of a tab, each with a count where it has one and the colours of its hint dot.
 	 *
-	 * @return list<array{subtab: CardSubtabEnum, note: string, isWaiting: bool}>
+	 * @return list<array{subtab: CardSubtabEnum, count: int, tones: list<HintToneEnum>}>
 	 */
-	private function subtabRows(CardTabEnum $cardTab, ?WorktreeEntity $worktreeEntity, ?ReadinessObject $readiness, int $roundCount): array
+	private function subtabRows(CardTabEnum $cardTab, CardObject $cardObject, ?WorktreeEntity $worktreeEntity, ?ReadinessObject $readiness, int $roundCount): array
 	{
 		$lensCount = $cardTab === CardTabEnum::REVIEW ? GetLensesAction::execute($worktreeEntity?->project)->filter(fn (LensEntity $lensEntity) => $lensEntity->isEnabled)->count() : 0;
 
 		return collect($cardTab->subtabs())->map(fn (CardSubtabEnum $cardSubtab) => [
 			'subtab' => $cardSubtab,
-			'note' => match ($cardSubtab) {
-				CardSubtabEnum::CHANGES => $worktreeEntity?->changedFiles ? (string) $worktreeEntity->changedFiles : '',
-				CardSubtabEnum::BRANCH => $worktreeEntity?->behind ? __(':count achter', ['count' => $worktreeEntity->behind]) : '',
-				CardSubtabEnum::SETUP => $readiness === null ? '' : ($readiness->isReady() ? __('in orde') : __(':count open', ['count' => $readiness->openCount()])),
-				CardSubtabEnum::ROUNDS => $roundCount > 0 ? (string) $roundCount : '',
-				CardSubtabEnum::LENSES => $lensCount > 0 ? (string) $lensCount : '',
-				default => '',
+			'count' => match ($cardSubtab) {
+				CardSubtabEnum::CHANGES => (int) $worktreeEntity?->changedFiles,
+				CardSubtabEnum::ROUNDS => $roundCount,
+				CardSubtabEnum::LENSES => $lensCount,
+				default => 0,
 			},
-			'isWaiting' => $cardSubtab === CardSubtabEnum::SETUP && $readiness !== null && ! $readiness->isReady(),
+			'tones' => $this->subtabTones($cardSubtab, $cardObject, $worktreeEntity, $readiness),
 		])->all();
+	}
+
+	/**
+	 * The colours of the hint dot beside a subtab: red for a rebase that stands
+	 * open or a conflict with the target branch, amber for what waits on you.
+	 *
+	 * @return list<HintToneEnum>
+	 */
+	private function subtabTones(CardSubtabEnum $cardSubtab, CardObject $cardObject, ?WorktreeEntity $worktreeEntity, ?ReadinessObject $readiness): array
+	{
+		return match ($cardSubtab) {
+			CardSubtabEnum::BRANCH => array_values(array_filter([
+				$worktreeEntity?->isRebasing === true || $cardObject->conflictedFiles !== [] ? HintToneEnum::RED : null,
+				(int) $worktreeEntity?->behind > 0 || (int) $worktreeEntity?->ahead > 0 ? HintToneEnum::AMBER : null,
+			])),
+			CardSubtabEnum::SETUP => $readiness !== null && ! $readiness->isReady() ? [HintToneEnum::AMBER] : [],
+			default => [],
+		};
+	}
+
+	/**
+	 * The colours of a main tab: what its subtabs show, gathered, so one dot says it all.
+	 *
+	 * @return list<HintToneEnum>
+	 */
+	private function tabTones(CardTabEnum $cardTab, CardObject $cardObject, ?WorktreeEntity $worktreeEntity, ?ReadinessObject $readiness): array
+	{
+		$tones = match ($cardTab) {
+			CardTabEnum::CHAT => $cardObject->hasUnreadQuestion ? [HintToneEnum::AMBER] : [],
+			CardTabEnum::WORKING_COPY => $worktreeEntity === null ? [] : [
+				...$this->subtabTones(CardSubtabEnum::BRANCH, $cardObject, $worktreeEntity, $readiness),
+				...$this->subtabTones(CardSubtabEnum::SETUP, $cardObject, $worktreeEntity, $readiness),
+			],
+			default => [],
+		};
+
+		return array_values(array_filter(HintToneEnum::cases(), fn (HintToneEnum $hintTone): bool => in_array($hintTone, $tones, true)));
 	}
 
 	/**

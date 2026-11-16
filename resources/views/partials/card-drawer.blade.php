@@ -93,8 +93,8 @@
 				<button type="button" role="tab" aria-selected="{{ $tab === $drawerTab['tab']->value ? 'true' : 'false' }}" :aria-selected="(pendingTab ?? @js($tab)) === @js($drawerTab['tab']->value)" @click="if (@js($tab) !== @js($drawerTab['tab']->value)) { pendingTab = @js($drawerTab['tab']->value); pendingView = pendingTab; compact = false }" wire:click="setDrawerTab('{{ $drawerTab['tab']->value }}')" aria-label="{{ $drawerTab['tab']->label() }}">
 					<x-icon :name="$drawerTab['tab']->icon()"/>
 					<span class="tab-label">{{ $drawerTab['tab']->label() }}</span>
-					@if ($drawerTab['isWaiting'])
-						<span class="waits" title="{{ __('Wacht op jou') }}"></span>
+					@if ($drawerTab['tones'] !== [])
+						<x-hint-dot :tones="$drawerTab['tones']"/>
 					@elseif ($drawerTab['unread'] > 0)
 						<span class="tunread" title="{{ trans_choice(':count nieuwe melding|:count nieuwe meldingen', $drawerTab['unread'], ['count' => $drawerTab['unread']]) }}">{{ $drawerTab['unread'] }}</span>
 					@endif
@@ -109,9 +109,9 @@
 				<nav class="segmented" aria-label="{{ __($tab) }}">
 					@foreach ($tabSubtabs as $subtabRow)
 						<button type="button" @if ($subtab === $subtabRow['subtab']) aria-current="page" @endif @click="if (@js($subtab->value) !== @js($subtabRow['subtab']->value)) { pendingView = @js($tab . ':' . $subtabRow['subtab']->value); compact = false }" wire:click="setDrawerSubtab('{{ $subtabRow['subtab']->value }}')">
-							@if ($subtabRow['isWaiting'])<span class="waits" title="{{ __('Wacht op jou') }}"></span>@endif
+							<x-hint-dot :tones="$subtabRow['tones']"/>
 							{{ $subtabRow['subtab']->label() }}
-							@if ($subtabRow['note'] !== '')<span class="note">{{ $subtabRow['note'] }}</span>@endif
+							@if ($subtabRow['count'] > 0)<span class="note">{{ $subtabRow['count'] }}</span>@endif
 						</button>
 					@endforeach
 				</nav>
