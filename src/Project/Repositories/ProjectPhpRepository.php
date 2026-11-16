@@ -52,6 +52,13 @@ class ProjectPhpRepository implements ProjectPhpRepositoryContract
 			: ['composer', ...$arguments, ...$ignored];
 	}
 
+	public function hasComposerScript(string $path, string $script): bool
+	{
+		$composer = json_decode((string) @file_get_contents($path . '/composer.json'), true);
+
+		return is_array($composer) && isset($composer['scripts'][$script]);
+	}
+
 	public function siteVersion(string $site): ?string
 	{
 		$herdBin = $this->herdBin();

@@ -91,7 +91,8 @@ class CheckWorkflowAction extends Command
 			? array_values(array_filter(self::FALLBACK_RULES, fn (string $file) => is_file($root . '/' . $file)))
 			: [];
 
-		$commandWorks = $this->commandWorks($lensEntity->command, $root);
+		$command = GetLensCommandAction::execute($lensEntity, $root);
+		$commandWorks = $this->commandWorks($command, $root);
 		$found = array_filter($paths, fn (array $path) => $path['count'] > 0);
 
 		// a path that does not exist here is skipped; only a lens with none
@@ -107,6 +108,7 @@ class CheckWorkflowAction extends Command
 			'paths' => $paths,
 			'reads' => $reads === [] ? $fallback : $reads,
 			'isFallback' => $reads === [],
+			'command' => $command,
 			'commandWorks' => $commandWorks,
 			'state' => $state,
 		];

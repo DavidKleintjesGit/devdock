@@ -15,7 +15,7 @@ use Src\Review\Objects\LensEntity;
  * The verdict block is a machine format and stays as written here; its other
  * half is ReadVerdictAction.
  *
- * @method static string execute(LensEntity $lensEntity, array $files, ?string $previousReport)
+ * @method static string execute(LensEntity $lensEntity, array $files, ?string $previousReport, array $rules = [], ?string $base = null, array $newFiles = [], ?string $command = null)
  */
 class ComposeLensContextAction extends Command
 {
@@ -30,6 +30,7 @@ class ComposeLensContextAction extends Command
 		public readonly array $rules = [],
 		public readonly ?string $base = null,
 		public readonly array $newFiles = [],
+		public readonly ?string $command = null,
 	) {}
 
 	public function handle(): string
@@ -98,9 +99,9 @@ class ComposeLensContextAction extends Command
 			$lines[] = __('- Beoordeel tegen deze regelbestanden: :files', ['files' => implode(', ', $this->rules)]);
 		}
 
-		if ($this->lensEntity->command !== null) {
+		if ($this->command !== null) {
 			$lines[] = __('- Draai :command en neem de uitkomst mee in je oordeel.', [
-				'command' => $this->lensEntity->command,
+				'command' => $this->command,
 			]);
 		}
 

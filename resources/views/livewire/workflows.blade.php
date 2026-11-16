@@ -152,8 +152,8 @@
 											@endif
 											@if ($item['check'])
 												<span class="chips" style="align-items:center"><span class="muted">{{ __('leest') }}</span>@forelse ($item['check']['reads'] as $file)<span class="path" style="background:var(--accent-soft);color:var(--accent-ink)">{{ $file }}</span>@empty<span class="hint">{{ __('niets') }}</span>@endforelse @if ($item['check']['isFallback'] && $item['check']['reads'] !== [])<span class="hint" style="color:var(--amber)">{{ __('geen eigen regelbestand') }}</span>@endif</span>
-												@if ($item['lens']->command && ($item['lens']->command !== $item['lens']->standardCommand || ! $item['check']['commandWorks']))
-													<span class="chips" style="align-items:center"><span class="muted">{{ __('draait') }}</span><span @class(['path', 'deny' => ! $item['check']['commandWorks']])>{{ $item['lens']->command }}</span></span>
+												@if ($item['check']['command'] && ($item['check']['command'] !== $item['lens']->standardCommand || ! $item['check']['commandWorks']))
+													<span class="chips" style="align-items:center"><span class="muted">{{ __('draait') }}</span><span @class(['path', 'deny' => ! $item['check']['commandWorks']])>{{ $item['check']['command'] }}</span></span>
 												@endif
 											@endif
 										</span>

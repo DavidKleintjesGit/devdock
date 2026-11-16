@@ -13,7 +13,7 @@ use Src\Review\Objects\LensEntity;
  * line that sends it there. The assignment is a file rather than a prompt, so
  * it can be read back afterwards exactly as the lens got it.
  *
- * @method static string execute(string $worktreePath, LensEntity $lensEntity, array $files, ?string $previousReport, array $rules = [], ?string $base = null, array $newFiles = [])
+ * @method static string execute(string $worktreePath, LensEntity $lensEntity, array $files, ?string $previousReport, array $rules = [], ?string $base = null, array $newFiles = [], ?string $command = null)
  */
 class WriteLensContextAction extends Command
 {
@@ -28,6 +28,7 @@ class WriteLensContextAction extends Command
 		public readonly array $rules = [],
 		public readonly ?string $base = null,
 		public readonly array $newFiles = [],
+		public readonly ?string $command = null,
 	) {}
 
 	public function handle(AgentContextRepositoryContract $agentContextRepository): string
@@ -35,7 +36,7 @@ class WriteLensContextAction extends Command
 		$agentContextRepository->writeLensContext(
 			$this->worktreePath,
 			$this->lensEntity->name,
-			ComposeLensContextAction::execute($this->lensEntity, $this->files, $this->previousReport, $this->rules, $this->base, $this->newFiles),
+			ComposeLensContextAction::execute($this->lensEntity, $this->files, $this->previousReport, $this->rules, $this->base, $this->newFiles, $this->command),
 		);
 
 		return self::assignmentFor($agentContextRepository->lensPath($this->lensEntity->name));

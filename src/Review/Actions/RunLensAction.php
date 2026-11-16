@@ -115,6 +115,7 @@ class RunLensAction extends Command implements ShouldQueue
 					$project === null ? [] : $this->rulesFor($project, $lensEntity),
 					$worktreeRepository->getBranchBase($directory),
 					array_values(array_intersect($touched, $worktreeRepository->getUntrackedFiles($directory))),
+					GetLensCommandAction::execute($lensEntity, $directory),
 				),
 				$this->logPath($lensEntity),
 				fn (array $event) => $this->note($reviewRoundRepository, $event),

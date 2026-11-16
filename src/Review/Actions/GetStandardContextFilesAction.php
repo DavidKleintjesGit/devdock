@@ -99,7 +99,7 @@ class GetStandardContextFilesAction extends Command
 				key: 'assignment',
 				name: __('Lensopdracht'),
 				description: __('zo krijgt de lens hem; een taak vult de bestanden en het vorige rapport in'),
-				contents: ComposeLensContextAction::execute($lensEntity, [__('<de bestanden die de taak raakte>')], null, $lensEntity->rules, __('<begin van de branch>')),
+				contents: ComposeLensContextAction::execute($lensEntity, [__('<de bestanden die de taak raakte>')], null, $lensEntity->rules, __('<begin van de branch>'), [], $lensEntity->command),
 			),
 		];
 	}

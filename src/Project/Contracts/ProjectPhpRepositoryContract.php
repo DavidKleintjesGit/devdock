@@ -28,6 +28,11 @@ interface ProjectPhpRepositoryContract
 	public function composerCommand(string $path, array $arguments): array;
 
 	/**
+	 * Whether the composer.json in the folder defines this script.
+	 */
+	public function hasComposerScript(string $path, string $script): bool;
+
+	/**
 	 * The PHP version Herd serves a site with, as major.minor; null without Herd.
 	 */
 	public function siteVersion(string $site): ?string;
