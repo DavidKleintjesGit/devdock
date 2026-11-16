@@ -51,7 +51,7 @@
 		</x-panel>
 
 		@if ($changeCount > 0)
-			<x-panel :title="__('Commit')">
+			<x-panel class="fit" :title="__('Commit')">
 				<x-slot:actions>
 					<x-busy-button action="suggestCommitMessage" class="btn text xs" icon="pencil" :busy="__('Bezig...')">{{ __('Laat de agent schrijven') }}</x-busy-button>
 				</x-slot:actions>
@@ -60,9 +60,9 @@
 					<input id="commit-title" @class(['input', 'invalid' => $errors->has('commitMessage')]) type="text" wire:model="commitMessage" x-on:input="length = $event.target.value.length" placeholder="{{ $card->suggestedCommitMessage() }}" autocomplete="off">
 					@error('commitMessage')<span class="err">{{ $message }}</span>@enderror
 				</div>
-				<div class="field grow-field">
+				<div class="field">
 					<span class="counter-row"><label for="commit-body" style="font-size:13px;font-weight:500;color:var(--fg)">{{ __('Bericht') }}</label><span>{{ __('mag leeg') }}</span></span>
-					<textarea id="commit-body" class="textarea" rows="4" wire:model="commitBody"></textarea>
+					<textarea id="commit-body" class="textarea" rows="8" wire:model="commitBody"></textarea>
 				</div>
 			</x-panel>
 		@endif

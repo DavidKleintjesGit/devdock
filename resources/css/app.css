@@ -603,9 +603,8 @@ button.row{width:100%;border:0;background:transparent;text-align:left;cursor:poi
 .panel-grid.fill-grid{flex:1;min-height:0;grid-template-rows:minmax(0,1fr);align-items:stretch}
 .fill-grid>.panel{min-height:0}
 .fill-grid>.panel>.panel-body{min-height:0;overflow-y:auto}
-.fill-grid .grow-field{flex:1;min-height:0}
+.fill-grid>.panel.fit{align-self:start}
 .fill-grid .filerow .name b{font-family:inherit;font-size:13.5px;font-weight:600}
-.fill-grid .grow-field .textarea{flex:1;min-height:140px;resize:none}
 .panel .panel-body>.list,.panel .panel-body>.dsec>.list{border:0;border-radius:0}
 .panel-head .seg{flex:none}
 .fact-grid{flex:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:stretch}
