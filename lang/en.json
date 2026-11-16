@@ -1784,6 +1784,5 @@
     "Je bericht kwam niet bij de agent": "Your message did not reach the agent",
     "Er ging geen ronde open": "No round opened",
     "Vastgelegd en gepusht naar origin.": "Committed and pushed to origin.",
-    "Dit loopt in de achtergrond; je kunt intussen gewoon verder of het paneel sluiten.": "This runs in the background; you can carry on or close the panel.",
-    "Daarna nog :count klus in de rij. Je kunt intussen gewoon verder of het paneel sluiten.|Daarna nog :count klussen in de rij. Je kunt intussen gewoon verder of het paneel sluiten.": "Then :count more task in line. You can carry on or close the panel.|Then :count more tasks in line. You can carry on or close the panel."
+    "Daarna nog :count klus in de rij.|Daarna nog :count klussen in de rij.": "Then :count more task in line.|Then :count more tasks in line."
 }
