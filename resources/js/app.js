@@ -559,16 +559,84 @@ const skeletonFor = (path) => {
 	return ['/sessies', '/toegang'].includes(path) ? 'skeleton-page' : 'skeleton-split';
 };
 
-document.addEventListener('livewire:navigate', (event) => {
-	const url = new URL(event.detail?.url ?? window.location.href, window.location.origin);
-	const page = document.querySelector('.shell > :not(.side):not(.tabbar)');
-	const template = document.getElementById(skeletonFor(url.pathname));
+// Each page you saw is kept as it looked, so the next visit shows its own
+// layout at once, dimmed, instead of a general outline.
+const GHOST_KEY = 'devdock.page-ghost.';
 
-	if (page === null || template === null || url.pathname === window.location.pathname) {
+const currentPage = () => document.querySelector('.shell > :not(.side):not(.tabbar)');
+
+const keepGhost = () => {
+	const page = currentPage();
+
+	if (page === null || page.classList.contains('ghost') || page.classList.contains('sk')) {
 		return;
 	}
 
-	page.replaceWith(template.content.firstElementChild.cloneNode(true));
+	try {
+		sessionStorage.setItem(GHOST_KEY + window.location.pathname, page.outerHTML);
+	} catch {
+		// a full storage keeps no ghost; the general outline still shows
+	}
+};
+
+const ghostFor = (path) => {
+	let html = null;
+
+	try {
+		html = sessionStorage.getItem(GHOST_KEY + path);
+	} catch {
+		return null;
+	}
+
+	if (! html) {
+		return null;
+	}
+
+	const template = document.createElement('template');
+	template.innerHTML = html;
+	const ghost = template.content.firstElementChild;
+
+	if (ghost === null) {
+		return null;
+	}
+
+	// the ghost only shows; nothing in it may start a component or answer a click
+	ghost.querySelectorAll('script, .drawer, .scrim, dialog').forEach((element) => element.remove());
+	[ghost, ...ghost.querySelectorAll('*')].forEach((element) => {
+		[...element.attributes].forEach((attribute) => {
+			if (/^(wire:|x-|@|:)/.test(attribute.name)) {
+				element.removeAttribute(attribute.name);
+			}
+		});
+	});
+	ghost.classList.add('ghost');
+	ghost.setAttribute('inert', '');
+	ghost.setAttribute('aria-busy', 'true');
+
+	return ghost;
+};
+
+document.addEventListener('livewire:navigated', keepGhost);
+window.addEventListener('pagehide', keepGhost);
+
+document.addEventListener('livewire:navigate', (event) => {
+	const url = new URL(event.detail?.url ?? window.location.href, window.location.origin);
+	const page = currentPage();
+
+	if (page === null || url.pathname === window.location.pathname) {
+		return;
+	}
+
+	keepGhost();
+
+	const ghost = ghostFor(url.pathname);
+	const template = document.getElementById(skeletonFor(url.pathname));
+
+	if (ghost !== null) {
+		page.replaceWith(ghost);
+	} else if (template !== null) {
+		page.replaceWith(template.content.firstElementChild.cloneNode(true));
+	}
 
 	document.querySelectorAll('.side .nav a, .tabbar a').forEach((link) => {
 		new URL(link.href).pathname === url.pathname ? link.setAttribute('aria-current', 'page') : link.removeAttribute('aria-current');

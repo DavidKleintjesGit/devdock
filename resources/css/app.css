@@ -1371,3 +1371,7 @@ body.window{margin:0;background:var(--surface)}
 .sk-body{display:flex;flex-direction:column;gap:10px;padding:28px 44px;max-width:var(--content)}
 .sk .sk-row{height:52px;border-radius:12px}
 @media (max-width:760px){.sk-columns{grid-template-columns:minmax(0,1fr)}.sk-phead,.sk-body,.sk-head{padding-left:16px;padding-right:16px}}
+
+/* a page as you last saw it, while its new state is on its way */
+.ghost{pointer-events:none;user-select:none;animation:ghost 1.2s ease-in-out infinite}
+@keyframes ghost{0%,100%{opacity:.55}50%{opacity:.3}}
