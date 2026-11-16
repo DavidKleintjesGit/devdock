@@ -19,7 +19,7 @@
 		<div class="context-columns">
 			<nav class="context-tree" aria-label="{{ __('Bronnen') }}">
 				@forelse ($contextOrigins as $contextOrigin)
-					<details class="context-root" wire:key="origin-{{ $contextOrigin['origin']->value }}" @if ($contextOrigin['isOpen']) open @endif>
+					<details class="context-root" wire:key="origin-{{ $contextOrigin['origin']->value }}" wire:ignore.self @if ($contextOrigin['isOpen']) open @endif>
 						<summary>
 							<x-icon name="chev" small/>
 							<span class="grow"><b>{{ $contextOrigin['origin']->label() }}</b><span class="origin-hint">{{ $contextOrigin['origin']->hint() }}</span></span>
