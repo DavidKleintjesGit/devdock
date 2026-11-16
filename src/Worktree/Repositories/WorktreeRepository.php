@@ -722,10 +722,14 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		]);
 	}
 
-	public function getFingerprint(string $path): ?string
+	public function getFingerprint(string $path, bool $isFresh = false): ?string
 	{
 		if (! is_dir($path)) {
 			return null;
+		}
+
+		if ($isFresh) {
+			Cache::forget('worktree.fingerprint.' . md5($path));
 		}
 
 		return $this->remember(

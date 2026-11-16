@@ -1353,3 +1353,8 @@ body.is-working .working{opacity:1}
 
 /* a panel you closed is gone at once; the page catches up behind it */
 body.drawer-closing :is(.drawer, .scrim){display:none}
+
+/* the changes of a card in a window of their own */
+body.window{margin:0;background:var(--surface)}
+.changes-window{height:100vh;height:100dvh;display:flex;flex-direction:column;background:var(--surface)}
+.icon-btn.is-busy{opacity:.5}

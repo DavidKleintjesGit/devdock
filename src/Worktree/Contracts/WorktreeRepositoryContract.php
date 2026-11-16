@@ -162,8 +162,9 @@ interface WorktreeRepositoryContract
 	/**
 	 * A hash of everything this branch changed against the main line,
 	 * committed or not. It moves with every change, and not with a commit.
+	 * Fresh reads git again instead of the kept answer.
 	 */
-	public function getFingerprint(string $path): ?string;
+	public function getFingerprint(string $path, bool $isFresh = false): ?string;
 
 	/**
 	 * Every file this branch changed against the main line, committed and

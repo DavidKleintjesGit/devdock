@@ -89,7 +89,6 @@ use Src\Task\Enums\TaskLinkKindEnum;
 use Src\Task\Objects\TaskEntity;
 use Src\Ticket\Actions\GetTicketsAction;
 use Src\Ticket\Objects\TicketEntity;
-use Src\Worktree\Actions\BuildFileTreeAction;
 use Src\Worktree\Actions\CheckReadinessAction;
 use Src\Worktree\Actions\EnsureReadyAction;
 use Src\Worktree\Actions\GetChangesAction;
@@ -136,11 +135,6 @@ class Drawer extends Component
 	use WithSessionActions;
 	use WithSetup;
 	use WithWorkingCopy;
-
-	/**
-	 * A file with more changed lines than this opens closed in the code reader.
-	 */
-	private const LARGE_DIFF_LINES = 600;
 
 	private const MAX_ATTACHMENTS = 10;
 
@@ -1554,44 +1548,7 @@ class Drawer extends Component
 
 		return $worktreeEntity === null
 			? []
-			: BuildFileTreeAction::execute(collect($this->viewChanges($worktreeEntity, $diffView))->values()->all());
-	}
-
-	/**
-	 * Every changed file of one view, in the order of the tree, for the page
-	 * that shows them under each other. Each file reads its own changes once
-	 * it comes into view.
-	 *
-	 * @param  array<int, FileTreeNodeObject>  $diffTree
-	 * @return array<int, array{change: ChangeObject, fingerprint: string, isLarge: bool, isGenerated: bool}>
-	 */
-	private function stackedDiffs(WorktreeEntity $worktreeEntity, DiffViewEnum $diffView, array $diffTree): array
-	{
-		$worktreeRepository = resolve(WorktreeRepositoryContract::class);
-		$changes = collect($this->viewChanges($worktreeEntity, $diffView))->keyBy('path');
-		$generatedFiles = $worktreeRepository->getGeneratedFiles($worktreeEntity->path, $changes->keys()->all());
-		$files = [];
-
-		foreach (array_merge([], ...array_map(fn (FileTreeNodeObject $node) => $node->filePaths(), $diffTree)) as $path) {
-			$changeObject = $changes->get($path);
-
-			if ($changeObject === null) {
-				continue;
-			}
-
-			$wholePath = $worktreeEntity->path . '/' . $path;
-
-			$files[] = [
-				'change' => $changeObject,
-				// read without git, so the page asks for no patch until a file is in view; a new save of the file un-views it
-				'fingerprint' => md5(implode(':', [$changeObject->added, $changeObject->removed, @filemtime($wholePath) ?: 0, @filesize($wholePath) ?: 0])),
-				// a file this large opens closed, so the page stays quick; opening it shows it in full
-				'isLarge' => $changeObject->added + $changeObject->removed > self::LARGE_DIFF_LINES,
-				'isGenerated' => in_array($path, $generatedFiles, true),
-			];
-		}
-
-		return $files;
+			: $this->diffTreeOf($worktreeEntity, $diffView);
 	}
 
 	private function branchSuggestion(?CardObject $cardObject): string

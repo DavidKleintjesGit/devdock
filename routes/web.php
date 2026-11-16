@@ -9,6 +9,7 @@ use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\LoginController;
 use App\Livewire\Access;
 use App\Livewire\Board;
+use App\Livewire\Changes;
 use App\Livewire\Rules;
 use App\Livewire\Sessions;
 use App\Livewire\Skills;
@@ -28,6 +29,7 @@ Route::middleware('auth')->group(function (): void {
 	Route::get('/', Board::class)->name('board');
 
 	Route::get('/sessies', Sessions::class)->name('sessions');
+	Route::get('/kaarten/{card}/wijzigingen', Changes::class)->where('card', '.+')->name('changes');
 	Route::get('/workflows', Workflows::class)->name('workflows');
 	Route::get('/regels', Rules::class)->name('rules');
 	Route::get('/skills', Skills::class)->name('skills');

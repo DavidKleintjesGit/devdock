@@ -1784,5 +1784,9 @@
     "Je bericht kwam niet bij de agent": "Your message did not reach the agent",
     "Er ging geen ronde open": "No round opened",
     "Vastgelegd en gepusht naar origin.": "Committed and pushed to origin.",
-    "Daarna nog :count klus in de rij.|Daarna nog :count klussen in de rij.": "Then :count more task in line.|Then :count more tasks in line."
+    "Daarna nog :count klus in de rij.|Daarna nog :count klussen in de rij.": "Then :count more task in line.|Then :count more tasks in line.",
+    "In eigen venster": "Open in its own window",
+    "Gewijzigd · vernieuwen": "Changed · refresh",
+    "Vernieuwen": "Refresh",
+    "Deze kaart heeft geen werkkopie meer.": "This card no longer has a working copy."
 }
