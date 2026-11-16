@@ -71,6 +71,7 @@ class RunPromptAction extends Command
 				GetReadableDirectoriesAction::execute($promptRunEntity->card),
 				$promptRunRepository->logPath($this->promptRunId),
 				$promptRunRepository->writeInstructions($this->promptRunId, implode("\n\n", array_filter([
+					DescribeWorkAction::execute(),
 					DescribeChatAction::execute(),
 					$promptRunEntity->directory === null ? null : resolve(AgentContextRepositoryContract::class)->getAgentContext($promptRunEntity->directory),
 				]))),

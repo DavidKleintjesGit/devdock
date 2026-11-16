@@ -6,6 +6,7 @@ namespace Src\Review\Actions;
 
 use Src\Packages\Cqrs\Command;
 use Src\Prompt\Actions\DescribeChatAction;
+use Src\Prompt\Actions\DescribeWorkAction;
 use Src\Review\Contracts\AgentContextRepositoryContract;
 use Src\Review\Enums\ContextChoiceEnum;
 use Src\Review\Enums\WorkflowStepEnum;
@@ -52,6 +53,7 @@ class GetStandardContextFilesAction extends Command
 
 		return [
 			new ContextFileObject(key: 'standing', name: __('Vaste afspraken'), group: __('Voor elke taak'), description: __('wie de agent is en wat hij nooit zonder ja doet'), contents: $blocks['standing'] ?? null),
+			new ContextFileObject(key: 'work', name: __('Werkwijze en rapport'), group: __('Voor elke taak'), description: __('hoe hij werkt en hoe hij elke beurt afsluit'), contents: DescribeWorkAction::execute()),
 			new ContextFileObject(key: 'chat', name: __('Chatinstructies'), group: __('Voor elke taak'), description: __('hoe hij mockups en keuzes schrijft'), contents: DescribeChatAction::execute()),
 			...array_map(
 				fn (WorkflowStepEnum $step) => new ContextFileObject(key: 'step:' . $step->value, name: $step->label(), group: __('Per stap van de taak'), contents: $blocks[$step->value] ?? null),

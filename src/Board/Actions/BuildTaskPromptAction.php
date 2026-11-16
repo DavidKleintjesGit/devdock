@@ -7,7 +7,6 @@ namespace Src\Board\Actions;
 use Src\Board\Enums\PromptSourceEnum;
 use Src\Board\Objects\CardObject;
 use Src\Packages\Cqrs\Command;
-use Src\Prompt\Actions\DescribeReportAction;
 use Src\PullRequest\Actions\BuildReviewPromptAction;
 use Src\PullRequest\Objects\PullRequestEntity;
 use Src\Review\Actions\BuildRoundPromptAction;
@@ -50,7 +49,7 @@ class BuildTaskPromptAction extends Command
 			return null;
 		}
 
-		return implode("\n\n", [...$parts, $this->howToGoAbout($cardObject)]);
+		return implode("\n\n", $parts);
 	}
 
 	/**
@@ -101,27 +100,5 @@ class BuildTaskPromptAction extends Command
 			->all();
 
 		return $pullRequestIds === [] ? null : BuildReviewPromptAction::execute($pullRequestIds);
-	}
-
-	/**
-	 * The ground rules every first prompt carries: look before you change, and
-	 * nothing leaves the machine unasked.
-	 */
-	private function howToGoAbout(CardObject $cardObject): string
-	{
-		$lines = [__('Werkwijze:')];
-
-		if ($cardObject->branch !== null) {
-			$lines[] = __('- Je werkt op branch :branch.', ['branch' => $cardObject->branch]);
-		}
-
-		return implode("\n", [
-			...$lines,
-			__('- Lees eerst de code die hierbij hoort en leg me een plan voor voordat je iets aanpast.'),
-			__('- Volg de regels uit CLAUDE.md en draai de tests van wat je aanraakt.'),
-			__('- Git lees je alleen. Committen, pushen en rebasen doe ik met de knoppen in DevDock, en DevDock houdt het voor jou tegen. Laat je werk in de werkkopie staan.'),
-			__('- Plaats nergens een reactie zonder dat ik daar eerst ja op heb gezegd.'),
-			DescribeReportAction::execute(),
-		]);
 	}
 }

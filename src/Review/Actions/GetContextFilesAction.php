@@ -6,6 +6,7 @@ namespace Src\Review\Actions;
 
 use Src\Packages\Cqrs\Command;
 use Src\Prompt\Actions\DescribeChatAction;
+use Src\Prompt\Actions\DescribeWorkAction;
 use Src\Prompt\Actions\GetLatestPromptRunAction;
 use Src\Review\Contracts\AgentContextRepositoryContract;
 use Src\Review\Enums\ContextChoiceEnum;
@@ -58,6 +59,12 @@ class GetContextFilesAction extends Command
 				path: $agentContextRepository->relativePath(),
 				contents: ($this->workingPath === null ? null : $agentContextRepository->getAgentContext($this->workingPath))
 					?? ComposeAgentContextAction::execute($this->card, $this->workingPath),
+			),
+			new ContextFileObject(
+				key: 'work',
+				name: __('Werkwijze en rapport'),
+				description: __('hoe hij werkt en hoe hij elke beurt afsluit'),
+				contents: DescribeWorkAction::execute(),
 			),
 			new ContextFileObject(
 				key: 'chat',

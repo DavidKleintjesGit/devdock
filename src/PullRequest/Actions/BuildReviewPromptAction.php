@@ -6,7 +6,6 @@ namespace Src\PullRequest\Actions;
 
 use Illuminate\Support\Collection;
 use Src\Packages\Cqrs\Command;
-use Src\Prompt\Actions\DescribeReportAction;
 use Src\PullRequest\Contracts\PullRequestRepositoryContract;
 use Src\PullRequest\Objects\PullRequestEntity;
 use Src\PullRequest\Objects\PullRequestId;
@@ -144,8 +143,6 @@ class BuildReviewPromptAction extends Command
 			__('- Is het nog open, pas het dan aan volgens de regels uit CLAUDE.md en draai de tests van wat je aanraakt.'),
 			__('- Ben je het ergens niet mee eens, schrijf dan een voorstel voor een antwoord en laat het aan mij zien.'),
 			__('- Plaats geen reacties in Bitbucket en vink geen opmerkingen af zonder dat ik daar eerst ja op heb gezegd. Leg het voor, wacht op mijn akkoord en doe het daarna pas.'),
-			__('- Git lees je alleen. Committen, pushen en rebasen doe ik met de knoppen in DevDock, en DevDock houdt het voor jou tegen. Laat je werk in de werkkopie staan.'),
-			DescribeReportAction::execute(),
 		]);
 	}
 }
