@@ -66,8 +66,8 @@ class GetBoardAction extends Command
 
 		$cardObjectCollection = BuildBoardAction::execute();
 
-		// the git state on the cards has its own cache of this length; the board never outlives it
-		Cache::put(self::KEY, ['version' => $version, 'board' => serialize($cardObjectCollection)], (int) config('devdock.worktree.status_seconds'));
+		// the git state on the cards is kept this long by the fetch round; the board never outlives it
+		Cache::put(self::KEY, ['version' => $version, 'board' => serialize($cardObjectCollection)], (int) config('devdock.worktree.keep_seconds'));
 
 		return $cardObjectCollection;
 	}

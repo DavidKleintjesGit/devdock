@@ -19,10 +19,10 @@ use Src\Session\Enums\SessionTraitEnum;
 class AppLayout extends Component
 {
 	/**
-	 * The signals in the side bar are worth a short wait, not a full board
-	 * on every page.
+	 * How long the count of projects behind their library holds: it reads the
+	 * rule files of every project, and libraries change seldom.
 	 */
-	private const SIGNAL_SECONDS = 30;
+	private const BEHIND_SECONDS = 300;
 
 	public function __construct(public ?string $title = null)
 	{
@@ -42,11 +42,12 @@ class AppLayout extends Component
 	 */
 	private function navigation(): array
 	{
-		$signals = Cache::remember('navigation.signals', self::SIGNAL_SECONDS, fn () => [
+		// the board and the session traits are kept ready by the fetch round, so these read what is there
+		$signals = [
 			'yours' => collect(GetBoardAction::execute())->filter(fn (CardObject $cardObject) => $cardObject->isYourTurn())->count(),
 			'sessions' => $this->sessionsThatCanGo(),
-			'behind' => $this->projectsBehind(),
-		]);
+			'behind' => Cache::remember('navigation.behind', self::BEHIND_SECONDS, fn (): int => $this->projectsBehind()),
+		];
 
 		return [
 			'board' => ['label' => 'Bord', 'icon' => 'bord', 'pill' => $signals['yours'] ?: null, 'count' => null, 'flag' => null],

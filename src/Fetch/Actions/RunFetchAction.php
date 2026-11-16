@@ -6,6 +6,7 @@ namespace Src\Fetch\Actions;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Str;
 use Src\Board\Actions\GetBoardAction;
 use Src\Fetch\Contracts\FetchRunRepositoryContract;
@@ -19,6 +20,7 @@ use Src\PullRequest\Actions\FetchPullRequestsAction;
 use Src\PullRequest\Contracts\PullRequestSourceRepositoryContract;
 use Src\Review\Actions\ResumeReviewLoopsAction;
 use Src\Rule\Actions\ScanRulesAction;
+use Src\Session\Actions\GetSessionTraitsAction;
 use Src\Session\Actions\ScanSessionsAction;
 use Src\Skill\Actions\ScanSkillsAction;
 use Src\Ticket\Actions\FetchTicketsAction;
@@ -122,8 +124,15 @@ class RunFetchAction extends Command
 		// for them; it is built after the round is marked finished, since that changes it too
 		try {
 			GetBoardAction::execute();
+			// the traits of the sessions ask git about every project; a page reads them ready
+			GetSessionTraitsAction::execute(true);
+
+			// every click reads the routes; ready made they save a third of its start
+			if (! app()->routesAreCached() && ! app()->runningUnitTests()) {
+				Artisan::call('route:cache');
+			}
 		} catch (Throwable $failure) {
-			// the round itself is done; a page that finds no board ready builds it itself
+			// the round itself is done; a page that finds nothing ready works it out itself
 			report($failure);
 		}
 
@@ -131,11 +140,12 @@ class RunFetchAction extends Command
 	}
 
 	/**
-	 * Long enough to bridge the gap to the next automatic round.
+	 * Long enough to bridge the gap to the next automatic round, even when a
+	 * round itself takes minutes.
 	 */
 	private function statusKeepSeconds(): int
 	{
-		return max((int) config('devdock.worktree.status_seconds'), (int) config('devdock.refresh_seconds') * 3);
+		return (int) config('devdock.worktree.keep_seconds');
 	}
 
 	private function isResting(FetchSourceEnum $source, FetchRunRepositoryContract $fetchRunRepository): bool

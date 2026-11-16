@@ -7,6 +7,7 @@ namespace Src\Session\Actions;
 use Carbon\CarbonImmutable;
 use FilesystemIterator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use Src\Board\Actions\BuildBoardAction;
@@ -26,19 +27,45 @@ use Src\Worktree\Objects\WorktreeEntity;
  * Every trait of every session, keyed by its uuid. The traits stack: the
  * page shows what has all of the ones you switched on.
  *
- * @method static array<string, array<int, SessionTraitEnum>> execute()
+ * Reading them asks git about every project and builds the board, so the
+ * fetch round works them out fresh and a page reads what the round kept.
+ *
+ * @method static array<string, array<int, SessionTraitEnum>> execute(bool $isFresh = false)
  */
 class GetSessionTraitsAction extends Command
 {
+	private const KEY = 'session.traits';
+
 	/**
 	 * A session that wrote to its file this recently is still going.
 	 */
 	private const RUNNING_MINUTES = 3;
 
+	public function __construct(
+		public readonly bool $isFresh = false,
+	) {}
+
 	/**
 	 * @return array<string, array<int, SessionTraitEnum>>
 	 */
 	public function handle(): array
+	{
+		$kept = $this->isFresh ? null : Cache::get(self::KEY);
+
+		if (is_array($kept)) {
+			return $kept;
+		}
+
+		$traits = $this->traits();
+		Cache::forever(self::KEY, $traits);
+
+		return $traits;
+	}
+
+	/**
+	 * @return array<string, array<int, SessionTraitEnum>>
+	 */
+	private function traits(): array
 	{
 		$sessionEntities = collect(GetSessionsAction::execute());
 		$cardObjects = collect(BuildBoardAction::execute());

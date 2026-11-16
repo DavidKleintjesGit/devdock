@@ -14,6 +14,12 @@ class AppServiceProvider extends ServiceProvider
 {
 	public function register(): void
 	{
+		// the routes are kept ready by the fetch round; a routes file changed since then makes them be read fresh
+		$cachedRoutes = $this->app->getCachedRoutesPath();
+
+		if (is_file($cachedRoutes) && @filemtime(base_path('routes/web.php')) > @filemtime($cachedRoutes)) {
+			@unlink($cachedRoutes);
+		}
 	}
 
 	public function boot(): void

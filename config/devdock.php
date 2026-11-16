@@ -103,6 +103,10 @@ return [
 		// wat DevDock zelf verandert haalt de regel meteen weg, dus hij mag lang
 		'status_seconds' => (int) env('DEVDOCK_WORKTREE_STATUS_SECONDS', 60),
 
+		// how long what a fetch round read about the working copies and the
+		// board holds; long enough to reach the next round, so no click waits on git
+		'keep_seconds' => (int) env('DEVDOCK_WORKTREE_KEEP_SECONDS', 900),
+
 		// files a tool writes rather than a person; the code reader keeps them
 		// closed and loads them only on request, like a pull request does. A
 		// project marks more with linguist-generated in its .gitattributes
