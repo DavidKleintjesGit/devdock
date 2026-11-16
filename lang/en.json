@@ -1788,5 +1788,6 @@
     "In eigen venster": "Open in its own window",
     "Gewijzigd · vernieuwen": "Changed · refresh",
     "Vernieuwen": "Refresh",
-    "Deze kaart heeft geen werkkopie meer.": "This card no longer has a working copy."
+    "Deze kaart heeft geen werkkopie meer.": "This card no longer has a working copy.",
+    "Nog :count sessie tonen|Nog :count sessies tonen": "Show :count more session|Show :count more sessions"
 }

@@ -31,6 +31,11 @@ class Sessions extends Component
 	private const TRAITS_ON_ROW = 3;
 
 	/**
+	 * How many sessions the list draws at a time; the rest come with "show more".
+	 */
+	private const ROWS_AT_A_TIME = 100;
+
+	/**
 	 * A finished round of fetching brings the page up to date.
 	 */
 	protected $listeners = ['fetched' => '$refresh'];
@@ -47,6 +52,8 @@ class Sessions extends Component
 
 	/** @var array<int, string> */
 	public array $selected = [];
+
+	public int $rowsShown = self::ROWS_AT_A_TIME;
 
 	#[Url(except: null)]
 	public ?string $openSession = null;
@@ -66,6 +73,12 @@ class Sessions extends Component
 	public function updatedQuery(): void
 	{
 		$this->selected = [];
+		$this->rowsShown = self::ROWS_AT_A_TIME;
+	}
+
+	public function showMoreRows(): void
+	{
+		$this->rowsShown += self::ROWS_AT_A_TIME;
 	}
 
 	public function toggleTrait(string $trait): void
@@ -74,6 +87,7 @@ class Sessions extends Component
 			? array_values(array_diff($this->traits, [$trait]))
 			: [...$this->traits, $trait];
 		$this->selected = [];
+		$this->rowsShown = self::ROWS_AT_A_TIME;
 	}
 
 	public function resetFilters(): void
@@ -81,6 +95,7 @@ class Sessions extends Component
 		$this->query = '';
 		$this->traits = [];
 		$this->selected = [];
+		$this->rowsShown = self::ROWS_AT_A_TIME;
 		$this->clearProjects();
 	}
 
@@ -267,7 +282,9 @@ class Sessions extends Component
 		$picked = $all->filter(fn (SessionEntity $sessionEntity) => in_array($sessionEntity->uuid, $this->selected, true));
 
 		return view('livewire.sessions', [
-			'rows' => $shown->map(fn (SessionEntity $sessionEntity) => $this->row($sessionEntity, $traitsByUuid[$sessionEntity->uuid] ?? [])),
+			'rows' => $shown->take($this->rowsShown)->map(fn (SessionEntity $sessionEntity) => $this->row($sessionEntity, $traitsByUuid[$sessionEntity->uuid] ?? [])),
+			'hiddenRows' => max(0, $shown->count() - $this->rowsShown),
+			'nextRows' => min(max(0, $shown->count() - $this->rowsShown), self::ROWS_AT_A_TIME),
 			'summary' => $this->summary($all, $canGo),
 			'result' => __(':shown van :total in beeld · :size', [
 				'shown' => $shown->count(),

@@ -113,6 +113,9 @@
 						</button>
 					</div>
 				@endforeach
+				@if ($hiddenRows > 0)
+					<button class="row" type="button" style="color:var(--accent);font-size:13px;min-height:44px;justify-content:center" wire:click="showMoreRows">{{ trans_choice('Nog :count sessie tonen|Nog :count sessies tonen', $nextRows, ['count' => $nextRows]) }}</button>
+				@endif
 			</div>
 		@endif
 	</main>
