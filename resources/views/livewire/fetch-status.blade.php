@@ -1,10 +1,11 @@
-<div class="nav"
+<div class="nav">
+	{{-- Each poll sits on its own element, so the poll stops with it when the state changes. --}}
 	@if ($running)
-		wire:poll.2s="followRun"
+		<span hidden wire:key="follow-run" wire:poll.2s="followRun"></span>
 	@elseif ($lookEvery > 0)
-		wire:poll.{{ $lookEvery }}s="refreshWhenStale"
+		<span hidden wire:key="look-stale" wire:poll.{{ $lookEvery }}s="refreshWhenStale"></span>
 	@endif
->
+
 	@if ($running)
 		<button type="button" disabled>
 			<x-icon name="refresh"/>

@@ -24,6 +24,7 @@ enum FetchSourceEnum: string
 	{
 		return match ($this) {
 			self::PULL_REQUESTS, self::LIBRARIES => (int) config('devdock.bitbucket.refresh_seconds'),
+			self::PROJECTS, self::RULES, self::SKILLS => (int) config('devdock.scan_refresh_seconds'),
 			default => 0,
 		};
 	}

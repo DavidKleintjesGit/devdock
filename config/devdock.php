@@ -262,6 +262,9 @@ return [
 
 	'refresh_seconds' => (int) env('DEVDOCK_REFRESH_SECONDS', 60),
 
+	// how long the folders on disk rest between two automatic rounds: projects, rules and skills change seldom, and scanning them is the slow part of a round
+	'scan_refresh_seconds' => (int) env('DEVDOCK_SCAN_REFRESH_SECONDS', 600),
+
 	/*
 	|--------------------------------------------------------------------------
 	| Drempels
