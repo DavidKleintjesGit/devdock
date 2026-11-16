@@ -12,14 +12,16 @@ use Src\Worktree\Objects\WorkingCopyTaskObject;
 
 /**
  * Puts a task on the working copy of a card in a process of its own, so the
- * page stays free while it runs. Returns false when a task of this card is
- * still running.
+ * page stays free while it runs. A task that arrives while another of the same
+ * card runs waits its turn: one working copy does one thing at a time.
  *
  * @method static bool execute(WorkingCopyTaskObject $workingCopyTaskObject)
  */
 class StartWorkingCopyTaskAction extends Command
 {
 	public const KEY = 'worktree.task.';
+
+	public const LOCK = 'worktree.task.lock.';
 
 	public function __construct(
 		public readonly WorkingCopyTaskObject $workingCopyTaskObject,
@@ -30,21 +32,39 @@ class StartWorkingCopyTaskAction extends Command
 		return self::KEY . md5($card);
 	}
 
+	public static function lockFor(string $card): string
+	{
+		return self::LOCK . md5($card);
+	}
+
 	public function handle(DetachedCommand $detachedCommand): bool
 	{
-		if (GetWorkingCopyTaskAction::execute($this->workingCopyTaskObject->card)?->isRunning === true) {
-			return false;
-		}
+		$card = $this->workingCopyTaskObject->card;
 
-		Cache::forever(self::keyFor($this->workingCopyTaskObject->card), [
-			'task' => $this->workingCopyTaskObject->task->value,
-			'is_running' => true,
-			'started_at' => CarbonImmutable::now()->toIso8601String(),
-			'failure' => null,
-		]);
+		return Cache::lock(self::lockFor($card), 10)->block(5, function () use ($card, $detachedCommand): bool {
+			$kept = (array) Cache::get(self::keyFor($card), []);
 
-		$detachedCommand->artisan('devdock:working-copy-task --task=' . $this->workingCopyTaskObject->toArgument());
+			if (GetWorkingCopyTaskAction::execute($card)?->isRunning === true) {
+				Cache::forever(self::keyFor($card), [
+					...$kept,
+					'queued' => [...(array) ($kept['queued'] ?? []), $this->workingCopyTaskObject->toArgument()],
+				]);
 
-		return true;
+				return true;
+			}
+
+			Cache::forever(self::keyFor($card), [
+				'task' => $this->workingCopyTaskObject->task->value,
+				'is_running' => true,
+				'started_at' => CarbonImmutable::now()->toIso8601String(),
+				'failure' => null,
+				'queued' => [],
+				'endings' => (array) ($kept['endings'] ?? []),
+			]);
+
+			$detachedCommand->artisan('devdock:working-copy-task --task=' . $this->workingCopyTaskObject->toArgument());
+
+			return true;
+		});
 	}
 }

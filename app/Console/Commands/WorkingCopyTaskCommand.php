@@ -10,7 +10,8 @@ use Src\Worktree\Objects\WorkingCopyTaskObject;
 
 /**
  * Runs a task on the working copy of a card in the background, such as
- * making it, so the page that asked for it stays free.
+ * making it, so the page that asked for it stays free. The tasks that waited
+ * behind it run next, one after the other, in the same process.
  */
 class WorkingCopyTaskCommand extends Command
 {
@@ -21,6 +22,10 @@ class WorkingCopyTaskCommand extends Command
 	public function handle(): int
 	{
 		$workingCopyTaskStateObject = RunWorkingCopyTaskAction::execute(WorkingCopyTaskObject::fromArgument((string) $this->option('task')));
+
+		while ($workingCopyTaskStateObject->next !== null) {
+			$workingCopyTaskStateObject = RunWorkingCopyTaskAction::execute(WorkingCopyTaskObject::fromArgument($workingCopyTaskStateObject->next));
+		}
 
 		if ($workingCopyTaskStateObject->failure !== null) {
 			$this->components->error($workingCopyTaskStateObject->failure);

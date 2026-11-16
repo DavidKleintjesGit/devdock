@@ -17,7 +17,6 @@ use Src\Prompt\Contracts\PromptRunRepositoryContract;
 use Src\Prompt\Objects\PromptRunEntity;
 use Src\Prompt\Objects\PromptRunId;
 use Src\Worktree\Actions\CarryOverAgainAction;
-use Src\Worktree\Actions\CommitChangesAction;
 use Src\Worktree\Actions\CreateWorktreeDatabaseAction;
 use Src\Worktree\Actions\DescribeCleanUpAction;
 use Src\Worktree\Actions\EnsureWorktreeAction;
@@ -26,6 +25,7 @@ use Src\Worktree\Actions\GetWorkingCopyTaskAction;
 use Src\Worktree\Actions\GetBranchChainAction;
 use Src\Worktree\Actions\SetUpstreamAction;
 use Src\Worktree\Actions\StartWorkingCopyTaskAction;
+use Src\Worktree\Actions\TakeWorkingCopyTaskEndingsAction;
 use Src\Worktree\Actions\UseWorktreeDatabaseAction;
 use Src\Worktree\Contracts\BranchStandingRepositoryContract;
 use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
@@ -196,24 +196,23 @@ trait WithWorkingCopy
 			return;
 		}
 
-		$failure = CommitChangesAction::execute($worktreeEntity->path, $this->commitMessage, $this->commitBody, $files);
-
-		if ($failure !== null) {
-			$this->failure = __('Committen lukte niet: :reason', ['reason' => $failure]);
-
-			return;
-		}
-
-		$this->committed = trans_choice('Vastgelegd: :count bestand.|Vastgelegd: :count bestanden.', count($files), ['count' => count($files)]);
+		$this->failure = $this->startLinking(new WorkingCopyTaskObject(
+			card: (string) $this->openCard,
+			task: WorkingCopyTaskEnum::COMMIT,
+			project: $worktreeEntity->project,
+			branch: $worktreeEntity->branch,
+			path: $worktreeEntity->path,
+			files: $files,
+			message: $this->commitMessage,
+			body: $this->commitBody,
+			pushesAfter: $this->pushAfterCommit,
+		));
+		$this->committed = null;
 		$this->commitMessage = '';
 		$this->commitBody = '';
 		$this->skippedFiles = [];
-
 		// pushing along is chosen per commit; the switch is off again for the next one
-		if ($this->pushAfterCommit) {
-			$this->pushAfterCommit = false;
-			$this->pushBranch();
-		}
+		$this->pushAfterCommit = false;
 	}
 
 	public function pushBranch(): void
@@ -353,29 +352,29 @@ trait WithWorkingCopy
 	}
 
 	/**
-	 * Brings what a finished task on the open card's working copy found into
-	 * the panel, once: its message, its failure, and what it wrote. Making a
-	 * working copy keeps its own bar, so that one is left alone.
+	 * Brings what the finished tasks on the open card's working copy found
+	 * into the panel, once: the last message, a failure, and what they wrote.
+	 * It also picks up what finished while the panel was closed.
 	 */
 	public function followWorkingCopyTask(): void
 	{
-		$workingCopyTaskStateObject = GetWorkingCopyTaskAction::execute((string) $this->openCard);
-
-		if ($workingCopyTaskStateObject === null || $workingCopyTaskStateObject->isRunning || $workingCopyTaskStateObject->task === WorkingCopyTaskEnum::LINK) {
+		if ($this->openCard === null) {
 			return;
 		}
 
-		$this->failure = $workingCopyTaskStateObject->failure;
-		$this->committed = $workingCopyTaskStateObject->notice;
-		$this->commitMessage = $workingCopyTaskStateObject->result['title'] ?? $this->commitMessage;
-		$this->commitBody = $workingCopyTaskStateObject->result['body'] ?? $this->commitBody;
-		$this->newBranch = $workingCopyTaskStateObject->result['branch'] ?? $this->newBranch;
+		foreach (TakeWorkingCopyTaskEndingsAction::execute($this->openCard) as $ending) {
+			$this->failure = $ending['failure'] !== null
+				? WorkingCopyTaskEnum::from($ending['task'])->failedLabel() . ': ' . $ending['failure']
+				: $this->failure;
+			$this->committed = $ending['notice'] ?? $this->committed;
+			$this->commitMessage = $ending['result']['title'] ?? $this->commitMessage;
+			$this->commitBody = $ending['result']['body'] ?? $this->commitBody;
+			$this->newBranch = $ending['result']['branch'] ?? $this->newBranch;
 
-		if (isset($workingCopyTaskStateObject->result['tab'])) {
-			$this->setDrawerTab($workingCopyTaskStateObject->result['tab']);
+			if (isset($ending['result']['tab'])) {
+				$this->setDrawerTab($ending['result']['tab']);
+			}
 		}
-
-		ForgetWorkingCopyTaskAction::execute((string) $this->openCard);
 	}
 
 	/**

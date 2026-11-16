@@ -33,15 +33,34 @@ class StartWorkingCopyTaskActionTest extends TestCase
 	}
 
 	#[Test]
-	public function execute_refuses_a_second_task_while_one_runs_for_the_card(): void
+	public function execute_queues_a_second_task_while_one_runs_for_the_card(): void
 	{
-		$workingCopyTaskObject = new WorkingCopyTaskObject(card: 'todo:' . fake()->numberBetween(1, 100), task: WorkingCopyTaskEnum::LINK, project: fake()->slug(2), branch: 'feature/billing');
+		$card = 'todo:' . fake()->numberBetween(1, 100);
+		$workingCopyTaskObject1 = new WorkingCopyTaskObject(card: $card, task: WorkingCopyTaskEnum::LINK, project: fake()->slug(2), branch: 'feature/billing');
+		$workingCopyTaskObject2 = new WorkingCopyTaskObject(card: $card, task: WorkingCopyTaskEnum::PUSH, project: $workingCopyTaskObject1->project, branch: 'feature/billing');
+		// only the first task gets a process; the second waits in line behind it
 		$this->mock(DetachedCommand::class)->shouldReceive('artisan')->once();
-		StartWorkingCopyTaskAction::execute($workingCopyTaskObject);
+		StartWorkingCopyTaskAction::execute($workingCopyTaskObject1);
 
-		$isStarted = StartWorkingCopyTaskAction::execute($workingCopyTaskObject);
+		StartWorkingCopyTaskAction::execute($workingCopyTaskObject2);
 
-		$this->assertFalse($isStarted);
+		$this->assertSame([$workingCopyTaskObject2->toArgument()], GetWorkingCopyTaskAction::execute($card)->queued);
+	}
+
+	#[Test]
+	public function run_hands_over_to_the_next_task_in_line(): void
+	{
+		$card = 'todo:' . fake()->numberBetween(1, 100);
+		// a project that is not on disk cannot be linked, so the first task ends at once
+		$workingCopyTaskObject1 = new WorkingCopyTaskObject(card: $card, task: WorkingCopyTaskEnum::LINK, project: fake()->slug(2), branch: 'feature/billing');
+		$workingCopyTaskObject2 = new WorkingCopyTaskObject(card: $card, task: WorkingCopyTaskEnum::PUSH, project: $workingCopyTaskObject1->project, branch: 'feature/billing');
+		$this->mock(DetachedCommand::class)->shouldReceive('artisan')->once();
+		StartWorkingCopyTaskAction::execute($workingCopyTaskObject1);
+		StartWorkingCopyTaskAction::execute($workingCopyTaskObject2);
+
+		$workingCopyTaskStateObject = RunWorkingCopyTaskAction::execute($workingCopyTaskObject1);
+
+		$this->assertSame($workingCopyTaskObject2->toArgument(), $workingCopyTaskStateObject->next);
 	}
 
 	#[Test]

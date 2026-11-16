@@ -44,13 +44,11 @@ use Src\Project\Objects\ProjectEntity;
 use Src\Prompt\Actions\GetConversationAction;
 use Src\Prompt\Actions\GetLatestPromptRunAction;
 use Src\Prompt\Actions\ReadReportAction;
-use Src\Prompt\Actions\StartPromptAction;
 use Src\Prompt\Actions\StopPromptAction;
 use Src\Prompt\Contracts\AttachmentRepositoryContract;
 use Src\Prompt\Contracts\ClaudeProcessRepositoryContract;
 use Src\Prompt\Contracts\PromptRunRepositoryContract;
 use Src\Prompt\Objects\PromptRunEntity;
-use Src\Prompt\Objects\PromptRunObject;
 use Src\PullRequest\Actions\BuildReviewPromptAction;
 use Src\PullRequest\Actions\GetReviewCommentsAction;
 use Src\PullRequest\Objects\PullRequestEntity;
@@ -63,7 +61,6 @@ use Src\Review\Actions\GetWorkflowSettingAction;
 use Src\Review\Actions\ResolveWorkflowStepAction;
 use Src\Review\Actions\RetryLensAction;
 use Src\Review\Actions\SetFindingStatusAction;
-use Src\Review\Actions\StartRoundAction;
 use Src\Review\Actions\StopRoundAction;
 use Src\Review\Contracts\AgentContextRepositoryContract;
 use Src\Review\Contracts\ReviewFindingRepositoryContract;
@@ -72,7 +69,6 @@ use Src\Review\Enums\FindingStatusEnum;
 use Src\Review\Enums\LoopStatusEnum;
 use Src\Review\Enums\RoundStatusEnum;
 use Src\Review\Enums\WorkflowStepEnum;
-use Src\Review\Exceptions\RoundNotStartedException;
 use Src\Review\Objects\LensEntity;
 use Src\Review\Objects\LensId;
 use Src\Review\Objects\ReviewFindingEntity;
@@ -116,7 +112,6 @@ use Src\Worktree\Enums\WorkingCopyTaskEnum;
 use Src\Worktree\Enums\WorkKindEnum;
 use Src\Worktree\Exceptions\SetupIncompleteException;
 use Src\Worktree\Exceptions\WorkingCopyBusyException;
-use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Src\Worktree\Objects\ChangeObject;
 use Src\Worktree\Objects\DiffHunkObjectCollection;
 use Src\Worktree\Objects\FileTreeNodeObject;
@@ -267,6 +262,7 @@ class Drawer extends Component
 			$this->fitContextChoice($cardObject?->project, CardSubtabEnum::tryFrom($this->openSubtab));
 			$this->replaceDrawer('card', $this->openCard, $this->openTab);
 			$this->markTabSeen($this->openCard, $this->openTab);
+			$this->followWorkingCopyTask();
 		}
 	}
 
@@ -372,13 +368,14 @@ class Drawer extends Component
 
 		$paths = resolve(AttachmentRepositoryContract::class)->attach($cardObject->id, array_column($this->attachments, 'upload'));
 
-		StartPromptAction::execute(PromptRunObject::from([
-			'card' => $cardObject->id,
-			'project' => $cardObject->project,
-			'branch' => $cardObject->branch,
-			'ticket_key' => $cardObject->ticketKey,
-			'prompt' => PromptRunEntity::withAttachments($this->prompt, $paths),
-		]));
+		$this->failure = $this->startLinking(new WorkingCopyTaskObject(
+			card: $cardObject->id,
+			task: WorkingCopyTaskEnum::PROMPT,
+			project: $cardObject->project,
+			branch: $cardObject->branch,
+			ticketKey: $cardObject->ticketKey,
+			prompt: PromptRunEntity::withAttachments($this->prompt, $paths),
+		));
 
 		$this->prompt = '';
 		$this->attachments = [];
@@ -482,13 +479,7 @@ class Drawer extends Component
 			return;
 		}
 
-		try {
-			if (StartRoundAction::execute($cardObject->id, $worktreeEntity->path) === null) {
-				$this->failure = __('Er ging geen ronde open.');
-			}
-		} catch (WorktreeNotPossibleException|RoundNotStartedException|SetupIncompleteException|WorkingCopyBusyException $refusal) {
-			$this->failure = $refusal->getMessage();
-		}
+		$this->startRoundTask($worktreeEntity, false);
 	}
 
 	/**
@@ -508,13 +499,23 @@ class Drawer extends Component
 			return;
 		}
 
-		try {
-			if (StartRoundAction::execute($cardObject->id, $worktreeEntity->path, true) === null) {
-				$this->failure = __('Er ging geen ronde open.');
-			}
-		} catch (WorktreeNotPossibleException|RoundNotStartedException|SetupIncompleteException|WorkingCopyBusyException $refusal) {
-			$this->failure = $refusal->getMessage();
-		}
+		$this->startRoundTask($worktreeEntity, true);
+	}
+
+	/**
+	 * Hands opening a round to the background: checking the working copy and
+	 * calling the lenses takes longer than a click should.
+	 */
+	private function startRoundTask(WorktreeEntity $worktreeEntity, bool $restartsLoop): void
+	{
+		$this->failure = $this->startLinking(new WorkingCopyTaskObject(
+			card: (string) $this->openCard,
+			task: WorkingCopyTaskEnum::ROUND,
+			project: $worktreeEntity->project,
+			branch: $worktreeEntity->branch,
+			path: $worktreeEntity->path,
+			restartsLoop: $restartsLoop,
+		));
 	}
 
 	public function stopRound(): void

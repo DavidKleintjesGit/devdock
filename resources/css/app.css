@@ -1350,3 +1350,6 @@ body.is-working .working{opacity:1}
   .card-drawer .bone-columns,.card-drawer .panel-grid.setup-grid{grid-template-columns:minmax(0,1fr)}
   .card-drawer .bone-tree{border-right:0;border-bottom:1px solid var(--line)}
 }
+
+/* a panel you closed is gone at once; the page catches up behind it */
+body.drawer-closing :is(.drawer, .scrim){display:none}

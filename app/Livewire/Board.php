@@ -16,12 +16,14 @@ use Src\Board\Actions\CreateTodoAction;
 use Src\Board\Actions\GetBoardAction;
 use Src\Board\Enums\BoardColumnEnum;
 use Src\Board\Enums\BoardSignalEnum;
+use Src\Board\Enums\HintToneEnum;
 use Src\Board\Objects\CardObject;
 use Src\Board\Objects\TodoObject;
 use Src\Fetch\Actions\StartFetchAction;
 use Src\Project\Actions\GetProjectsAction;
 use Src\Ticket\Actions\GetTicketsAction;
 use Src\Ticket\Objects\TicketEntity;
+use Src\Worktree\Actions\GetWorkingCopyTaskAction;
 
 class Board extends Component
 {
@@ -310,6 +312,29 @@ class Board extends Component
 			->countBy();
 	}
 
+	/**
+	 * The dot of each card with background work: amber while it runs, red when a task failed that you have not seen yet.
+	 *
+	 * @param  Collection<int, CardObject>  $cardObjects
+	 * @return array<string, list<HintToneEnum>>
+	 */
+	private function taskTones(Collection $cardObjects): array
+	{
+		return $cardObjects
+			->mapWithKeys(function (CardObject $cardObject): array {
+				$workingCopyTaskStateObject = GetWorkingCopyTaskAction::execute($cardObject->id);
+				$hasFailed = $workingCopyTaskStateObject?->hasUnshownFailure() === true
+					|| ($workingCopyTaskStateObject?->isRunning === false && $workingCopyTaskStateObject->failure !== null);
+
+				return [$cardObject->id => array_values(array_filter([
+					$hasFailed ? HintToneEnum::RED : null,
+					$workingCopyTaskStateObject?->isRunning === true ? HintToneEnum::AMBER : null,
+				]))];
+			})
+			->filter()
+			->all();
+	}
+
 	public function render(): View
 	{
 		$cardObjects = $this->board();
@@ -340,8 +365,12 @@ class Board extends Component
 			$this->mobileColumn = $columns->first()['case']->value;
 		}
 
+		$taskTones = $this->taskTones($visible);
+
 		return view('livewire.board', [
 			'columns' => $columns,
+			'taskTones' => $taskTones,
+			'hasRunningTask' => collect($taskTones)->contains(fn (array $tones): bool => in_array(HintToneEnum::AMBER, $tones, true)),
 			'allColumns' => collect(BoardColumnEnum::sprint())->map(fn (BoardColumnEnum $column) => [
 				'case' => $column,
 				'total' => $cardObjects->filter(fn (CardObject $card) => $card->column === $column)->count(),

@@ -56,7 +56,7 @@
 				<button class="danger" type="button" role="menuitem" wire:click="deleteTask">{{ $confirmingDeleteTask ? __('Zeker weten? Verwijderen') : __('Taak verwijderen') }}</button>
 			</div>
 		</details>
-		<button class="icon-btn" type="button" wire:click="closeDrawer" aria-label="{{ __('Sluiten') }}"><x-icon name="x"/></button>
+		<button class="icon-btn" type="button" @click="document.body.classList.add('drawer-closing')" wire:click="closeDrawer" aria-label="{{ __('Sluiten') }}"><x-icon name="x"/></button>
 	</div>
 
 	<div class="dhead card-head">

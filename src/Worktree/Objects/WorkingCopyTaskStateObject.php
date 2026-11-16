@@ -9,13 +9,16 @@ use Src\Packages\ValueObject\ValueObject;
 use Src\Worktree\Enums\WorkingCopyTaskEnum;
 
 /**
- * The last background task on the working copy of a card: whether it still
- * runs, and why it stopped when it failed.
+ * The background tasks on the working copy of a card: the one that runs or
+ * ran last, how many wait behind it, and how the finished ones ended that the
+ * panel has not shown yet.
  */
 class WorkingCopyTaskStateObject extends ValueObject
 {
 	/**
 	 * @param  array<string, string>  $result  what the task brings back for the panel, such as a written commit message
+	 * @param  list<string>  $queued  the tasks waiting their turn, as their process carries them
+	 * @param  list<array{task: string, failure: ?string, notice: ?string, result: array<string, string>}>  $endings
 	 */
 	public function __construct(
 		public readonly WorkingCopyTaskEnum $task,
@@ -24,6 +27,9 @@ class WorkingCopyTaskStateObject extends ValueObject
 		public readonly ?string $failure,
 		public readonly ?string $notice = null,
 		public readonly array $result = [],
+		public readonly ?string $next = null,
+		public readonly array $queued = [],
+		public readonly array $endings = [],
 	) {
 		parent::__construct();
 	}
@@ -40,6 +46,17 @@ class WorkingCopyTaskStateObject extends ValueObject
 			failure: $data['failure'] ?? null,
 			notice: $data['notice'] ?? null,
 			result: (array) ($data['result'] ?? []),
+			next: $data['next'] ?? null,
+			queued: array_values((array) ($data['queued'] ?? [])),
+			endings: array_values((array) ($data['endings'] ?? [])),
 		);
+	}
+
+	/**
+	 * Whether a finished task failed that the panel has not shown yet.
+	 */
+	public function hasUnshownFailure(): bool
+	{
+		return collect($this->endings)->contains(fn (array $ending): bool => ($ending['failure'] ?? null) !== null);
 	}
 }

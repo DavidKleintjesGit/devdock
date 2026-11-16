@@ -5,7 +5,7 @@
 		@else
 			<span class="kind">{{ __('Bevinding') }}</span>
 		@endif
-		<button class="icon-btn" type="button" wire:click="closeDrawer" aria-label="{{ __('Sluiten') }}"><x-icon name="x"/></button>
+		<button class="icon-btn" type="button" @click="document.body.classList.add('drawer-closing')" wire:click="closeDrawer" aria-label="{{ __('Sluiten') }}"><x-icon name="x"/></button>
 	</div>
 
 	<div class="dhead">

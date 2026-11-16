@@ -1,6 +1,6 @@
 <div class="drawer-host">
 	@if ($drawer)
-		<div class="scrim" wire:click="closeDrawer"></div>
+		<div class="scrim" @click="document.body.classList.add('drawer-closing')" wire:click="closeDrawer"></div>
 
 		@if ($drawer['type'] === 'session')
 			@include('partials.session-drawer', $drawer)

@@ -17,6 +17,9 @@ enum WorkingCopyTaskEnum: string
 	case OWN_TEST_DATABASE = 'own-test-database';
 	case COMMIT_MESSAGE = 'commit-message';
 	case BRANCH_NAME = 'branch-name';
+	case COMMIT = 'commit';
+	case PROMPT = 'prompt';
+	case ROUND = 'round';
 
 	/**
 	 * What the card says while the task runs.
@@ -31,6 +34,9 @@ enum WorkingCopyTaskEnum: string
 			self::OWN_TEST_DATABASE => 'DevDock maakt een eigen testdatabase',
 			self::COMMIT_MESSAGE => 'DevDock schrijft een commitbericht bij de aangevinkte bestanden',
 			self::BRANCH_NAME => 'DevDock bedenkt een branchnaam',
+			self::COMMIT => 'DevDock legt de wijzigingen vast',
+			self::PROMPT => 'DevDock geeft je bericht aan de agent',
+			self::ROUND => 'DevDock roept de lenzen op',
 		});
 	}
 
@@ -47,6 +53,9 @@ enum WorkingCopyTaskEnum: string
 			self::OWN_TEST_DATABASE => 'De eigen testdatabase kon niet gemaakt worden',
 			self::COMMIT_MESSAGE => 'Er kwam geen commitbericht',
 			self::BRANCH_NAME => 'Er kwam geen branchnaam',
+			self::COMMIT => 'Committen lukte niet',
+			self::PROMPT => 'Je bericht kwam niet bij de agent',
+			self::ROUND => 'Er ging geen ronde open',
 		});
 	}
 }

@@ -8,6 +8,7 @@
 		@if ($card->variant())<span class="label teal kvariant" title="{{ __('Aftakking van :ticket', ['ticket' => $card->ticketKey]) }}">{{ $card->variant() }}</span>@endif
 		@if ($card->project)<span>·</span><span class="kproject">{{ $card->project }}</span>@else<span class="kproject"></span>@endif
 		@if ($card->behind > 0)<span class="kbehind" title="{{ trans_choice(':count commit achter op :main|:count commits achter op :main', $card->behind, ['count' => $card->behind, 'main' => $card->targetBranch]) }}">↓{{ $card->behind }}</span>@endif
+		<x-hint-dot :tones="$taskTones[$card->id] ?? []"/>
 		<span>{{ $card->ageLabel() }}</span>
 	</span>
 	<span class="ktitle">{{ $card->title }}</span>

@@ -15,7 +15,7 @@ use Src\Worktree\Enums\WorkingCopyTaskEnum;
 class WorkingCopyTaskObject extends ValueObject
 {
 	/**
-	 * @param  list<string>  $files  the files a commit message is written about
+	 * @param  list<string>  $files  the files a commit or a commit message is about
 	 */
 	public function __construct(
 		public readonly string $card,
@@ -27,6 +27,11 @@ class WorkingCopyTaskObject extends ValueObject
 		public readonly ?string $path = null,
 		public readonly ?string $ticketKey = null,
 		public readonly array $files = [],
+		public readonly ?string $message = null,
+		public readonly ?string $body = null,
+		public readonly bool $pushesAfter = false,
+		public readonly ?string $prompt = null,
+		public readonly bool $restartsLoop = false,
 	) {
 		parent::__construct();
 	}
@@ -46,6 +51,11 @@ class WorkingCopyTaskObject extends ValueObject
 			path: $data['path'] ?? null,
 			ticketKey: $data['ticket_key'] ?? null,
 			files: array_values((array) ($data['files'] ?? [])),
+			message: $data['message'] ?? null,
+			body: $data['body'] ?? null,
+			pushesAfter: (bool) ($data['pushes_after'] ?? false),
+			prompt: $data['prompt'] ?? null,
+			restartsLoop: (bool) ($data['restarts_loop'] ?? false),
 		);
 	}
 
@@ -64,6 +74,11 @@ class WorkingCopyTaskObject extends ValueObject
 			'path' => $this->path,
 			'ticket_key' => $this->ticketKey,
 			'files' => $this->files,
+			'message' => $this->message,
+			'body' => $this->body,
+			'pushes_after' => $this->pushesAfter,
+			'prompt' => $this->prompt,
+			'restarts_loop' => $this->restartsLoop,
 		]));
 	}
 

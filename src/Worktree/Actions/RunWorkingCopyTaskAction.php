@@ -11,6 +11,13 @@ use Src\Project\Actions\GetProjectsAction;
 use Src\Project\Objects\ProjectEntity;
 use Src\Prompt\Actions\GenerateBranchNameAction;
 use Src\Prompt\Actions\GenerateCommitMessageAction;
+use Src\Prompt\Actions\StartPromptAction;
+use Src\Prompt\Objects\PromptRunObject;
+use Src\Review\Actions\StartRoundAction;
+use Src\Review\Exceptions\RoundNotStartedException;
+use Src\Worktree\Exceptions\SetupIncompleteException;
+use Src\Worktree\Exceptions\WorkingCopyBusyException;
+use Src\Worktree\Exceptions\WorktreeNotPossibleException;
 use Src\Worktree\Contracts\BranchStandingRepositoryContract;
 use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
@@ -52,24 +59,107 @@ class RunWorkingCopyTaskAction extends Command
 				WorkingCopyTaskEnum::OWN_TEST_DATABASE => $this->ownTestDatabaseEnding(),
 				WorkingCopyTaskEnum::COMMIT_MESSAGE => $this->commitMessageEnding(),
 				WorkingCopyTaskEnum::BRANCH_NAME => $this->branchNameEnding(),
+				WorkingCopyTaskEnum::COMMIT => $this->commitEnding(),
+				WorkingCopyTaskEnum::PROMPT => $this->promptEnding(),
+				WorkingCopyTaskEnum::ROUND => $this->roundEnding(),
 			};
 		} catch (Throwable $exception) {
 			report($exception);
 			$ending = ['failure' => $exception->getMessage()];
 		}
 
-		$data = [
-			'task' => $this->workingCopyTaskObject->task->value,
-			'is_running' => false,
-			'started_at' => $startedAt['started_at'] ?? CarbonImmutable::now()->toIso8601String(),
-			'failure' => $ending['failure'] ?? null,
-			'notice' => $ending['notice'] ?? null,
-			'result' => $ending['result'] ?? [],
-		];
+		// the ending is written down and the next task in line takes over in one step, so a task that arrives meanwhile is never lost
+		return Cache::lock(StartWorkingCopyTaskAction::lockFor($this->workingCopyTaskObject->card), 10)->block(5, function () use ($key, $startedAt, $ending): WorkingCopyTaskStateObject {
+			$kept = (array) Cache::get($key, []);
+			$endings = [...(array) ($kept['endings'] ?? []), [
+				'task' => $this->workingCopyTaskObject->task->value,
+				'failure' => $ending['failure'] ?? null,
+				'notice' => $ending['notice'] ?? null,
+				'result' => $ending['result'] ?? [],
+			]];
+			$queued = array_values((array) ($kept['queued'] ?? []));
+			$next = array_shift($queued);
 
-		Cache::forever($key, $data);
+			$data = $next === null ? [
+				'task' => $this->workingCopyTaskObject->task->value,
+				'is_running' => false,
+				'started_at' => $startedAt['started_at'] ?? CarbonImmutable::now()->toIso8601String(),
+				'failure' => $ending['failure'] ?? null,
+				'notice' => $ending['notice'] ?? null,
+				'result' => $ending['result'] ?? [],
+				'queued' => [],
+				'endings' => $endings,
+			] : [
+				'task' => WorkingCopyTaskObject::fromArgument($next)->task->value,
+				'is_running' => true,
+				'started_at' => CarbonImmutable::now()->toIso8601String(),
+				'failure' => null,
+				'next' => $next,
+				'queued' => $queued,
+				'endings' => $endings,
+			];
 
-		return WorkingCopyTaskStateObject::from($data);
+			Cache::forever($key, $data);
+
+			return WorkingCopyTaskStateObject::from($data);
+		});
+	}
+
+	/**
+	 * @return array{failure?: string, notice?: string}
+	 */
+	private function commitEnding(): array
+	{
+		$files = $this->workingCopyTaskObject->files;
+		$failure = CommitChangesAction::execute((string) $this->workingCopyTaskObject->path, (string) $this->workingCopyTaskObject->message, (string) $this->workingCopyTaskObject->body, $files);
+
+		if ($failure !== null) {
+			return ['failure' => $failure];
+		}
+
+		$notice = trans_choice('Vastgelegd: :count bestand.|Vastgelegd: :count bestanden.', count($files), ['count' => count($files)]);
+
+		if (! $this->workingCopyTaskObject->pushesAfter) {
+			return ['notice' => $notice];
+		}
+
+		$pushEnding = $this->pushEnding();
+
+		return isset($pushEnding['failure'])
+			? ['failure' => $notice . ' ' . $pushEnding['failure']]
+			: ['notice' => __('Vastgelegd en gepusht naar origin.')];
+	}
+
+	/**
+	 * A turn of the agent that DevDock could not start writes its reason on the turn itself, in the chat.
+	 *
+	 * @return array<string, never>
+	 */
+	private function promptEnding(): array
+	{
+		StartPromptAction::execute(PromptRunObject::from([
+			'card' => $this->workingCopyTaskObject->card,
+			'project' => $this->workingCopyTaskObject->project,
+			'branch' => $this->workingCopyTaskObject->branch,
+			'ticket_key' => $this->workingCopyTaskObject->ticketKey,
+			'prompt' => (string) $this->workingCopyTaskObject->prompt,
+		]));
+
+		return [];
+	}
+
+	/**
+	 * @return array{failure?: string}
+	 */
+	private function roundEnding(): array
+	{
+		try {
+			$reviewRoundEntity = StartRoundAction::execute($this->workingCopyTaskObject->card, (string) $this->workingCopyTaskObject->path, $this->workingCopyTaskObject->restartsLoop);
+		} catch (WorktreeNotPossibleException|RoundNotStartedException|SetupIncompleteException|WorkingCopyBusyException $refusal) {
+			return ['failure' => $refusal->getMessage()];
+		}
+
+		return $reviewRoundEntity === null ? ['failure' => __('Er ging geen ronde open.')] : [];
 	}
 
 	/**

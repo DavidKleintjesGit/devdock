@@ -473,6 +473,7 @@ const VIEW_ACTIONS = new Set([
 	'closeContextFile',
 	'closeDiff',
 	'closeFile',
+	'closeDrawer',
 	'closeLens',
 	'closeLibraryItem',
 	'editLens',
@@ -528,6 +529,22 @@ document.addEventListener('livewire:init', () => {
 		if (earlier && ! earlier.isCancelled()) {
 			moving.delete(action.component.id);
 			earlier.cancel();
+		}
+	});
+});
+
+// Hides a panel the moment you close it; the server catches up behind it.
+// Opening a card shows the panel again straight away.
+document.addEventListener('livewire:init', () => {
+	Livewire.interceptMessage(({ message, onFinish }) => {
+		const actions = Array.from(message.actions ?? []);
+
+		if (actions.some((action) => action.name === 'closeDrawer')) {
+			onFinish(() => document.body.classList.remove('drawer-closing'));
+		}
+
+		if (actions.some((action) => action.name === '__dispatch' && action.params?.[0] === 'open-card')) {
+			document.body.classList.remove('drawer-closing');
 		}
 	});
 });

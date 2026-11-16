@@ -13,7 +13,7 @@
 				<button type="button" role="menuitem" wire:click="pin('{{ $session->uuid }}', {{ $session->isPinned ? 'false' : 'true' }})">{{ $session->isPinned ? __('Losmaken, mag weer opgeruimd') : __('Vastzetten, nooit opruimen') }}</button>
 			</div>
 		</details>
-		<button class="icon-btn" type="button" wire:click="closeDrawer" aria-label="{{ __('Sluiten') }}"><x-icon name="x"/></button>
+		<button class="icon-btn" type="button" @click="document.body.classList.add('drawer-closing')" wire:click="closeDrawer" aria-label="{{ __('Sluiten') }}"><x-icon name="x"/></button>
 	</div>
 
 	<div class="dhead">
