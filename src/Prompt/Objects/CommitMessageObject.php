@@ -37,7 +37,7 @@ class CommitMessageObject extends ValueObject
 			return $this;
 		}
 
-		$subject = (string) preg_replace('/^' . preg_quote($ticketKey, '/') . '\s*[-:·]?\s*/i', '', $this->title);
+		$subject = (string) preg_replace('/^' . preg_quote($ticketKey, '/') . '\s*[-:·]?\s*/iu', '', $this->title);
 
 		return new self(title: trim($ticketKey . ' ' . $subject), body: $this->body);
 	}
