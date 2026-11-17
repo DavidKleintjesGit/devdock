@@ -6,6 +6,7 @@ namespace Src\Worktree\Objects;
 
 use Carbon\CarbonImmutable;
 use Src\Packages\ValueObject\ValueObject;
+use Src\Worktree\Enums\OriginStandingEnum;
 use Src\Worktree\Enums\WorktreeOriginEnum;
 
 /**
@@ -57,6 +58,19 @@ class WorktreeEntity extends ValueObject
 	public function holdsWork(): bool
 	{
 		return $this->changedFiles > 0 || $this->ahead > 0;
+	}
+
+	/**
+	 * Whether everything committed here is on origin, or what still waits for a
+	 * push; null for a branch that was never pushed.
+	 */
+	public function originStanding(): ?OriginStandingEnum
+	{
+		if ($this->upstream === null) {
+			return null;
+		}
+
+		return $this->ahead > 0 ? OriginStandingEnum::UNPUSHED : OriginStandingEnum::PUSHED;
 	}
 
 	/**

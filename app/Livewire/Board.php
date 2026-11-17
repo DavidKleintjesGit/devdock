@@ -117,6 +117,7 @@ class Board extends Component
 			)) ?: array_column(BoardColumnEnum::sprint(), 'value');
 		}
 
+		$this->shownColumns = BoardColumnEnum::withNotSetUp($this->shownColumns);
 		$this->showBacklog ??= ! config('devdock.board.backlog_hidden');
 		$this->mobileColumn = $this->shownColumns[0] ?? BoardColumnEnum::TO_DO->value;
 	}

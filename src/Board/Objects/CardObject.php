@@ -15,6 +15,7 @@ use Src\PullRequest\Objects\PullRequestEntityCollection;
 use Src\Session\Objects\SessionEntity;
 use Src\Session\Objects\SessionEntityCollection;
 use Src\Task\Objects\TaskAgentEntity;
+use Src\Worktree\Enums\OriginStandingEnum;
 
 /**
  * One task on the board: what belongs together under the same ticket number
@@ -53,8 +54,18 @@ class CardObject extends ValueObject
 		public readonly ?CarbonImmutable $agentActiveAt = null,
 		public readonly array $unreadPerSource = [],
 		public readonly bool $hasUnreadQuestion = false,
+		public readonly ?OriginStandingEnum $originStanding = null,
+		public readonly int $unpushedCommits = 0,
 	) {
 		parent::__construct();
+	}
+
+	/**
+	 * How the branch stands on origin, in words, for a card that shows it.
+	 */
+	public function originLabel(): ?string
+	{
+		return $this->originStanding?->label($this->unpushedCommits);
 	}
 
 	/**

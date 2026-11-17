@@ -26,4 +26,7 @@
 			<span class="wicon pause" title="{{ __('Stilgevallen') }}"><svg class="ic s" width="12" height="12" role="img" aria-label="{{ __('Stilgevallen') }}"><use href="#i-pause"/></svg></span>
 		@endif
 	</span>
+	@if ($card->originStanding)
+		<span class="korigin {{ $card->originStanding->tone() }}"><svg class="ic s" width="12" height="12" aria-hidden="true"><use href="#i-up"/></svg>{{ $card->originLabel() }}</span>
+	@endif
 </button>

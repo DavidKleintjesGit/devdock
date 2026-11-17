@@ -423,6 +423,8 @@ button.row{width:100%;border:0;background:transparent;text-align:left;cursor:poi
 .kcard .kstatus{display:flex;align-items:center;gap:8px;font-size:12.5px;min-width:0}
 .kcard .kstatus .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
 .kcard .kstatus .txt.yours{color:var(--accent-ink);font-weight:500}
+.kcard .korigin{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--muted)}
+.kcard .korigin.blue{color:var(--blue)}
 .kcard .kstatus .txt.conflict{color:var(--red)}
 .kcard .kstatus .txt.approved{color:var(--green)}
 .kcard .kplace{flex:none;color:var(--faint)}

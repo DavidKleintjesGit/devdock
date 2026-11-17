@@ -7,6 +7,9 @@ namespace Src\Board\Actions;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use ReflectionMethod;
+use ReflectionParameter;
+use Src\Board\Objects\CardObject;
 use Src\Board\Objects\CardObjectCollection;
 use Src\Packages\Cqrs\Command;
 use Src\Packages\Process\DetachedCommand;
@@ -79,7 +82,8 @@ class GetBoardAction extends Command
 		$clickVersion = $this->version(self::CLICK_TABLES);
 		$workVersion = $this->version(self::WORK_TABLES);
 		$kept = $this->isFresh ? null : Cache::get(self::KEY);
-		$cardObjectCollection = is_array($kept) && ($kept['click_version'] ?? null) === $clickVersion
+		// a board kept by an older build of the card holds cards that lack its newer fields
+		$cardObjectCollection = is_array($kept) && ($kept['click_version'] ?? null) === $clickVersion && ($kept['card_shape'] ?? null) === $this->cardShape()
 			? $this->unpack((string) $kept['board'])
 			: null;
 
@@ -98,6 +102,7 @@ class GetBoardAction extends Command
 
 		Cache::forever(self::KEY, [
 			'click_version' => $clickVersion,
+			'card_shape' => $this->cardShape(),
 			'work_version' => $workVersion,
 			'built_at' => microtime(true),
 			'board' => serialize($cardObjectCollection),
@@ -136,6 +141,17 @@ class GetBoardAction extends Command
 		}
 
 		return md5((string) json_encode($query->get()));
+	}
+
+	/**
+	 * The fields a card is built from, as one fingerprint.
+	 */
+	private function cardShape(): string
+	{
+		return md5(implode(',', array_map(
+			fn (ReflectionParameter $reflectionParameter): string => $reflectionParameter->getName(),
+			(new ReflectionMethod(CardObject::class, '__construct'))->getParameters(),
+		)));
 	}
 
 	private function unpack(string $board): ?CardObjectCollection

@@ -1810,5 +1810,11 @@
     "Andere doelbranch": "Other target branch",
     "Zet op :branch": "Move onto :branch",
     "- Moet deze taak op een andere branch voortbouwen en daarin mergen, bijvoorbeeld op de branch van een andere taak, vraag mij dan niet om dat zelf te regelen en doe het niet met git. Sluit af met een actions-blok met een regel \"target\" en de naam van die branch op origin. DevDock maakt er een knop van die de doelbranch en de pull request omzet en de eigen commits van de taak daarop rebaset.": "- If this task should build on and merge into another branch, for example the branch of another task, do not ask me to arrange it and do not do it with git. End with an actions block holding a line \"target\" followed by the name of that branch on origin. DevDock turns it into a button that changes the target branch and the pull request and rebases the own commits of the task onto it.",
-    "Verplaatsen...": "Moving..."
+    "Verplaatsen...": "Moving...",
+    "Hier staat een taak met een branch of agent, maar nog zonder werkkopie.": "Tasks with a branch or agent but no working copy yet.",
+    "Hier komt een taak zodra hij een werkkopie heeft.": "A task lands here once it has a working copy.",
+    "Hier staat een taak vanaf de eerste reviewronde tot zijn pull request.": "A task stays here from its first review round until its pull request.",
+    "↑:count niet gepusht": "↑:count not pushed",
+    "Niet ingericht": "Not set up",
+    "Gepusht · nog geen PR": "Pushed · no PR yet"
 }

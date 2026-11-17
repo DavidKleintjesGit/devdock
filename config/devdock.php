@@ -172,7 +172,7 @@ return [
 
 	'board' => [
 		'done_days' => (int) env('DEVDOCK_DONE_DAYS', 14),
-		'columns' => array_values(array_filter(explode(',', (string) env('DEVDOCK_COLUMNS', 'todo,building,review,pull_request,done')))),
+		'columns' => array_values(array_filter(explode(',', (string) env('DEVDOCK_COLUMNS', 'todo,not_set_up,building,review,pull_request,done')))),
 
 		// the backlog is the column you look at least; it starts folded away
 		'backlog_hidden' => filter_var(env('DEVDOCK_BACKLOG_HIDDEN', true), FILTER_VALIDATE_BOOL),

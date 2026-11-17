@@ -12,6 +12,7 @@ enum BoardColumnEnum: string
 {
 	case LATER = 'later';
 	case TO_DO = 'todo';
+	case NOT_SET_UP = 'not_set_up';
 	case BUILDING = 'building';
 	case REVIEW = 'review';
 	case PULL_REQUEST = 'pull_request';
@@ -22,6 +23,7 @@ enum BoardColumnEnum: string
 		return __(match ($this) {
 			self::LATER => 'Later',
 			self::TO_DO => 'Te doen',
+			self::NOT_SET_UP => 'Niet ingericht',
 			self::BUILDING => 'Bouwen',
 			self::REVIEW => 'Review',
 			self::PULL_REQUEST => 'Pull request',
@@ -37,6 +39,7 @@ enum BoardColumnEnum: string
 		return match ($this) {
 			self::LATER => 'faint',
 			self::TO_DO => 'gray',
+			self::NOT_SET_UP => 'gray',
 			self::BUILDING => 'teal',
 			self::REVIEW => 'amber',
 			self::PULL_REQUEST => 'blue',
@@ -52,11 +55,33 @@ enum BoardColumnEnum: string
 		return __(match ($this) {
 			self::LATER => 'Niets in de backlog.',
 			self::TO_DO => 'Haal iets uit de backlog, of maak een to-do.',
-			self::BUILDING => 'Hier komt een taak zodra hij is ingericht.',
-			self::REVIEW => 'Hier kijken de lenzen mee.',
+			self::NOT_SET_UP => 'Hier staat een taak met een branch of agent, maar nog zonder werkkopie.',
+			self::BUILDING => 'Hier komt een taak zodra hij een werkkopie heeft.',
+			self::REVIEW => 'Hier staat een taak vanaf de eerste reviewronde tot zijn pull request.',
 			self::PULL_REQUEST => 'Hier wacht een taak op collega\'s en de merge.',
 			self::DONE => 'Wat de laatste :days dagen gemerged is.',
 		}, ['days' => (int) config('devdock.board.done_days')]);
+	}
+
+	/**
+	 * A choice of shown columns with "not set up" in front of building. That
+	 * column split off from building, so a choice that shows building and
+	 * predates it shows it too.
+	 *
+	 * @param  array<int, string>  $columns
+	 * @return array<int, string>
+	 */
+	public static function withNotSetUp(array $columns): array
+	{
+		$buildingAt = array_search(self::BUILDING->value, $columns, true);
+
+		if ($buildingAt === false || in_array(self::NOT_SET_UP->value, $columns, true)) {
+			return $columns;
+		}
+
+		array_splice($columns, $buildingAt, 0, [self::NOT_SET_UP->value]);
+
+		return $columns;
 	}
 
 	/**

@@ -12,9 +12,11 @@ use Src\Board\Enums\BoardColumnEnum;
 use Src\Board\Enums\CardStatusEnum;
 use Src\Board\Enums\CopyPlaceEnum;
 use Src\Board\Enums\UnreadSourceEnum;
+use Src\Board\Objects\BoardColumnFactsObject;
 use Src\Board\Objects\CardObject;
 use Src\Board\Objects\CardObjectCollection;
 use Src\Board\Objects\TodoEntity;
+use Src\Board\Policies\BoardColumnPolicy;
 use Src\Packages\Cqrs\Command;
 use Src\Project\Actions\GetProjectsAction;
 use Src\Project\Objects\ProjectEntity;
@@ -355,12 +357,15 @@ class BuildBoardAction extends Command
 		$promptRunEntity = $this->promptRunsByCard[$key] ?? null;
 		$agent = $taskEntity?->activeAgent();
 
-		$column = $this->columnFor(
-			$pullRequestEntities,
-			$ticketEntity,
-			$branch !== null || $sessionEntities->isNotEmpty() || $agent !== null,
-			$pullRequestEntities->isNotEmpty() || ($worktreeEntity?->hasCommits ?? false),
-		);
+		$column = resolve(BoardColumnPolicy::class)->decide(new BoardColumnFactsObject(
+			isTickedOff: false,
+			hasPullRequest: $pullRequestEntities->isNotEmpty(),
+			hasOpenPullRequest: $pullRequestEntities->contains(fn (PullRequestEntity $pullRequestEntity): bool => $pullRequestEntity->isOpen()),
+			hasReviewRound: $latestRound !== null,
+			hasWorkingCopy: $worktreeEntity !== null,
+			isStarted: $branch !== null || $sessionEntities->isNotEmpty() || $agent !== null,
+			isForLater: $this->knowsSprints && $ticketEntity !== null && ! $ticketEntity->isInSprint(),
+		));
 
 		$lastActivity = $this->lastActivity($pullRequestEntities, $sessionEntities, $worktreeEntity, $latestRound, $promptRunEntity, $agent?->startedAt);
 		$quietDays = $lastActivity === null ? null : (int) $lastActivity->diffInDays(CarbonImmutable::now(), absolute: true);
@@ -422,6 +427,8 @@ class BuildBoardAction extends Command
 			agentActiveAt: $this->agentActiveAt($promptRunEntity),
 			unreadPerSource: $this->unreadPerSource($key, $pullRequestEntities),
 			hasUnreadQuestion: $this->hasUnreadQuestion($key, $promptRunEntity),
+			originStanding: $column === BoardColumnEnum::REVIEW ? $worktreeEntity?->originStanding() : null,
+			unpushedCommits: $worktreeEntity?->ahead ?? 0,
 		);
 	}
 
@@ -434,19 +441,24 @@ class BuildBoardAction extends Command
 		$ticketEntity = $ticketKey === null ? null : $this->ticketsByKey->get($ticketKey);
 		$agent = $taskEntity?->activeAgent();
 		$promptRunEntity = $this->promptRunsByCard[$todoEntity->boardKey()] ?? null;
+		$latestRound = $this->roundsByCard[$todoEntity->boardKey()] ?? null;
+		$project = $taskEntity?->project() ?? $todoEntity->project;
 
-		$column = match (true) {
-			$todoEntity->isDone() => BoardColumnEnum::DONE,
-			// work tied to it outweighs "for later", as with a ticket in the backlog
-			$agent !== null || $taskEntity?->branch() !== null => BoardColumnEnum::BUILDING,
-			$todoEntity->isLater => BoardColumnEnum::LATER,
-			default => BoardColumnEnum::TO_DO,
-		};
+		$column = resolve(BoardColumnPolicy::class)->decide(new BoardColumnFactsObject(
+			isTickedOff: $todoEntity->isDone(),
+			hasPullRequest: false,
+			hasOpenPullRequest: false,
+			hasReviewRound: $latestRound !== null,
+			hasWorkingCopy: $this->worktreeFor($project, $taskEntity?->branch()) !== null,
+			isStarted: $agent !== null || $taskEntity?->branch() !== null,
+			isForLater: $todoEntity->isLater,
+		));
 
 		[$status, $statusText] = match ($column) {
 			BoardColumnEnum::DONE => [CardStatusEnum::QUIET, __('Afgevinkt')],
 			BoardColumnEnum::LATER => [CardStatusEnum::QUIET, __('Eigen to-do, voor later')],
-			BoardColumnEnum::BUILDING => $this->buildingStatus($promptRunEntity, $agent !== null, null),
+			BoardColumnEnum::BUILDING, BoardColumnEnum::NOT_SET_UP => $this->buildingStatus($promptRunEntity, $agent !== null, null),
+			BoardColumnEnum::REVIEW => $this->busyStatus($column, $latestRound, $promptRunEntity, $project) ?? $this->reviewStatus($latestRound, null, $this->maxRoundsFor($project)),
 			default => [CardStatusEnum::QUIET, __('Nog niet ingericht')],
 		};
 
@@ -467,7 +479,7 @@ class BuildBoardAction extends Command
 			description: $todoEntity->note,
 			status: $status,
 			statusText: $statusText,
-			lensStates: [],
+			lensStates: $column === BoardColumnEnum::REVIEW ? $this->lensStates($latestRound) : [],
 			hasNameMismatch: false,
 			isStale: false,
 			behind: 0,
@@ -480,33 +492,6 @@ class BuildBoardAction extends Command
 			unreadPerSource: $this->unreadPerSource($todoEntity->boardKey()),
 			hasUnreadQuestion: $this->hasUnreadQuestion($todoEntity->boardKey(), $promptRunEntity),
 		);
-	}
-
-	/**
-	 * Where a task stands in the way of working. The first commit is the
-	 * turning point: only then is there something for the lenses to judge,
-	 * and a pull request means it left the machine.
-	 *
-	 * @param  Collection<int, PullRequestEntity>  $pullRequestEntities
-	 */
-	private function columnFor(
-		Collection $pullRequestEntities,
-		?TicketEntity $ticketEntity,
-		bool $isStarted,
-		bool $isDelivered,
-	): BoardColumnEnum {
-		$hasOpen = $pullRequestEntities->contains(
-			fn (PullRequestEntity $pullRequestEntity) => $pullRequestEntity->isOpen(),
-		);
-
-		return match (true) {
-			$pullRequestEntities->isNotEmpty() && ! $hasOpen => BoardColumnEnum::DONE,
-			$hasOpen => BoardColumnEnum::PULL_REQUEST,
-			$isDelivered => BoardColumnEnum::REVIEW,
-			$isStarted => BoardColumnEnum::BUILDING,
-			$this->knowsSprints && $ticketEntity !== null && ! $ticketEntity->isInSprint() => BoardColumnEnum::LATER,
-			default => BoardColumnEnum::TO_DO,
-		};
 	}
 
 	/**
@@ -535,9 +520,8 @@ class BuildBoardAction extends Command
 
 		return match ($column) {
 			BoardColumnEnum::LATER => [CardStatusEnum::QUIET, __('In de backlog, nog niet gepland')],
-			BoardColumnEnum::TO_DO => $hasAgent
-				? [CardStatusEnum::YOURS, __('Ingericht · jouw beurt: bouwen')]
-				: [CardStatusEnum::QUIET, __('Nog niet ingericht')],
+			BoardColumnEnum::TO_DO => [CardStatusEnum::QUIET, __('Nog niet ingericht')],
+			BoardColumnEnum::NOT_SET_UP => $this->buildingStatus($promptRunEntity, $hasAgent, null),
 			BoardColumnEnum::BUILDING => $this->buildingStatus($promptRunEntity, $hasAgent, $staleDays, $worktreeEntity),
 			BoardColumnEnum::REVIEW => $latestRound?->isExpiredBy($worktreeEntity === null ? null : resolve(WorktreeRepositoryContract::class)->getFingerprint($worktreeEntity->path))
 				? [CardStatusEnum::YOURS, __('Gewijzigd na de ronde · opnieuw naar de lenzen')]

@@ -1184,7 +1184,7 @@ class Drawer extends Component
 		$subtab = $tab === CardTabEnum::WORKING_COPY->value && $worktreeEntity === null ? null : CardTabEnum::tryFrom($tab)?->subtab($this->openSubtab);
 		$changes = $tab === 'Werkkopie' && $worktreeEntity !== null ? $this->changesFor($cardObject) : collect();
 		// a task with a working copy but without an agent is not set up yet: the panel stays until all three steps are done
-		$isSetup = in_array($cardObject->column, [BoardColumnEnum::TO_DO, BoardColumnEnum::LATER], true)
+		$isSetup = in_array($cardObject->column, [BoardColumnEnum::TO_DO, BoardColumnEnum::LATER, BoardColumnEnum::NOT_SET_UP], true)
 			|| ($cardObject->column === BoardColumnEnum::BUILDING && $cardObject->agent === null && $promptRunEntity === null);
 		$cardSteps = $this->cardSteps($cardObject);
 		$workingCopyTask = GetWorkingCopyTaskAction::execute($cardObject->id);
