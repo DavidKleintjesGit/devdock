@@ -43,10 +43,6 @@
 					</div>
 				</details>
 
-				<button class="fbtn" type="button" aria-pressed="{{ $showBacklog ? 'true' : 'false' }}" wire:click="toggleBacklog">
-					<x-icon name="backlog" small/>{{ $showBacklog ? __('Backlog verbergen') : __('Backlog tonen') }} <span class="n">{{ $backlogCount }}</span>
-				</button>
-
 				<span class="vsep"></span>
 
 				@foreach ($signals as $signal)
@@ -89,9 +85,9 @@
 							<div class="col-empty">
 								@if ($filtered)
 									{{ __('Niets in deze kolom voor dit filter.') }}
-								@elseif ($column['case']->offersBacklog() && ! $showBacklog)
+								@elseif ($column['case']->offersBacklog() && ! in_array(\Src\Board\Enums\BoardColumnEnum::LATER->value, $shownColumns, true))
 									<b>{{ __('Niets in de sprint') }}</b>{{ $column['case']->emptyText() }}
-									<button class="btn sm" type="button" wire:click="toggleBacklog">{{ __('Backlog tonen') }}</button>
+									<button class="btn sm" type="button" wire:click="toggleColumn('later')">{{ __('Backlog tonen') }}</button>
 								@else
 									{{ $column['case']->emptyText() }}
 								@endif

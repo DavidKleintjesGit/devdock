@@ -67,8 +67,6 @@ class Settings extends Component
 
 	public string $language = 'en';
 
-	public bool $backlogHidden = true;
-
 	public int $staleDays = 5;
 
 	public bool $saved = false;
@@ -136,7 +134,6 @@ class Settings extends Component
 			'large_from_mb' => $this->largeFromMegabytes,
 			'old_after_days' => $this->oldAfterDays,
 			'theme' => $this->theme,
-			'backlog_hidden' => $this->backlogHidden,
 			'stale_days' => $this->staleDays,
 			'language' => $this->language,
 		]));
@@ -223,7 +220,6 @@ class Settings extends Component
 		$this->largeFromMegabytes = $settingEntity->largeFromMegabytes;
 		$this->oldAfterDays = $settingEntity->oldAfterDays;
 		$this->theme = $settingEntity->theme;
-		$this->backlogHidden = $settingEntity->backlogHidden;
 		$this->staleDays = $settingEntity->staleDays;
 		$this->language = $settingEntity->language;
 	}
@@ -245,7 +241,7 @@ class Settings extends Component
 			'hasClaudeToken' => $settingEntity->hasClaudeToken,
 			'run' => GetLatestFetchRunAction::execute(),
 			'bitbucketRestMinutes' => intdiv((int) config('devdock.bitbucket.refresh_seconds'), 60),
-			'allColumns' => BoardColumnEnum::sprint(),
+			'allColumns' => BoardColumnEnum::cases(),
 			'libraries' => $this->section === 'bibliotheken' ? GetLibrariesAction::execute() : [],
 			'database' => str_replace(base_path() . DIRECTORY_SEPARATOR, '', (string) config('database.connections.' . config('database.default') . '.database')),
 			'counts' => [

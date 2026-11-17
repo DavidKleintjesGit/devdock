@@ -172,10 +172,12 @@ return [
 
 	'board' => [
 		'done_days' => (int) env('DEVDOCK_DONE_DAYS', 14),
-		'columns' => array_values(array_filter(explode(',', (string) env('DEVDOCK_COLUMNS', 'todo,not_set_up,building,review,pull_request,done')))),
-
-		// the backlog is the column you look at least; it starts folded away
-		'backlog_hidden' => filter_var(env('DEVDOCK_BACKLOG_HIDDEN', true), FILTER_VALIDATE_BOOL),
+		// the backlog is the column you look at least, so it is left out by default; a
+		// setting from before it was a column of its own still shows it
+		'columns' => array_values(array_unique(array_filter([
+			...(filter_var(env('DEVDOCK_BACKLOG_HIDDEN', true), FILTER_VALIDATE_BOOL) ? [] : ['later']),
+			...explode(',', (string) env('DEVDOCK_COLUMNS', 'todo,not_set_up,building,review,pull_request,done')),
+		]))),
 
 		// a task under way with no commit, agent message, review round or
 		// reaction for this many days has stalled

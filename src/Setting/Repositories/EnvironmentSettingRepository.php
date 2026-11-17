@@ -27,7 +27,6 @@ class EnvironmentSettingRepository implements SettingRepositoryContract
 			refreshSeconds: (int) config('devdock.refresh_seconds'),
 			columns: (array) config('devdock.board.columns'),
 			doneDays: (int) config('devdock.board.done_days'),
-			backlogHidden: (bool) config('devdock.board.backlog_hidden'),
 			staleDays: (int) config('devdock.board.stale_days'),
 			abandonedUpToPrompts: (int) config('devdock.sessions.abandoned_up_to'),
 			largeFromMegabytes: (int) config('devdock.sessions.large_from_mb'),
@@ -50,7 +49,8 @@ class EnvironmentSettingRepository implements SettingRepositoryContract
 			'DEVDOCK_REFRESH_SECONDS' => (string) $settingObject->refreshSeconds,
 			'DEVDOCK_COLUMNS' => implode(',', $settingObject->columns),
 			'DEVDOCK_DONE_DAYS' => (string) $settingObject->doneDays,
-			'DEVDOCK_BACKLOG_HIDDEN' => $settingObject->backlogHidden ? 'true' : 'false',
+			// the backlog is one of the columns now; this older key must not bring it back
+			'DEVDOCK_BACKLOG_HIDDEN' => 'true',
 			'DEVDOCK_STALE_DAYS' => (string) $settingObject->staleDays,
 			'DEVDOCK_ABANDONED_UP_TO' => (string) $settingObject->abandonedUpToPrompts,
 			'DEVDOCK_LARGE_FROM_MB' => (string) $settingObject->largeFromMegabytes,

@@ -66,9 +66,6 @@ class Board extends Component
 	#[Session(key: 'devdock.board.attention')]
 	public string $attention = '';
 
-	#[Session(key: 'devdock.board.backlog')]
-	public ?bool $showBacklog = null;
-
 	/** @var array<int, string> */
 	#[Session(key: 'devdock.board.columns')]
 	public array $shownColumns = [];
@@ -118,7 +115,6 @@ class Board extends Component
 		}
 
 		$this->shownColumns = BoardColumnEnum::withNotSetUp($this->shownColumns);
-		$this->showBacklog ??= ! config('devdock.board.backlog_hidden');
 		$this->mobileColumn = $this->shownColumns[0] ?? BoardColumnEnum::TO_DO->value;
 	}
 
@@ -173,11 +169,6 @@ class Board extends Component
 		StartFetchAction::execute();
 	}
 
-	public function toggleBacklog(): void
-	{
-		$this->showBacklog = ! $this->showBacklog;
-	}
-
 	public function toggleAttention(string $filter): void
 	{
 		$this->attention = $this->attention === $filter ? '' : $filter;
@@ -192,7 +183,7 @@ class Board extends Component
 
 	public function showAllColumns(): void
 	{
-		$this->shownColumns = array_column(BoardColumnEnum::sprint(), 'value');
+		$this->shownColumns = array_column(BoardColumnEnum::cases(), 'value');
 	}
 
 	public function resetFilters(): void
@@ -279,9 +270,7 @@ class Board extends Component
 	private function inView(Collection $cardObjects): Collection
 	{
 		return $cardObjects
-			->filter(fn (CardObject $card) => $card->column === BoardColumnEnum::LATER
-				? $this->showBacklog
-				: in_array($card->column->value, $this->shownColumns, true))
+			->filter(fn (CardObject $card) => in_array($card->column->value, $this->shownColumns, true))
 			->filter(fn (CardObject $card) => $this->showsProject($card->project))
 			->when(filled($this->query), fn (Collection $all) => $all->filter(
 				fn (CardObject $card) => $card->matches($this->query),
@@ -356,9 +345,7 @@ class Board extends Component
 		$visible = $this->visible($cardObjects);
 
 		$columns = collect(BoardColumnEnum::cases())
-			->filter(fn (BoardColumnEnum $column) => $column === BoardColumnEnum::LATER
-				? $this->showBacklog
-				: in_array($column->value, $this->shownColumns, true))
+			->filter(fn (BoardColumnEnum $column) => in_array($column->value, $this->shownColumns, true))
 			->map(function (BoardColumnEnum $column) use ($cardObjects, $visible): array {
 				$cards = $visible->filter(fn (CardObject $card) => $card->column === $column)->values();
 
@@ -386,18 +373,17 @@ class Board extends Component
 			'columns' => $columns,
 			'taskTones' => $taskTones,
 			'hasRunningTask' => collect($taskTones)->contains(fn (array $tones): bool => in_array(HintToneEnum::AMBER, $tones, true)),
-			'allColumns' => collect(BoardColumnEnum::sprint())->map(fn (BoardColumnEnum $column) => [
+			'allColumns' => collect(BoardColumnEnum::cases())->map(fn (BoardColumnEnum $column) => [
 				'case' => $column,
 				'total' => $cardObjects->filter(fn (CardObject $card) => $card->column === $column)->count(),
 				'isShown' => in_array($column->value, $this->shownColumns, true),
 			]),
-			'shownCount' => collect(BoardColumnEnum::sprint())->filter(fn (BoardColumnEnum $column) => in_array($column->value, $this->shownColumns, true))->count(),
+			'shownCount' => collect(BoardColumnEnum::cases())->filter(fn (BoardColumnEnum $column) => in_array($column->value, $this->shownColumns, true))->count(),
 			'projectOptions' => $this->projectOptions($this->countsByProject($cardObjects)),
 			'projectTotal' => $cardObjects->count(),
 			'withoutProjectCount' => $cardObjects->filter(fn (CardObject $card) => $card->project === null)->count(),
 			'signals' => $this->signals($this->inView($cardObjects)),
 			'allProjectNames' => GetProjectsAction::execute()->pluck('name')->sort()->values(),
-			'backlogCount' => $cardObjects->filter(fn (CardObject $card) => $card->column === BoardColumnEnum::LATER)->count(),
 			'summary' => $this->summary($cardObjects),
 			'visibleCount' => $visible->count(),
 			'totalCount' => $cardObjects->count(),
