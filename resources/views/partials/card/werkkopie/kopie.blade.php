@@ -41,7 +41,7 @@
 				<span class="hint">{{ $testDatabase->serverLabel() }} · {{ __('uit de .env.testing van deze kopie') }}</span>
 				@if ($testDatabase->isShared)
 					<span class="hint" style="color:var(--amber)">{{ __('Draaien hier en ergens anders tegelijk tests, dan legen ze elkaars database.') }}</span>
-					<span class="v" style="margin-top:4px"><x-busy-button action="giveOwnTestDatabase" class="btn xs" :busy="__('Aanmaken...')">{{ __('Eigen testdatabase aanmaken') }}</x-busy-button></span>
+					<span class="v" style="margin-top:4px"><x-busy-button action="giveOwnTestDatabase" :pending="(bool) $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::OWN_TEST_DATABASE)" class="btn xs" :busy="__('Aanmaken...')">{{ __('Eigen testdatabase aanmaken') }}</x-busy-button></span>
 				@endif
 			</div>
 		@endif

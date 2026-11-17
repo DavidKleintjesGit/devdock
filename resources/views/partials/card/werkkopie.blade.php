@@ -28,7 +28,7 @@
 
 	<div class="dfoot">
 		<span class="hint">{{ __('De branch wordt van origin afgesneden zonder hem te volgen.') }}</span>
-		<x-busy-button action="createWorktree" class="btn primary" :busy="__('Aanmaken...')" :disabled="$card->project === null">{{ __('Werkkopie aanmaken') }}</x-busy-button>
+		<x-busy-button action="createWorktree" :pending="(bool) $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::LINK)" class="btn primary" :busy="__('Aanmaken...')" :disabled="$card->project === null">{{ __('Werkkopie aanmaken') }}</x-busy-button>
 	</div>
 @else
 	@switch ($subtab?->value)

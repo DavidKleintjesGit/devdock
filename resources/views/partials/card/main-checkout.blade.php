@@ -12,7 +12,7 @@
 				<li>{{ __('Een eigen testdatabase') }}</li>
 			</ol>
 			@if ($mainCheckout['uncommitted'] === [])
-				<span class="v" style="margin-top:4px"><x-busy-button action="moveToOwnWorkingCopy" class="btn sm primary" :busy="__('Verhuizen...')">{{ __('Verhuizen naar eigen werkkopie') }}</x-busy-button></span>
+				<span class="v" style="margin-top:4px"><x-busy-button action="moveToOwnWorkingCopy" :pending="(bool) $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::LINK)" class="btn sm primary" :busy="__('Verhuizen...')">{{ __('Verhuizen naar eigen werkkopie') }}</x-busy-button></span>
 			@endif
 		</div>
 
@@ -28,7 +28,7 @@
 					@endforeach
 				</ul>
 				<span class="v" style="margin-top:4px;flex-wrap:wrap">
-					<x-busy-button action="moveToOwnWorkingCopy(true)" class="btn sm" :busy="__('Verhuizen...')">{{ __('Meenemen naar de werkkopie') }}</x-busy-button>
+					<x-busy-button action="moveToOwnWorkingCopy(true)" :pending="(bool) $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::LINK)" class="btn sm" :busy="__('Verhuizen...')">{{ __('Meenemen naar de werkkopie') }}</x-busy-button>
 					@if ($canCommitHere)
 						<button class="btn sm" type="button" x-on:click="document.getElementById('commit-title')?.focus()">{{ __('Eerst committen') }}</button>
 					@endif

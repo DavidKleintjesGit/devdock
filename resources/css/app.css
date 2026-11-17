@@ -188,6 +188,9 @@ h1,h2,h3{text-wrap:balance}
 .btn.sm{height:34px;padding:0 12px;border-radius:9px;font-size:13px}
 .btn.xs{height:32px;padding:0 12px;border-radius:8px;font-size:12.5px}
 .btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn.is-busy,.btn.is-busy[disabled]{opacity:.7;cursor:progress}
+.spin{width:12px;height:12px;flex:none;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .btn .lbl{display:inline-flex;align-items:center;gap:7px}
 .icon-btn{display:grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:9px;background:transparent;color:var(--fg-2);cursor:pointer;flex:none;text-decoration:none}
 .icon-btn:hover{background:var(--sunken);color:var(--fg)}

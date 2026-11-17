@@ -101,7 +101,7 @@
 								<div class="reportbar-actions">
 									@if ($loop->last)
 										@foreach ($exchange->actions as $agentAction)
-											<button class="btn sm primary" type="button" wire:click="takeAgentAction(@js($agentAction->action->value), @js($agentAction->argument))" wire:key="action-{{ $loop->index }}">{{ $agentAction->label() }}</button>
+											<x-busy-button :action="'takeAgentAction(' . Js::from($agentAction->action->value) . ', ' . Js::from($agentAction->argument) . ')'" class="btn sm primary" :busy="__('Verplaatsen...')" :pending="(bool) $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::RETARGET)" wire:key="action-{{ $loop->index }}">{{ $agentAction->label() }}</x-busy-button>
 										@endforeach
 									@endif
 									@if ($loop->last && $exchange->choices !== [])
@@ -199,9 +199,13 @@
 						</div>
 					</details>
 				@endif
-				<button class="btn primary send" type="button" wire:click="send" wire:target="send" wire:loading.attr="disabled" aria-label="{{ __('Versturen') }}" @disabled($run?->isRunning())>
-					<span wire:loading.remove wire:target="send"><x-icon name="send" small/></span>
-					<span wire:loading wire:target="send" class="dot amber pulse"></span>
+				<button @class(['btn primary send', 'is-busy' => $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::PROMPT)]) type="button" wire:click="send" wire:target="send" wire:loading.attr="disabled" wire:loading.class="is-busy" aria-label="{{ __('Versturen') }}" @disabled($run?->isRunning() || $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::PROMPT))>
+					@if ($workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::PROMPT))
+						<span class="spin" aria-hidden="true"></span>
+					@else
+						<span wire:loading.remove wire:target="send"><x-icon name="send" small/></span>
+						<span wire:loading wire:target="send" class="spin" aria-hidden="true"></span>
+					@endif
 				</button>
 			</div>
 		</div>

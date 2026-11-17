@@ -4,7 +4,7 @@
 		<div style="display:flex;gap:8px">
 			<input id="new-branch" class="input mono" type="text" wire:model="newBranch" placeholder="{{ $card->branch ?? 'feature/' . ($card->ticketKey ?? 'naam') }}" autocomplete="off" @disabled($card->branch !== null)>
 			@if ($card->branch === null && $card->ticketKey === null)
-				<x-busy-button action="suggestBranchName" class="btn sm" icon="pencil" :busy="__('Bezig...')">{{ __('Laat de agent het bedenken') }}</x-busy-button>
+				<x-busy-button action="suggestBranchName" :pending="(bool) $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::BRANCH_NAME)" class="btn sm" icon="pencil" :busy="__('Bezig...')">{{ __('Laat de agent het bedenken') }}</x-busy-button>
 			@endif
 		</div>
 		<span class="hint">{{ $card->branch ? __('De werkkopie komt op de branch van deze taak.') : __('Een naam die nog niet bestaat wordt van de hoofdlijn afgesneden, zonder hem te volgen.') }}</span>

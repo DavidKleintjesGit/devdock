@@ -47,7 +47,7 @@
 										<input class="input mono" type="text" wire:model.live.debounce.400ms="newBranch" placeholder="{{ $card->ticketKey ? 'feature/' . $card->ticketKey : 'feature/naam' }}">
 									</label>
 									@if ($card->ticketKey === null)
-										<x-busy-button action="suggestBranchName" class="btn text xs" icon="pencil" :busy="__('Bezig...')" style="align-self:flex-start">{{ __('Laat de agent het bedenken') }}</x-busy-button>
+										<x-busy-button action="suggestBranchName" :pending="(bool) $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::BRANCH_NAME)" class="btn text xs" icon="pencil" :busy="__('Bezig...')" style="align-self:flex-start">{{ __('Laat de agent het bedenken') }}</x-busy-button>
 									@endif
 								@endif
 								@if ($preparePlan['isNew'])
@@ -70,7 +70,7 @@
 											<span>{{ $preparePlan['text'] }}</span>
 										</span>
 									@endif
-									<x-busy-button action="prepareWorkingCopy" class="btn primary sm" :busy="__('Bezig...')">{{ $setupRefusal ? __('Opnieuw klaarzetten') : __('Klaarzetten') }}</x-busy-button>
+									<x-busy-button action="prepareWorkingCopy" :pending="(bool) $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::LINK)" class="btn primary sm" :busy="__('Bezig...')">{{ $setupRefusal ? __('Opnieuw klaarzetten') : __('Klaarzetten') }}</x-busy-button>
 								</span>
 								<span class="hint" wire:loading wire:target="prepareWorkingCopy">{{ $preparePlan['isNew'] ? __('De werkkopie wordt gemaakt; de database en de rest volgen in de achtergrond.') : __('De werkkopie wordt gekoppeld.') }}</span>
 							</span>

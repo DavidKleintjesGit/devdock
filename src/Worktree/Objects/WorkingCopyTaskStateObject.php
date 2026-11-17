@@ -53,6 +53,19 @@ class WorkingCopyTaskStateObject extends ValueObject
 	}
 
 	/**
+	 * Whether a task of this kind runs now or waits its turn.
+	 */
+	public function isPending(WorkingCopyTaskEnum $workingCopyTaskEnum): bool
+	{
+		if (! $this->isRunning) {
+			return false;
+		}
+
+		return $this->task === $workingCopyTaskEnum || collect($this->queued)
+			->contains(fn (string $argument): bool => WorkingCopyTaskObject::fromArgument($argument)->task === $workingCopyTaskEnum);
+	}
+
+	/**
 	 * Whether a finished task failed that the panel has not shown yet.
 	 */
 	public function hasUnshownFailure(): bool

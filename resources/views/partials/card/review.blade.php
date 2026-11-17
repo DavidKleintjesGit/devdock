@@ -103,7 +103,7 @@
 		@if ($latestRound?->isRunning())
 			<x-busy-button action="stopRound" class="btn" :busy="__('Afbreken...')">{{ __('Ronde afbreken') }}</x-busy-button>
 		@elseif (! $loopStatus->needsYou())
-			<x-busy-button action="startRound" class="btn primary" :busy="__('Lenzen oproepen...')" :disabled="! $canDeliver">{{ $latestRound ? __('Opnieuw beoordelen') : __('Naar de lenzen') }}</x-busy-button>
+			<x-busy-button action="startRound" :pending="(bool) $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::ROUND)" class="btn primary" :busy="__('Lenzen oproepen...')" :disabled="! $canDeliver">{{ $latestRound ? __('Opnieuw beoordelen') : __('Naar de lenzen') }}</x-busy-button>
 		@endif
 	</div>
 @endif

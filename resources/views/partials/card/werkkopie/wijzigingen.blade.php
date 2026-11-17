@@ -53,7 +53,7 @@
 		@if ($changeCount > 0)
 			<x-panel :title="__('Commit')">
 				<x-slot:actions>
-					<x-busy-button action="suggestCommitMessage" class="btn text xs" icon="pencil" :busy="__('Bezig...')">{{ __('Laat de agent schrijven') }}</x-busy-button>
+					<x-busy-button action="suggestCommitMessage" :pending="(bool) $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::COMMIT_MESSAGE)" class="btn text xs" icon="pencil" :busy="__('Bezig...')">{{ __('Laat de agent schrijven') }}</x-busy-button>
 				</x-slot:actions>
 				<div class="field" x-data="{ length: @js(mb_strlen($commitMessage)) }">
 					<span class="counter-row"><label for="commit-title" style="font-size:13px;font-weight:500;color:var(--fg)">{{ __('Titel') }}</label><span x-text="length + ' / 72'" :style="length > 72 ? 'color:var(--red)' : ''"></span></span>
@@ -74,10 +74,10 @@
 		<span class="grow" style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--fg-2)">
 			<button class="switch" type="button" role="switch" aria-checked="{{ $pushAfterCommit ? 'true' : 'false' }}" wire:click="$toggle('pushAfterCommit')" aria-label="{{ __('Daarna pushen') }}"></button>{{ __('Daarna pushen') }}
 		</span>
-		<x-busy-button action="commitChanges" class="btn primary" :busy="__('Committen...')" :disabled="$pickedCount === 0">{{ trans_choice('Committen · :count bestand|Committen · :count bestanden', $pickedCount, ['count' => $pickedCount]) }}</x-busy-button>
+		<x-busy-button action="commitChanges" :pending="(bool) $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::COMMIT)" class="btn primary" :busy="__('Committen...')" :disabled="$pickedCount === 0">{{ trans_choice('Committen · :count bestand|Committen · :count bestanden', $pickedCount, ['count' => $pickedCount]) }}</x-busy-button>
 	@elseif ($worktree->ahead > 0)
 		<span class="hint">{{ __('Niets meer te committen.') }}</span>
-		<x-busy-button action="pushBranch" class="btn primary" :busy="__('Pushen...')">{{ $worktree->onlyOnUpstream > 0 ? trans_choice('Overschrijven op origin · :count commit|Overschrijven op origin · :count commits', $worktree->ahead, ['count' => $worktree->ahead]) : trans_choice('Pushen · :count commit|Pushen · :count commits', $worktree->ahead, ['count' => $worktree->ahead]) }}</x-busy-button>
+		<x-busy-button action="pushBranch" :pending="(bool) $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::PUSH)" class="btn primary" :busy="__('Pushen...')">{{ $worktree->onlyOnUpstream > 0 ? trans_choice('Overschrijven op origin · :count commit|Overschrijven op origin · :count commits', $worktree->ahead, ['count' => $worktree->ahead]) : trans_choice('Pushen · :count commit|Pushen · :count commits', $worktree->ahead, ['count' => $worktree->ahead]) }}</x-busy-button>
 	@else
 		<span class="hint">{{ __('Schoon: niets te committen of te pushen.') }}</span>
 	@endif
