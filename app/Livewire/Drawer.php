@@ -44,6 +44,7 @@ use Src\Project\Objects\ProjectEntity;
 use Src\Prompt\Actions\GetConversationAction;
 use Src\Prompt\Actions\GetLatestPromptRunAction;
 use Src\Prompt\Actions\ReadReportAction;
+use Src\Prompt\Enums\AgentActionEnum;
 use Src\Prompt\Actions\StopPromptAction;
 use Src\Prompt\Contracts\AttachmentRepositoryContract;
 use Src\Prompt\Contracts\ClaudeProcessRepositoryContract;
@@ -416,6 +417,17 @@ class Drawer extends Component
 		$this->prompt = $choice;
 
 		$this->send();
+	}
+
+	/**
+	 * Carries out an action the agent offered as a button.
+	 */
+	public function takeAgentAction(string $action, string $argument): void
+	{
+		match (AgentActionEnum::tryFrom($action)) {
+			AgentActionEnum::TARGET => $this->retargetTo($argument),
+			null => null,
+		};
 	}
 
 	/**

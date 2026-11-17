@@ -54,4 +54,8 @@
 	@if ($upstreamDialog)
 		@include('partials.card.upstream')
 	@endif
+
+	@if ($targetDialog)
+		@include('partials.card.target')
+	@endif
 @endif

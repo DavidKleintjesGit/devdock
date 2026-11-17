@@ -62,6 +62,7 @@ class RunWorkingCopyTaskAction extends Command
 				WorkingCopyTaskEnum::COMMIT => $this->commitEnding(),
 				WorkingCopyTaskEnum::PROMPT => $this->promptEnding(),
 				WorkingCopyTaskEnum::ROUND => $this->roundEnding(),
+				WorkingCopyTaskEnum::RETARGET => $this->retargetEnding(),
 			};
 		} catch (Throwable $exception) {
 			report($exception);
@@ -194,6 +195,29 @@ class RunWorkingCopyTaskAction extends Command
 		return match ($rebaseOutcomeObject->outcome) {
 			RebaseOutcomeEnum::CONFLICTED => ['result' => ['tab' => 'Agent']],
 			RebaseOutcomeEnum::DONE => ['notice' => __('Gerebased op :main zonder conflicten.', ['main' => $rebaseOutcomeObject->targetBranch])],
+			RebaseOutcomeEnum::FAILED => ['failure' => $rebaseOutcomeObject->failure],
+		};
+	}
+
+	/**
+	 * @return array{failure?: ?string, notice?: string, result?: array<string, string>}
+	 */
+	private function retargetEnding(): array
+	{
+		$rebaseOutcomeObject = RetargetWorkingCopyAction::execute(
+			$this->workingCopyTaskObject->card,
+			$this->workingCopyTaskObject->project,
+			$this->workingCopyTaskObject->branch,
+			$this->workingCopyTaskObject->ticketKey,
+			(string) $this->workingCopyTaskObject->path,
+			(string) $this->workingCopyTaskObject->target,
+		);
+
+		$this->refreshStanding();
+
+		return match ($rebaseOutcomeObject->outcome) {
+			RebaseOutcomeEnum::CONFLICTED => ['result' => ['tab' => 'Agent']],
+			RebaseOutcomeEnum::DONE => ['notice' => __('Op :target gezet en gerebased. Push om origin bij te werken.', ['target' => $rebaseOutcomeObject->targetBranch])],
 			RebaseOutcomeEnum::FAILED => ['failure' => $rebaseOutcomeObject->failure],
 		};
 	}

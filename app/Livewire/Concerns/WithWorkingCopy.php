@@ -70,6 +70,10 @@ trait WithWorkingCopy
 
 	public string $upstreamChoice = '';
 
+	public bool $targetDialog = false;
+
+	public string $targetChoice = '';
+
 	/** The turn of the agent whose changes the round view of the code reader shows. */
 	public ?int $diffRun = null;
 
@@ -299,6 +303,57 @@ trait WithWorkingCopy
 		$this->upstreamDialog = false;
 	}
 
+	public function startTarget(): void
+	{
+		$this->targetChoice = $this->openWorktree()?->targetBranch ?? '';
+		$this->targetDialog = true;
+	}
+
+	public function saveTarget(): void
+	{
+		$this->retargetTo(trim($this->targetChoice));
+
+		$this->targetDialog = $this->failure !== null;
+	}
+
+	/**
+	 * Puts the task on another branch to build on and merge into, in a process
+	 * of its own: the pull request follows, and the branch is rebased onto it.
+	 */
+	public function retargetTo(string $target): void
+	{
+		$worktreeEntity = $this->openWorktree();
+
+		if ($worktreeEntity === null) {
+			return;
+		}
+
+		$isKnown = $target === $worktreeEntity->mainBranch
+			|| in_array('origin/' . $target, resolve(WorktreeRepositoryContract::class)->getRemoteBranches($worktreeEntity->path), true);
+
+		$this->failure = match (true) {
+			$worktreeEntity->isRebasing => __('Er staat een rebase open. Maak die eerst af of breek hem af.'),
+			$target === $worktreeEntity->branch => __('Een branch kan niet op zichzelf voortbouwen.'),
+			! $isKnown => __(':target staat niet op origin. Push die branch eerst, dan kan deze taak erop.', ['target' => $target]),
+			default => null,
+		};
+
+		if ($this->failure !== null || $target === $worktreeEntity->targetBranch) {
+			return;
+		}
+
+		$this->failure = $this->startLinking(new WorkingCopyTaskObject(
+			card: (string) $this->openCard,
+			task: WorkingCopyTaskEnum::RETARGET,
+			project: $worktreeEntity->project,
+			branch: $worktreeEntity->branch,
+			path: $worktreeEntity->path,
+			ticketKey: $this->cardById($this->board(), (string) $this->openCard)?->ticketKey,
+			target: $target,
+		));
+		$this->committed = null;
+	}
+
 	public function carryOverAgain(): void
 	{
 		$worktreeEntity = $this->openWorktree();
@@ -441,7 +496,8 @@ trait WithWorkingCopy
 			'database' => $projectPath === null ? null : resolve(WorktreeDatabaseRepositoryContract::class)->describe($projectPath, $worktreeEntity->path),
 			'testDatabase' => $projectPath === null ? null : resolve(WorktreeDatabaseRepositoryContract::class)->describeTesting($projectPath, $worktreeEntity->path),
 			'databases' => $this->databaseDialog === 'choose' ? resolve(WorktreeDatabaseRepositoryContract::class)->getDatabases($worktreeEntity->path) : [],
-			'remoteBranches' => $this->upstreamDialog ? $worktreeRepository->getRemoteBranches($worktreeEntity->path) : [],
+			'remoteBranches' => $this->upstreamDialog || $this->targetDialog ? $worktreeRepository->getRemoteBranches($worktreeEntity->path) : [],
+			'taskTargets' => $this->targetDialog ? $this->taskTargets($worktreeEntity, $worktreeRepository->getRemoteBranches($worktreeEntity->path)) : collect(),
 			'packages' => $projectPath === null ? [] : resolve(WorkingCopyRepositoryContract::class)->getPackages($projectPath, $worktreeEntity->path),
 			'carried' => resolve(WorkingCopyRepositoryContract::class)->getCarried($worktreeEntity->path),
 			'fills' => DatabaseFillEnum::cases(),
@@ -568,7 +624,25 @@ trait WithWorkingCopy
 
 		return $projectEntity === null
 			? null
-			: GetBranchChainAction::execute($projectEntity->path, $projectEntity->repositorySlug(), $worktreeEntity->branch, $worktreeEntity->mainBranch);
+			: GetBranchChainAction::execute($projectEntity->path, $projectEntity->repositorySlug(), $worktreeEntity->branch, $worktreeEntity->mainBranch, $worktreeEntity->targetBranch);
+	}
+
+	/**
+	 * The other tasks of the same project whose branch is on origin, as
+	 * branches this task can build on.
+	 *
+	 * @param  array<int, string>  $remoteBranches
+	 * @return Collection<int, CardObject>
+	 */
+	private function taskTargets(WorktreeEntity $worktreeEntity, array $remoteBranches): Collection
+	{
+		return $this->board()
+			->filter(fn (CardObject $cardObject): bool => $cardObject->project === $worktreeEntity->project
+				&& $cardObject->branch !== null
+				&& $cardObject->branch !== $worktreeEntity->branch
+				&& in_array('origin/' . $cardObject->branch, $remoteBranches, true))
+			->unique(fn (CardObject $cardObject): string => (string) $cardObject->branch)
+			->values();
 	}
 
 	private function levelFirst(BranchLinkObject $branchLinkObject): string

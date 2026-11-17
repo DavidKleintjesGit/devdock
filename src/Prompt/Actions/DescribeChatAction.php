@@ -40,6 +40,12 @@ class DescribeChatAction extends Command
 			'- <answer>',
 			'```',
 			'',
+			__('- Moet deze taak op een andere branch voortbouwen en daarin mergen, bijvoorbeeld op de branch van een andere taak, vraag mij dan niet om dat zelf te regelen en doe het niet met git. Sluit af met een actions-blok met een regel "target" en de naam van die branch op origin. DevDock maakt er een knop van die de doelbranch en de pull request omzet en de eigen commits van de taak daarop rebaset.'),
+			'',
+			'```actions',
+			'target <branch>',
+			'```',
+			'',
 			__('- Een attachments-blok onder mijn bericht noemt de bestanden die ik meestuur, één volledig pad per regel. Lees ze met de Read-tool voor je antwoordt; een afbeelding of pdf zie je dan zoals ik hem zie. Lees een pdf zonder de pages-parameter: die heeft pdftoppm nodig, en dat staat niet op deze machine.'),
 		]);
 	}

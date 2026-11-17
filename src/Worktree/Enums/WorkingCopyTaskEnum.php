@@ -20,6 +20,7 @@ enum WorkingCopyTaskEnum: string
 	case COMMIT = 'commit';
 	case PROMPT = 'prompt';
 	case ROUND = 'round';
+	case RETARGET = 'retarget';
 
 	/**
 	 * What the card says while the task runs.
@@ -37,6 +38,7 @@ enum WorkingCopyTaskEnum: string
 			self::COMMIT => 'DevDock legt de wijzigingen vast',
 			self::PROMPT => 'DevDock geeft je bericht aan de agent',
 			self::ROUND => 'DevDock roept de lenzen op',
+			self::RETARGET => 'DevDock zet de taak op een andere doelbranch en rebaset',
 		});
 	}
 
@@ -56,6 +58,7 @@ enum WorkingCopyTaskEnum: string
 			self::COMMIT => 'Committen lukte niet',
 			self::PROMPT => 'Je bericht kwam niet bij de agent',
 			self::ROUND => 'Er ging geen ronde open',
+			self::RETARGET => 'De doelbranch kon niet veranderd worden',
 		});
 	}
 }

@@ -32,6 +32,7 @@ class WorkingCopyTaskObject extends ValueObject
 		public readonly bool $pushesAfter = false,
 		public readonly ?string $prompt = null,
 		public readonly bool $restartsLoop = false,
+		public readonly ?string $target = null,
 	) {
 		parent::__construct();
 	}
@@ -56,6 +57,7 @@ class WorkingCopyTaskObject extends ValueObject
 			pushesAfter: (bool) ($data['pushes_after'] ?? false),
 			prompt: $data['prompt'] ?? null,
 			restartsLoop: (bool) ($data['restarts_loop'] ?? false),
+			target: $data['target'] ?? null,
 		);
 	}
 
@@ -79,6 +81,7 @@ class WorkingCopyTaskObject extends ValueObject
 			'pushes_after' => $this->pushesAfter,
 			'prompt' => $this->prompt,
 			'restarts_loop' => $this->restartsLoop,
+			'target' => $this->target,
 		]));
 	}
 

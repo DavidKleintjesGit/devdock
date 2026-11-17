@@ -89,6 +89,17 @@ class BitbucketPullRequestRepository implements PullRequestSourceRepositoryContr
 		return ReviewCommentObjectCollection::fromArray($reviewCommentObjects);
 	}
 
+	public function changeDestination(string $repository, int $number, string $branch): void
+	{
+		$result = $this->client()->put($this->pullRequestPath($repository) . '/' . $number, [
+			'destination' => ['branch' => ['name' => $branch]],
+		]);
+
+		if ($result->failed()) {
+			throw new RuntimeException($this->reason($result));
+		}
+	}
+
 	/**
 	 * Whether this remark is off the table: resolved, withdrawn, or still a
 	 * draft of the reviewer.

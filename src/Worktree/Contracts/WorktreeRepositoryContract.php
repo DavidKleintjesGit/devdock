@@ -278,9 +278,21 @@ interface WorktreeRepositoryContract
 
 	/**
 	 * Names the branch a branch merges into, so every comparison is made against
-	 * it; null or the main line takes the mark away. Returns whether it changed.
+	 * it; null or the main line takes the mark away. A target chosen by hand is
+	 * marked as such. Returns whether the target changed.
 	 */
-	public function setTargetBranch(string $repositoryPath, string $branch, ?string $target): bool;
+	public function setTargetBranch(string $repositoryPath, string $branch, ?string $target, bool $isChosen = false): bool;
+
+	/**
+	 * The target of a branch when it was chosen by hand, else null.
+	 */
+	public function getChosenTarget(string $repositoryPath, string $branch): ?string;
+
+	/**
+	 * Notes where the own commits of a branch begin, so a rebase onto another
+	 * target replays those commits and no more.
+	 */
+	public function keepOwnBase(string $repositoryPath, string $branch, string $base): void;
 
 	/**
 	 * Notes the stand of its target a branch is built on, while the branch still

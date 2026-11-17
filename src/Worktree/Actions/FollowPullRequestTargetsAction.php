@@ -12,12 +12,16 @@ use Src\PullRequest\Enums\PullRequestStateEnum;
 use Src\PullRequest\Objects\PullRequestEntity;
 use Src\Worktree\Contracts\BranchStandingRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
+use Src\Worktree\Enums\TargetSourceEnum;
+use Src\Worktree\Objects\TargetFactsObject;
+use Src\Worktree\Policies\TargetBranchPolicy;
 
 /**
  * Marks for every working copy the branch its open pull request merges into,
  * so behind, conflicts, rebase and the code reader compare against that
- * branch. A working copy without an open pull request goes back to the main
- * line. Returns how many working copies changed target.
+ * branch. A working copy without an open pull request keeps a target chosen
+ * by hand, or goes back to the main line. Returns how many working copies
+ * changed target.
  *
  * @method static int execute()
  */
@@ -46,7 +50,13 @@ class FollowPullRequestTargetsAction extends Command
 				continue;
 			}
 
-			if ($worktreeRepository->setTargetBranch($projectEntity->path, $worktreeEntity->branch, $targetsBySource->get($slug . '|' . $worktreeEntity->branch))) {
+			$pullRequestTarget = $targetsBySource->get($slug . '|' . $worktreeEntity->branch);
+			$targetSource = resolve(TargetBranchPolicy::class)->decide(new TargetFactsObject(
+				pullRequestTarget: $pullRequestTarget,
+				chosenTarget: $pullRequestTarget === null ? $worktreeRepository->getChosenTarget($projectEntity->path, $worktreeEntity->branch) : null,
+			));
+
+			if ($targetSource !== TargetSourceEnum::CHOSEN && $worktreeRepository->setTargetBranch($projectEntity->path, $worktreeEntity->branch, $pullRequestTarget)) {
 				$worktreeRepository->forgetStatus($worktreeEntity->path);
 				$branchStandingRepository->forget($projectEntity->path, $worktreeEntity->branch);
 				$changedWorkingCopies++;

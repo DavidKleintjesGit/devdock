@@ -53,6 +53,12 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	private const TARGET_KEY = 'devdock-target';
 
 	/**
+	 * The key under a branch in git's config that marks its target as chosen by
+	 * hand rather than taken from its pull request.
+	 */
+	private const CHOSEN_KEY = 'devdock-target-chosen';
+
+	/**
 	 * The key under a branch in git's config that holds the stand of its target
 	 * the branch was last built on, where its own commits begin.
 	 */
@@ -1378,12 +1384,17 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		});
 	}
 
-	public function setTargetBranch(string $repositoryPath, string $branch, ?string $target): bool
+	public function setTargetBranch(string $repositoryPath, string $branch, ?string $target, bool $isChosen = false): bool
 	{
 		$key = 'branch.' . $branch . '.' . self::TARGET_KEY;
 		// the main line is where a branch goes without a mark, so it is never written down
 		$wanted = $target === null || $target === $this->mainBranch($repositoryPath) ? null : $target;
 		$current = LocalCommand::run($repositoryPath, ['git', 'config', '--get', $key]);
+		$chosenKey = 'branch.' . $branch . '.' . self::CHOSEN_KEY;
+
+		LocalCommand::run($repositoryPath, $isChosen && $wanted !== null
+			? ['git', 'config', $chosenKey, 'true']
+			: ['git', 'config', '--unset', $chosenKey]);
 
 		if (($current->successful() ? trim($current->output()) : null) === $wanted) {
 			return false;
@@ -1401,6 +1412,18 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		Process::path($repositoryPath)->timeout(self::TIMEOUT)->run(['git', 'fetch', '--quiet', 'origin', $wanted]);
 
 		return true;
+	}
+
+	public function getChosenTarget(string $repositoryPath, string $branch): ?string
+	{
+		$isChosen = LocalCommand::run($repositoryPath, ['git', 'config', '--get', 'branch.' . $branch . '.' . self::CHOSEN_KEY]);
+
+		return $isChosen->successful() && trim($isChosen->output()) === 'true' ? $this->targetOf($repositoryPath, $branch) : null;
+	}
+
+	public function keepOwnBase(string $repositoryPath, string $branch, string $base): void
+	{
+		LocalCommand::run($repositoryPath, ['git', 'config', 'branch.' . $branch . '.' . self::BASE_KEY, $base]);
 	}
 
 	/**

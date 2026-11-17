@@ -21,6 +21,7 @@
 								@endif
 							@endforeach
 						</span>
+						<button class="btn sm" type="button" wire:click="startTarget" @disabled($worktree->isRebasing)>{{ __('Andere doelbranch') }}</button>
 					</div>
 					@if ($levelFirst)
 						<p class="alert" style="margin:0 0 0 21px">{{ $levelFirst }}</p>

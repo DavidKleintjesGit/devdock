@@ -26,4 +26,11 @@ interface PullRequestSourceRepositoryContract
 	 * The remarks on one pull request that nobody has resolved yet.
 	 */
 	public function getOpenComments(string $repository, int $number): ReviewCommentObjectCollection;
+
+	/**
+	 * Points one pull request at another branch to merge into.
+	 *
+	 * @throws \RuntimeException with the answer of the service when it refuses
+	 */
+	public function changeDestination(string $repository, int $number, string $branch): void;
 }

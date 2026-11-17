@@ -17,7 +17,7 @@ use Src\Worktree\Objects\BranchLinkObject;
  * merges into, the branch that one merges into, and so on to the main line,
  * with per step how far the branch is behind its target on origin.
  *
- * @method static BranchChainObject execute(string $repositoryPath, ?string $repositorySlug, string $branch, string $mainBranch)
+ * @method static BranchChainObject execute(string $repositoryPath, ?string $repositorySlug, string $branch, string $mainBranch, ?string $ownTarget = null)
  */
 class GetBranchChainAction extends Command
 {
@@ -31,6 +31,7 @@ class GetBranchChainAction extends Command
 		public readonly ?string $repositorySlug,
 		public readonly string $branch,
 		public readonly string $mainBranch,
+		public readonly ?string $ownTarget = null,
 	) {}
 
 	public function handle(WorktreeRepositoryContract $worktreeRepository): BranchChainObject
@@ -46,7 +47,10 @@ class GetBranchChainAction extends Command
 		$branch = $this->branch;
 
 		while (count($links) < self::MAX_LINKS) {
-			$target = $targetsBySource->get($branch) ?? ($branch === $this->branch ? $this->mainBranch : null);
+			// the branch itself goes where it is marked to, which may be chosen by hand rather than by a pull request
+			$target = $branch === $this->branch
+				? $this->ownTarget ?? $targetsBySource->get($branch) ?? $this->mainBranch
+				: $targetsBySource->get($branch);
 
 			if ($target === null) {
 				break;

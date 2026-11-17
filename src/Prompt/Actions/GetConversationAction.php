@@ -7,6 +7,8 @@ namespace Src\Prompt\Actions;
 use Src\Packages\Cqrs\Command;
 use Src\Packages\Markdown\RenderMarkdown;
 use Src\Prompt\Contracts\PromptRunRepositoryContract;
+use Src\Prompt\Enums\AgentActionEnum;
+use Src\Prompt\Objects\AgentActionObject;
 use Src\Prompt\Objects\ExchangeObject;
 use Src\Prompt\Objects\MockupObject;
 use Src\Prompt\Objects\PromptRunEntity;
@@ -24,7 +26,7 @@ class GetConversationAction extends Command
 	 * The blocks an answer closes with. They are read out separately, so they
 	 * are taken out of what the agent said in its own words.
 	 */
-	private const FENCES = ['report', 'commit', 'choices'];
+	private const FENCES = ['report', 'commit', 'choices', 'actions'];
 
 	public function __construct(
 		public readonly string $card,
@@ -54,6 +56,7 @@ class GetConversationAction extends Command
 				passages: $this->passages($renderMarkdown, $said),
 				report: $promptRunEntity->isRunning() ? null : ReadReportAction::execute($promptRunEntity->output),
 				choices: $promptRunEntity->isRunning() ? [] : $this->choices($promptRunEntity),
+				actions: $promptRunEntity->isRunning() ? [] : $this->actions($promptRunEntity),
 				transcript: $transcriptObject,
 			);
 		}
@@ -132,6 +135,27 @@ class GetConversationAction extends Command
 		return collect(explode("\n", $found[1]))
 			->map(fn (string $line) => trim(ltrim(trim($line), '-*')))
 			->filter()
+			->values()
+			->all();
+	}
+
+	/**
+	 * What the agent asked DevDock to do, one line of its actions block each:
+	 * the name of the action, then what it is about. A line DevDock does not
+	 * know is left out.
+	 *
+	 * @return array<int, AgentActionObject>
+	 */
+	private function actions(PromptRunEntity $promptRunEntity): array
+	{
+		if (preg_match('/```actions\s*\n(.*?)```/s', (string) $promptRunEntity->output, $found) !== 1) {
+			return [];
+		}
+
+		return collect(explode("\n", $found[1]))
+			->map(fn (string $line): array => preg_split('/\s+/', trim(ltrim(trim($line), '-*')), 2) ?: [])
+			->filter(fn (array $parts): bool => count($parts) === 2 && AgentActionEnum::tryFrom($parts[0]) !== null)
+			->map(fn (array $parts): AgentActionObject => new AgentActionObject(AgentActionEnum::from($parts[0]), trim($parts[1], " \t`")))
 			->values()
 			->all();
 	}

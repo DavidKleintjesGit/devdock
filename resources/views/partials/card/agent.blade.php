@@ -88,7 +88,7 @@
 							@endif
 						</div>
 
-						@if (! $exchange->run->isRunning() && ($exchange->report || ($loop->last && $exchange->choices !== [])))
+						@if (! $exchange->run->isRunning() && ($exchange->report || ($loop->last && ($exchange->choices !== [] || $exchange->actions !== []))))
 							<div class="reportbar {{ $exchange->report?->status->tone() ?? 'amber' }}">
 								<span class="state"><span class="sdot"></span>{{ $exchange->report?->status->label() ?? __('Vraag') }}</span>
 								@if ($exchange->report?->question)
@@ -99,9 +99,14 @@
 									</ul>
 								@endif
 								<div class="reportbar-actions">
+									@if ($loop->last)
+										@foreach ($exchange->actions as $agentAction)
+											<button class="btn sm primary" type="button" wire:click="takeAgentAction(@js($agentAction->action->value), @js($agentAction->argument))" wire:key="action-{{ $loop->index }}">{{ $agentAction->label() }}</button>
+										@endforeach
+									@endif
 									@if ($loop->last && $exchange->choices !== [])
 										@foreach ($exchange->choices as $choice)
-											<button class="btn sm {{ $loop->first ? 'primary' : '' }}" type="button" wire:click="answer(@js($choice))" wire:key="choice-{{ $loop->index }}">{{ $choice }}</button>
+											<button class="btn sm {{ $loop->first && $exchange->actions === [] ? 'primary' : '' }}" type="button" wire:click="answer(@js($choice))" wire:key="choice-{{ $loop->index }}">{{ $choice }}</button>
 										@endforeach
 									@endif
 									<button class="btn sm push-end" type="button" wire:click="setDrawerTab('Werkkopie')">{{ __('Wijzigingen bekijken') }}</button>
