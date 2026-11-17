@@ -70,6 +70,9 @@ trait WithWorkingCopy
 
 	public string $upstreamChoice = '';
 
+	/** The moment, in milliseconds, of the last task ending this page received. */
+	public int $seenEndingsUntil = 0;
+
 	public bool $targetDialog = false;
 
 	public string $targetChoice = '';
@@ -406,8 +409,10 @@ trait WithWorkingCopy
 
 	/**
 	 * Brings what the finished tasks on the open card's working copy found
-	 * into the panel, once: the last message, a failure, and what they wrote.
-	 * It also picks up what finished while the panel was closed.
+	 * into the panel: the last message, a failure, and what they wrote. The
+	 * moment of the last ending taken travels with the page, so an answer the
+	 * page never received is handed over again on the next request. It also
+	 * picks up what finished while the panel was closed.
 	 */
 	public function followWorkingCopyTask(): void
 	{
@@ -415,7 +420,8 @@ trait WithWorkingCopy
 			return;
 		}
 
-		foreach (TakeWorkingCopyTaskEndingsAction::execute($this->openCard) as $ending) {
+		foreach (TakeWorkingCopyTaskEndingsAction::execute($this->openCard, $this->seenEndingsUntil) as $ending) {
+			$this->seenEndingsUntil = max($this->seenEndingsUntil, $ending['at']);
 			$this->failure = $ending['failure'] !== null
 				? WorkingCopyTaskEnum::from($ending['task'])->failedLabel() . ': ' . $ending['failure']
 				: $this->failure;

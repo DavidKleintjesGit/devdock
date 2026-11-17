@@ -287,6 +287,7 @@ class Drawer extends Component
 	public function open(string $card): void
 	{
 		$this->openCard = $card;
+		$this->seenEndingsUntil = 0;
 		$this->prompt = '';
 		$this->attachments = [];
 		$this->pickedSources = [];

@@ -73,6 +73,8 @@ class RunWorkingCopyTaskAction extends Command
 		return Cache::lock(StartWorkingCopyTaskAction::lockFor($this->workingCopyTaskObject->card), 10)->block(5, function () use ($key, $startedAt, $ending): WorkingCopyTaskStateObject {
 			$kept = (array) Cache::get($key, []);
 			$endings = [...(array) ($kept['endings'] ?? []), [
+				// a moment in milliseconds names the ending, so a panel can say up to where it has seen them
+				'at' => (int) round(microtime(true) * 1000),
 				'task' => $this->workingCopyTaskObject->task->value,
 				'failure' => $ending['failure'] ?? null,
 				'notice' => $ending['notice'] ?? null,
