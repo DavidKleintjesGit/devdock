@@ -1,6 +1,6 @@
 [x-cloak]{display:none !important}
 /* DevDock. De bouwstenen staan op het ontwerpcanvas onder 1.1 Bouwstenen; wat hier staat volgt dat. Een pagina vult altijd het hele scherm, de kop blijft staan, details schuiven als lade van rechts in. */
-:root{
+:root,[data-code-theme="light"]{
   --bg:#F5F5F2; --surface:#FFFFFF; --surface-2:#FAFAF7; --sunken:#EDEDE8; --column:#EDECE6;
   --line:#E3E3DD; --line-strong:#CFCFC7; --faint:#8E949A;
   --fg:#16181B; --fg-2:#3B4047; --muted:#5D636B;
@@ -45,7 +45,7 @@
   --scrim:rgba(0,0,0,.55);
   color-scheme:dark;
 }}
-:root[data-wb-theme="dark"]{
+:root[data-wb-theme="dark"],[data-code-theme="dark"]{
   --bg:#111312; --surface:#191C1B; --surface-2:#1D2120; --sunken:#242827; --column:#1B1F1E;
   --line:#2C3130; --line-strong:#3B4240; --faint:#6E7571;
   --fg:#ECEDEA; --fg-2:#C6C9C5; --muted:#9BA19D;
@@ -1420,3 +1420,8 @@ body.window{margin:0;background:var(--surface)}
 .assessment-reason{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
 .assessment-reason .input{height:34px}
 .assessment-foot{display:flex;align-items:center;gap:10px}
+/* de code-lezer kiest zijn eigen licht of donker; de rest van het scherm volgt de app */
+.code-reader{display:contents}
+[data-code-theme]{color:var(--fg)}
+[data-code-theme="light"]{color-scheme:light}
+.icon-btn > .swap{display:contents}

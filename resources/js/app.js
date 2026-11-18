@@ -663,3 +663,102 @@ document.addEventListener('livewire:navigate', (event) => {
 		new URL(link.href).pathname === url.pathname ? link.setAttribute('aria-current', 'page') : link.removeAttribute('aria-current');
 	});
 });
+
+// De code-lezer: licht of donker, los van de rest van DevDock en onthouden in
+// deze browser, en de boom die meeloopt met het bestand bovenaan in beeld.
+document.addEventListener('alpine:init', () => {
+	const themeKey = 'devdock.codeTheme';
+
+	Alpine.data('codeReader', () => ({
+		theme: null,
+		current: null,
+		jumping: false,
+
+		init() {
+			try {
+				this.theme = localStorage.getItem(themeKey);
+			} catch {
+				this.theme = null;
+			}
+		},
+
+		isDark() {
+			if (this.theme !== null) {
+				return this.theme === 'dark';
+			}
+
+			const appTheme = document.documentElement.dataset.wbTheme;
+
+			return appTheme === 'dark' || (appTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+		},
+
+		switchTheme() {
+			this.theme = this.isDark() ? 'light' : 'dark';
+
+			try {
+				localStorage.setItem(themeKey, this.theme);
+			} catch {
+				// a private window keeps nothing; the choice then lasts as long as the page
+			}
+		},
+
+		// The file whose section reaches the top of the code pane is the one being read.
+		followScroll() {
+			if (this.jumping) {
+				return;
+			}
+
+			const patch = this.$refs.patch;
+			const top = patch.getBoundingClientRect().top + 24;
+			let reading = null;
+
+			for (const section of patch.querySelectorAll(':scope > .dfile')) {
+				if (section.getBoundingClientRect().top > top) {
+					break;
+				}
+
+				reading = section.id;
+			}
+
+			this.mark(reading ?? patch.querySelector(':scope > .dfile')?.id ?? null);
+		},
+
+		jumpTo(anchor) {
+			const section = document.getElementById(anchor);
+
+			if (section === null) {
+				return;
+			}
+
+			// the chosen file stays marked until you scroll yourself, also when it is
+			// one of the last files that never reach the top
+			this.jumping = true;
+			this.mark(anchor);
+			section.scrollIntoView({ block: 'start', behavior: 'smooth' });
+		},
+
+		// Keeps the marked row inside the visible part of the tree.
+		mark(anchor) {
+			if (anchor === this.current) {
+				return;
+			}
+
+			this.current = anchor;
+			const tree = this.$refs.tree;
+			const row = anchor === null ? null : tree.querySelector(`[data-anchor="${CSS.escape(anchor)}"]`);
+
+			if (row === null || row.offsetParent === null) {
+				return;
+			}
+
+			const treeBox = tree.getBoundingClientRect();
+			const rowBox = row.getBoundingClientRect();
+
+			if (rowBox.top < treeBox.top + 8) {
+				tree.scrollTop -= treeBox.top + 8 - rowBox.top;
+			} else if (rowBox.bottom > treeBox.bottom - 8) {
+				tree.scrollTop += rowBox.bottom - treeBox.bottom + 8;
+			}
+		},
+	}));
+});
