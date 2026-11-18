@@ -170,6 +170,7 @@ class RepairSetupAction extends Command
 			SetupCheckEnum::JS_PACKAGES => $this->installPackages($projectPath, $path, 'node_modules', is_file($path . '/package-lock.json') ? ['npm', 'ci'] : ['npm', 'install'], $prepare, $logPath, $workingCopyStateRepository, $workingCopyRepository),
 			SetupCheckEnum::ASSETS => $workingCopyStateRepository->runStep($path, ['npm', 'run', (string) ProjectKindEnum::of($path)->assetScript()], $logPath, self::STEP_SECONDS),
 			SetupCheckEnum::APP_KEY => $workingCopyStateRepository->runStep($path, [$php, 'artisan', 'key:generate', '--force'], $logPath, self::STEP_SECONDS),
+			SetupCheckEnum::TEST_APP_KEY => $workingCopyStateRepository->runStep($path, [$php, 'artisan', 'key:generate', '--force', '--env=testing'], $logPath, self::STEP_SECONDS),
 			SetupCheckEnum::OWN_DATABASE => ($worktreeDatabaseRepository->describe($projectPath, $path)->isShared
 				? CreateWorktreeDatabaseAction::execute(
 					$worktreeEntity,

@@ -56,6 +56,7 @@ class WorkingCopyStateRepository implements WorkingCopyStateRepositoryContract
 			hasPackageLock: is_file($path . '/' . $packageLock),
 			hasAssetManifest: $projectKind->assetManifest() !== null && is_file($path . '/' . $projectKind->assetManifest()),
 			hasAppKey: filled($environment['APP_KEY'] ?? null),
+			hasTestAppKey: is_file($path . '/.env.testing') ? filled($this->environmentOf($path . '/.env.testing')['APP_KEY'] ?? null) : null,
 			needsStorageLink: file_exists($repositoryPath . '/public/storage'),
 			hasStorageLink: file_exists($path . '/public/storage'),
 			appUrl: $environment['APP_URL'] ?? null,

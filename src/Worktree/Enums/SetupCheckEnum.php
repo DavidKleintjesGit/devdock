@@ -18,6 +18,7 @@ enum SetupCheckEnum: string
 	case JS_PACKAGES = 'js_packages';
 	case ASSETS = 'assets';
 	case APP_KEY = 'app_key';
+	case TEST_APP_KEY = 'test_app_key';
 	case OWN_DATABASE = 'own_database';
 	case OWN_TEST_DATABASE = 'own_test_database';
 	case MIGRATIONS = 'migrations';
@@ -36,6 +37,7 @@ enum SetupCheckEnum: string
 			self::JS_PACKAGES => 'JS-pakketten',
 			self::ASSETS => 'Assets',
 			self::APP_KEY => 'App key',
+			self::TEST_APP_KEY => 'App key van de tests',
 			self::OWN_DATABASE => 'Eigen database',
 			self::OWN_TEST_DATABASE => 'Eigen testdatabase',
 			self::MIGRATIONS => 'Migraties',
@@ -54,7 +56,7 @@ enum SetupCheckEnum: string
 	{
 		return match ($this) {
 			self::ASSETS => [self::JS_PACKAGES],
-			self::APP_KEY, self::STORAGE_LINK => [self::CARRIED_FILES, self::PHP_PACKAGES],
+			self::APP_KEY, self::TEST_APP_KEY, self::STORAGE_LINK => [self::CARRIED_FILES, self::PHP_PACKAGES],
 			self::MIGRATIONS => [self::PHP_PACKAGES, self::OWN_DATABASE],
 			self::TEST_MIGRATIONS => [self::PHP_PACKAGES, self::OWN_TEST_DATABASE],
 			default => [],

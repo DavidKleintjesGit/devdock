@@ -222,4 +222,59 @@ class CheckReadinessActionTest extends TestCase
 
 		$this->assertSame(CheckStateEnum::WAITING, collect($readinessObject->setupChecks)->firstWhere('setupCheck', SetupCheckEnum::ASSETS)->state);
 	}
+
+	#[Test]
+	public function execute_opens_the_test_app_key_point_when_the_env_testing_has_no_key(): void
+	{
+		$project = Project::factory()->create(['path' => $this->repository->path]);
+		$this->repository->commit('composer.json', '{"require":{"laravel/framework":"^13.0"}}', 'Make it Laravel');
+		$path = $this->repository->addWorktree('feature/billing');
+		$this->repository->write('.worktrees/feature-billing/vendor/autoload.php', '<?php');
+		file_put_contents($path . '/.env.testing', "APP_KEY=\n");
+		Worktree::factory()->create([
+			'project' => $project->name,
+			'branch' => 'feature/billing',
+			'path' => $path,
+		]);
+
+		$readinessObject = CheckReadinessAction::execute($path);
+
+		$this->assertSame(CheckStateEnum::OPEN, collect($readinessObject->setupChecks)->firstWhere('setupCheck', SetupCheckEnum::TEST_APP_KEY)->state);
+	}
+
+	#[Test]
+	public function execute_passes_the_test_app_key_point_when_the_env_testing_has_a_key(): void
+	{
+		$project = Project::factory()->create(['path' => $this->repository->path]);
+		$this->repository->commit('composer.json', '{"require":{"laravel/framework":"^13.0"}}', 'Make it Laravel');
+		$path = $this->repository->addWorktree('feature/billing');
+		$this->repository->write('.worktrees/feature-billing/vendor/autoload.php', '<?php');
+		file_put_contents($path . '/.env.testing', 'APP_KEY=base64:' . base64_encode(fake()->sha256()) . "\n");
+		Worktree::factory()->create([
+			'project' => $project->name,
+			'branch' => 'feature/billing',
+			'path' => $path,
+		]);
+
+		$readinessObject = CheckReadinessAction::execute($path);
+
+		$this->assertSame(CheckStateEnum::READY, collect($readinessObject->setupChecks)->firstWhere('setupCheck', SetupCheckEnum::TEST_APP_KEY)->state);
+	}
+
+	#[Test]
+	public function execute_leaves_out_the_test_app_key_point_without_an_env_testing(): void
+	{
+		$project = Project::factory()->create(['path' => $this->repository->path]);
+		$this->repository->commit('composer.json', '{"require":{"laravel/framework":"^13.0"}}', 'Make it Laravel');
+		$path = $this->repository->addWorktree('feature/billing');
+		Worktree::factory()->create([
+			'project' => $project->name,
+			'branch' => 'feature/billing',
+			'path' => $path,
+		]);
+
+		$readinessObject = CheckReadinessAction::execute($path);
+
+		$this->assertNull(collect($readinessObject->setupChecks)->firstWhere('setupCheck', SetupCheckEnum::TEST_APP_KEY));
+	}
 }

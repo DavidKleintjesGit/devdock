@@ -40,7 +40,7 @@ enum SetupGroupEnum: string
 			SetupCheckEnum::WORKING_COPY, SetupCheckEnum::BRANCH, SetupCheckEnum::CARRIED_FILES, SetupCheckEnum::OWN_FILES_OUT_OF_GIT => self::FOLDER,
 			SetupCheckEnum::PHP_PACKAGES, SetupCheckEnum::JS_PACKAGES, SetupCheckEnum::ASSETS => self::PACKAGES,
 			SetupCheckEnum::OWN_DATABASE, SetupCheckEnum::OWN_TEST_DATABASE, SetupCheckEnum::MIGRATIONS, SetupCheckEnum::TEST_MIGRATIONS => self::DATABASES,
-			SetupCheckEnum::APP_KEY, SetupCheckEnum::STORAGE_LINK, SetupCheckEnum::SITE => self::SITE,
+			SetupCheckEnum::APP_KEY, SetupCheckEnum::TEST_APP_KEY, SetupCheckEnum::STORAGE_LINK, SetupCheckEnum::SITE => self::SITE,
 		};
 	}
 }

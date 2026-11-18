@@ -112,6 +112,8 @@ class CheckReadinessAction extends Command
 			$workingCopyStateObject->hasPackageJson ? $this->jsPackages($workingCopyStateObject) : null,
 			$projectKind->assetManifest() === null ? null : $this->assets($projectKind, $workingCopyStateObject),
 			$projectKind->isLaravel() ? $this->appKey($workingCopyStateObject) : null,
+			// the tests read .env.testing instead of .env, and without a key of their own every request in them fails
+			$projectKind->isLaravel() && $workingCopyStateObject->hasTestAppKey !== null ? $this->testAppKey($workingCopyStateObject) : null,
 			...$databaseChecks,
 			$projectKind->isLaravel() ? $this->migrations($workingCopyStateRepository, $worktreeEntity->path, $canCountMigrations, isRebasing: $isRebasing) : null,
 			// a test database of its own falls behind like the other one, and then the tests of an agent or lens stop at once
@@ -275,6 +277,13 @@ class CheckReadinessAction extends Command
 		return $workingCopyStateObject->hasAppKey
 			? new SetupCheckObject(SetupCheckEnum::APP_KEY, CheckStateEnum::READY, __('Staat in .env.'))
 			: new SetupCheckObject(SetupCheckEnum::APP_KEY, CheckStateEnum::OPEN, __('APP_KEY is leeg in .env.'), 'php artisan key:generate');
+	}
+
+	private function testAppKey(WorkingCopyStateObject $workingCopyStateObject): SetupCheckObject
+	{
+		return $workingCopyStateObject->hasTestAppKey === true
+			? new SetupCheckObject(SetupCheckEnum::TEST_APP_KEY, CheckStateEnum::READY, __('Staat in .env.testing.'))
+			: new SetupCheckObject(SetupCheckEnum::TEST_APP_KEY, CheckStateEnum::OPEN, __('APP_KEY is leeg in .env.testing.'), 'php artisan key:generate --env=testing');
 	}
 
 	/**

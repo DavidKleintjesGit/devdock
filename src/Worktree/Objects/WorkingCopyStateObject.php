@@ -17,6 +17,7 @@ class WorkingCopyStateObject extends ValueObject
 	 * @param  list<string>  $missingExcludes  lines for DevDock's own files the exclude of the repository lacks
 	 * @param  list<string>  $missingVendorPackages  package folders of the project a borrowed vendor lacks
 	 * @param  list<string>  $staleVendorPackages  packages composer.lock asks for that vendor holds at another version or not at all
+	 * @param  ?bool  $hasTestAppKey  whether the .env.testing holds an APP_KEY, or null when the copy has no .env.testing
 	 */
 	public function __construct(
 		public readonly ?string $currentBranch,
@@ -38,6 +39,7 @@ class WorkingCopyStateObject extends ValueObject
 		public readonly bool $hasPackageLock,
 		public readonly bool $hasAssetManifest,
 		public readonly bool $hasAppKey,
+		public readonly ?bool $hasTestAppKey,
 		public readonly bool $needsStorageLink,
 		public readonly bool $hasStorageLink,
 		public readonly ?string $appUrl,
