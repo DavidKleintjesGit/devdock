@@ -66,15 +66,39 @@ class RenderMarkdown
 	}
 
 	/**
-	 * A fenced block of code, with the language it is coloured in when one was named.
+	 * A fenced block of code, with the language it is coloured in when one was
+	 * named, under a bar to copy it. A block of markdown, or one without a
+	 * language, can also be read formatted; copying it then carries the
+	 * formatting along, so it pastes into an editor as headings and lists.
 	 *
 	 * @param  array<int, string>  $lines
 	 */
 	private function codeBlock(array $lines, string $language): string
 	{
 		$language = (string) preg_replace('/[^a-z0-9+#-]/', '', $language);
+		$isText = in_array($language, ['', 'md', 'markdown'], true);
 
-		return '<div class="code mono" data-language="' . e($language) . '">' . e(implode("\n", $lines)) . '</div>';
+		$views = $isText
+			? '<div class="md-code-views" role="group">'
+				. '<button type="button" :aria-pressed="(! formatted).toString()" x-on:click="show(false)">' . e(__('Code')) . '</button>'
+				. '<button type="button" :aria-pressed="formatted.toString()" x-on:click="show(true)">' . e(__('Opgemaakt')) . '</button>'
+				. '</div>'
+			: '';
+
+		$copy = '<button class="md-code-copy" type="button" x-on:click="copy()">'
+			. '<span x-show="! copied">' . e(__('Kopiëren')) . '</span>'
+			. '<span x-show="copied" x-cloak>' . e(__('Gekopieerd')) . '</span>'
+			. '</button>';
+
+		$formatted = $isText
+			? '<div class="md-code-formatted" x-ref="formatted" x-show="formatted" x-cloak>' . $this->toHtml(implode("\n", $lines)) . '</div>'
+			: '';
+
+		return '<div class="md-code" x-data="codeBlock(' . ($isText ? 'true' : 'false') . ')">'
+			. '<div class="md-code-bar">' . $views . $copy . '</div>'
+			. '<div class="code mono" data-language="' . e($language) . '" x-ref="raw" x-show="! formatted">' . e(implode("\n", $lines)) . '</div>'
+			. $formatted
+			. '</div>';
 	}
 
 	/**

@@ -761,3 +761,117 @@ document.addEventListener('alpine:init', () => {
 		},
 	}));
 });
+
+// Een codeblok in de chat, een rapport of een regel: kopiëren met één klik, en
+// bij markdown wisselen tussen de code en de opgemaakte tekst. Opgemaakt
+// gekopieerd plakt in een editor als koppen, vet en lijsten. Deze browser
+// onthoudt welke weergave je koos.
+document.addEventListener('alpine:init', () => {
+	const viewKey = 'devdock.codeBlockView';
+
+	// Turns the formatted view into plain html an editor understands: real headings, lists and paragraphs.
+	const clipboardHtml = (root) => {
+		const parts = [];
+		let list = null;
+
+		const closeList = () => {
+			if (list !== null) {
+				parts.push(`<${list.tag}>${list.items.join('')}</${list.tag}>`);
+				list = null;
+			}
+		};
+
+		for (const element of root.querySelectorAll(':scope > .md > *')) {
+			const html = element.innerHTML;
+
+			if (element.classList.contains('md-li')) {
+				const tag = element.classList.contains('numbered') ? 'ol' : 'ul';
+
+				if (list?.tag !== tag) {
+					closeList();
+					list = { tag, items: [] };
+				}
+
+				list.items.push(`<li>${html}</li>`);
+
+				continue;
+			}
+
+			closeList();
+
+			if (element.classList.contains('md-h1')) {
+				parts.push(`<h1>${html}</h1>`);
+			} else if (element.classList.contains('md-h2')) {
+				parts.push(`<h2>${html}</h2>`);
+			} else if (element.classList.contains('md-h3')) {
+				parts.push(`<h3>${html}</h3>`);
+			} else if (element.classList.contains('md-q')) {
+				parts.push(`<blockquote>${html}</blockquote>`);
+			} else if (element.classList.contains('md-code')) {
+				const pre = document.createElement('pre');
+				pre.textContent = element.querySelector('.code')?.textContent ?? '';
+				parts.push(pre.outerHTML);
+			} else {
+				parts.push(element.classList.contains('md-p') ? `<p>${html}</p>` : element.outerHTML);
+			}
+		}
+
+		closeList();
+
+		return parts.join('');
+	};
+
+	// Copies through the copy event, which also works on a site served over plain http.
+	const copyToClipboard = (text, html = null) => {
+		const onCopy = (event) => {
+			event.clipboardData.setData('text/plain', text);
+
+			if (html !== null) {
+				event.clipboardData.setData('text/html', html);
+			}
+
+			event.preventDefault();
+		};
+
+		document.addEventListener('copy', onCopy);
+
+		try {
+			return document.execCommand('copy');
+		} finally {
+			document.removeEventListener('copy', onCopy);
+		}
+	};
+
+	Alpine.data('codeBlock', (isText) => ({
+		formatted: false,
+		copied: false,
+
+		init() {
+			try {
+				this.formatted = isText && localStorage.getItem(viewKey) === 'formatted';
+			} catch {
+				this.formatted = false;
+			}
+		},
+
+		show(formatted) {
+			this.formatted = formatted;
+
+			try {
+				localStorage.setItem(viewKey, formatted ? 'formatted' : 'code');
+			} catch {
+				// a private window keeps nothing; the choice then lasts as long as the page
+			}
+		},
+
+		copy() {
+			const text = this.$refs.raw.textContent;
+			const isCopied = copyToClipboard(text, this.formatted ? clipboardHtml(this.$refs.formatted) : null);
+
+			if (isCopied) {
+				this.copied = true;
+				setTimeout(() => this.copied = false, 1500);
+			}
+		},
+	}));
+});

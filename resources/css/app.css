@@ -1425,3 +1425,14 @@ body.window{margin:0;background:var(--surface)}
 [data-code-theme]{color:var(--fg)}
 [data-code-theme="light"]{color-scheme:light}
 .icon-btn > .swap{display:contents}
+/* een codeblok in markdown: de balk erboven om te kopiëren en om tussen code en opgemaakt te wisselen */
+.md-code{margin:0 0 10px;border-radius:10px;background:#1E1F22;overflow:hidden}
+.md-code .code{margin:0;border-radius:0}
+.md-code-bar{display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.08)}
+.md-code-bar button{border:0;border-radius:6px;padding:3px 9px;background:transparent;color:#BCBEC4;font:500 12px/1.4 var(--font);cursor:pointer}
+.md-code-bar button:hover{background:rgba(255,255,255,.08)}
+.md-code-views{display:flex;gap:2px;margin-right:auto;padding:2px;border-radius:8px;background:rgba(255,255,255,.06)}
+.md-code-views button[aria-pressed="true"]{background:rgba(255,255,255,.14);color:#FFFFFF}
+.md-code-copy{background:rgba(255,255,255,.06) !important}
+.md-code-formatted{padding:14px 16px;background:var(--surface);color:var(--fg)}
+.md-code-formatted .md-p,.md-code-formatted .md-li{color:var(--fg)}
