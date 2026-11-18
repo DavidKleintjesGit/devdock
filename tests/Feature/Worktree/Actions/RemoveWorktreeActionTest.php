@@ -70,4 +70,47 @@ class RemoveWorktreeActionTest extends TestCase
 		$this->assertDatabaseMissing('worktrees', ['id' => $worktree->id]);
 		$this->assertDirectoryExists($path);
 	}
+
+	#[Test]
+	public function execute_removes_a_folder_git_already_let_go_of(): void
+	{
+		$project = Project::factory()->create(['path' => $this->repository->path]);
+		$path = $this->repository->addWorktree('feature/billing');
+		// git took the working copy away, but its folder stayed behind with the pinned project name
+		$this->repository->git('worktree', 'remove', $path);
+		$this->repository->write('.worktrees/feature-billing/.wakatime-project', $project->name);
+		$worktree = Worktree::factory()->create([
+			'project' => $project->name,
+			'branch' => 'feature/billing',
+			'path' => $path,
+			'origin' => WorktreeOriginEnum::MADE,
+		]);
+
+		$removed = RemoveWorktreeAction::execute(new WorktreeId(id: $worktree->id));
+
+		$this->assertTrue($removed);
+		$this->assertDirectoryDoesNotExist($path);
+		$this->assertDatabaseMissing('worktrees', ['id' => $worktree->id]);
+	}
+
+	#[Test]
+	public function execute_keeps_a_folder_git_let_go_of_that_still_holds_files(): void
+	{
+		$project = Project::factory()->create(['path' => $this->repository->path]);
+		$path = $this->repository->addWorktree('feature/billing');
+		$this->repository->git('worktree', 'remove', $path);
+		$this->repository->write('.worktrees/feature-billing/Invoice.php', '<?php');
+		$worktree = Worktree::factory()->create([
+			'project' => $project->name,
+			'branch' => 'feature/billing',
+			'path' => $path,
+			'origin' => WorktreeOriginEnum::MADE,
+		]);
+
+		$removed = RemoveWorktreeAction::execute(new WorktreeId(id: $worktree->id));
+
+		$this->assertFalse($removed);
+		$this->assertFileExists($path . '/Invoice.php');
+		$this->assertDatabaseHas('worktrees', ['id' => $worktree->id]);
+	}
 }

@@ -215,8 +215,18 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		$path = (string) $worktreeEloquent->path;
 		$origin = $worktreeEloquent->origin ?? WorktreeOriginEnum::MADE;
 
-		// a working copy stands two folders deep in its checkout; once the folder is gone git cannot say so itself
-		$repositoryPath = is_dir($path) ? $this->repositoryPathOf($path) : dirname($path, 2);
+		// a working copy stands two folders deep in its checkout; once git let go of the folder it cannot say so itself
+		$isHeldByGit = file_exists($path . '/.git');
+		$repositoryPath = $isHeldByGit ? $this->repositoryPathOf($path) : dirname($path, 2);
+
+		// git let go of the working copy but could not take its folder along, for instance while another program held it open
+		if ($origin->isOurs() && is_dir($path) && ! $isHeldByGit) {
+			if (! $this->removeLeftoverFolder($path)) {
+				return false;
+			}
+
+			Process::path($repositoryPath)->run(['git', 'worktree', 'prune']);
+		}
 
 		// a folder DevDock did not make stays where it is; only the record goes
 		if ($origin->isOurs() && is_dir($path)) {
@@ -1494,6 +1504,21 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		}
 
 		return null;
+	}
+
+	/**
+	 * Takes away a folder git no longer holds as a working copy, as long as
+	 * nothing but the pinned project name is left in it.
+	 */
+	private function removeLeftoverFolder(string $path): bool
+	{
+		if (array_diff(scandir($path) ?: [], ['.', '..', self::PROJECT_NAME_FILE]) !== []) {
+			return false;
+		}
+
+		@unlink($path . '/' . self::PROJECT_NAME_FILE);
+
+		return @rmdir($path);
 	}
 
 	/**
