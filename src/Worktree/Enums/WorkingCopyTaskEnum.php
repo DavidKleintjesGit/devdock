@@ -21,6 +21,9 @@ enum WorkingCopyTaskEnum: string
 	case PROMPT = 'prompt';
 	case ROUND = 'round';
 	case RETARGET = 'retarget';
+	case CLEAN_UP = 'clean-up';
+	case ARCHIVE = 'archive';
+	case DELETE = 'delete';
 
 	/**
 	 * What the card says while the task runs.
@@ -39,6 +42,9 @@ enum WorkingCopyTaskEnum: string
 			self::PROMPT => 'DevDock geeft je bericht aan de agent',
 			self::ROUND => 'DevDock roept de lenzen op',
 			self::RETARGET => 'DevDock zet de taak op een andere doelbranch en rebaset',
+			self::CLEAN_UP => 'DevDock ruimt de lokale spullen van deze taak op',
+			self::ARCHIVE => 'DevDock ruimt deze taak op en archiveert hem',
+			self::DELETE => 'DevDock verwijdert deze to-do',
 		});
 	}
 
@@ -59,6 +65,9 @@ enum WorkingCopyTaskEnum: string
 			self::PROMPT => 'Je bericht kwam niet bij de agent',
 			self::ROUND => 'Er ging geen ronde open',
 			self::RETARGET => 'De doelbranch kon niet veranderd worden',
+			self::CLEAN_UP => 'Opruimen lukte niet',
+			self::ARCHIVE => 'Archiveren lukte niet',
+			self::DELETE => 'Verwijderen lukte niet',
 		});
 	}
 }

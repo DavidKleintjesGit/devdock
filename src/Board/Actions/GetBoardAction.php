@@ -42,6 +42,7 @@ class GetBoardAction extends Command
 	 * row last changed. A change in any of them makes the board build at once.
 	 */
 	private const CLICK_TABLES = [
+		'card_archives' => 'updated_at',
 		'card_views' => 'updated_at',
 		'project_workflows' => 'updated_at',
 		'task_agents' => 'updated_at',

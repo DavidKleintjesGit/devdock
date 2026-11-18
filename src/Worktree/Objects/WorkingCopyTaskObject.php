@@ -33,6 +33,7 @@ class WorkingCopyTaskObject extends ValueObject
 		public readonly ?string $prompt = null,
 		public readonly bool $restartsLoop = false,
 		public readonly ?string $target = null,
+		public readonly bool $discardsWork = false,
 	) {
 		parent::__construct();
 	}
@@ -58,6 +59,7 @@ class WorkingCopyTaskObject extends ValueObject
 			prompt: $data['prompt'] ?? null,
 			restartsLoop: (bool) ($data['restarts_loop'] ?? false),
 			target: $data['target'] ?? null,
+			discardsWork: (bool) ($data['discards_work'] ?? false),
 		);
 	}
 
@@ -82,6 +84,7 @@ class WorkingCopyTaskObject extends ValueObject
 			'prompt' => $this->prompt,
 			'restarts_loop' => $this->restartsLoop,
 			'target' => $this->target,
+			'discards_work' => $this->discardsWork,
 		]));
 	}
 

@@ -94,10 +94,11 @@ interface WorktreeRepositoryContract
 	public function rename(WorktreeId $worktreeId, string $branch): WorktreeEntity;
 
 	/**
-	 * Takes the working copy off disk and forgets it. Work that was never
-	 * committed goes with it, so the caller decides when this is allowed.
+	 * Takes the working copy off disk with its local branch, and forgets it.
+	 * Git refuses while work stands that is not committed, unless that work is
+	 * discarded on purpose; the local branch goes once origin holds it.
 	 */
-	public function remove(WorktreeId $worktreeId): bool;
+	public function remove(WorktreeId $worktreeId, bool $discardsWork = false): bool;
 
 	/**
 	 * Every file a round left behind in a working copy, with how much of it

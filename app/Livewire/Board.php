@@ -298,7 +298,8 @@ class Board extends Component
 	 */
 	private function board(): Collection
 	{
-		return $this->cardObjects ??= collect(GetBoardAction::execute());
+		// an archived card stays off the board
+		return $this->cardObjects ??= collect(GetBoardAction::execute())->reject(fn (CardObject $card): bool => $card->isArchived)->values();
 	}
 
 	/**

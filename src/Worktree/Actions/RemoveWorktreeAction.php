@@ -5,9 +5,6 @@ declare(strict_types=1);
 namespace Src\Worktree\Actions;
 
 use Src\Packages\Cqrs\Command;
-use Src\Prompt\Contracts\AttachmentRepositoryContract;
-use Src\Review\Contracts\AgentContextRepositoryContract;
-use Src\Session\Contracts\SessionFileRepositoryContract;
 use Src\Worktree\Contracts\WorkingCopyRepositoryContract;
 use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
@@ -17,21 +14,24 @@ use Src\Worktree\Objects\WorktreeId;
 
 /**
  * Takes away everything DevDock put down for a working copy: the folder, the
- * borrowed packages and the site, its own database, the branch it created
- * once that is merged, and the sessions Claude kept for the folder. What it
- * found already standing, it leaves where it is.
+ * borrowed packages and the site, its own databases, and the local branch
+ * once origin holds it. What it found already standing, it leaves where it
+ * is. The history of the task, its conversation, sessions and round reports,
+ * stays for reading back.
  *
- * @method static bool execute(WorktreeId $worktreeId)
+ * @method static bool execute(WorktreeId $worktreeId, bool $discardsWork = false)
  */
 class RemoveWorktreeAction extends Command
 {
 	public function __construct(
 		public readonly WorktreeId $worktreeId,
+		public readonly bool $discardsWork = false,
 	) {}
 
 	public function handle(
 		WorktreeRepositoryContract $worktreeRepository,
 		WorkingCopyRepositoryContract $workingCopyRepository,
+		WorktreeDatabaseRepositoryContract $worktreeDatabaseRepository,
 	): bool {
 		$worktreeEntity = $worktreeRepository->getAll()->first(
 			fn (WorktreeEntity $worktreeEntity) => $worktreeEntity->worktreeId->id === $this->worktreeId->id,
@@ -41,41 +41,25 @@ class RemoveWorktreeAction extends Command
 			return false;
 		}
 
-		// only a copy DevDock made borrowed anything; the packages of the project or of a folder from elsewhere are its own
 		// a site worker or queue that still runs in the folder holds its files open, and then removing it fails halfway
 		if ($worktreeEntity->origin === WorktreeOriginEnum::MADE && is_dir($worktreeEntity->path)) {
 			$workingCopyRepository->stopProcesses($worktreeEntity->path);
 		}
 
 		if ($worktreeEntity->origin->isOurs()) {
-			// the borrowed folders only point at the checkout, and git empties the
-			// folder it is told to remove
+			// the borrowed folders only point at the checkout, and git empties the folder it is told to remove
 			$workingCopyRepository->release($worktreeEntity->path, $worktreeEntity->site);
 		}
 
 		// the databases read their names from the copy, so they go first
 		if ($worktreeEntity->ownDatabase !== null) {
-			resolve(WorktreeDatabaseRepositoryContract::class)->drop($worktreeEntity->path, $worktreeEntity->ownDatabase);
+			$worktreeDatabaseRepository->drop($worktreeEntity->path, $worktreeEntity->ownDatabase);
 		}
 
 		if ($worktreeEntity->origin->isOurs() && is_dir($worktreeEntity->path)) {
-			resolve(WorktreeDatabaseRepositoryContract::class)->dropTestDatabase(dirname($worktreeEntity->path, 2), $worktreeEntity->path);
+			$worktreeDatabaseRepository->dropTestDatabase(dirname($worktreeEntity->path, 2), $worktreeEntity->path);
 		}
 
-		// a folder DevDock did not make stays, but the round reports of this task were ours
-		if ($worktreeEntity->card !== null) {
-			resolve(AgentContextRepositoryContract::class)->removeReports($worktreeEntity->path, $worktreeEntity->card);
-			resolve(AttachmentRepositoryContract::class)->deleteFor($worktreeEntity->card);
-		}
-
-		if (! $worktreeRepository->remove($this->worktreeId)) {
-			return false;
-		}
-
-		if ($worktreeEntity->origin->isOurs()) {
-			resolve(SessionFileRepositoryContract::class)->deleteFor($worktreeEntity->path);
-		}
-
-		return true;
+		return $worktreeRepository->remove($this->worktreeId, $this->discardsWork);
 	}
 }

@@ -114,5 +114,6 @@
 	@endif
 
 	<livewire:drawer/>
+	<livewire:card-clean-up/>
 	@include('partials.skeletons.card')
 </div>

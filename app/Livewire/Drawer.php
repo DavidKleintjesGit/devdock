@@ -20,11 +20,11 @@ use Livewire\Component;
 use Src\Access\Actions\GetRoleAccessAction;
 use Src\Access\Enums\AgentRoleEnum;
 use Src\Board\Actions\BuildTaskPromptAction;
-use Src\Board\Actions\DeleteTodoAction;
 use Src\Board\Actions\GetBoardAction;
 use Src\Board\Actions\PlanTodoLaterAction;
 use Src\Board\Contracts\CardViewRepositoryContract;
 use Src\Board\Enums\BoardColumnEnum;
+use Src\Board\Enums\CardActionEnum;
 use Src\Board\Enums\HintToneEnum;
 use Src\Board\Enums\CardStatusEnum;
 use Src\Board\Enums\CardSubtabEnum;
@@ -59,7 +59,6 @@ use Src\Review\Actions\GetLoopStatusAction;
 use Src\Review\Actions\GetRoundsAction;
 use Src\Review\Actions\GetRoundTurnsAction;
 use Src\Review\Actions\GetWorkflowSettingAction;
-use Src\Review\Actions\ResolveWorkflowStepAction;
 use Src\Review\Actions\RetryLensAction;
 use Src\Review\Actions\SetFindingStatusAction;
 use Src\Review\Actions\StopRoundAction;
@@ -69,7 +68,6 @@ use Src\Review\Contracts\ReviewRoundRepositoryContract;
 use Src\Review\Enums\FindingStatusEnum;
 use Src\Review\Enums\LoopStatusEnum;
 use Src\Review\Enums\RoundStatusEnum;
-use Src\Review\Enums\WorkflowStepEnum;
 use Src\Review\Objects\LensEntity;
 use Src\Review\Objects\LensId;
 use Src\Review\Objects\ReviewFindingEntity;
@@ -80,7 +78,6 @@ use Src\Review\Objects\ReviewRoundId;
 use Src\Session\Actions\GetSessionTraitsAction;
 use Src\Task\Actions\ActivateAgentAction;
 use Src\Task\Actions\ActivateLinkAction;
-use Src\Task\Actions\DeleteTaskAction;
 use Src\Task\Actions\GetReadableDirectoriesAction;
 use Src\Task\Actions\LinkToTaskAction;
 use Src\Task\Actions\OpenAgentAction;
@@ -99,7 +96,6 @@ use Src\Worktree\Actions\GetSetupGroupsAction;
 use Src\Worktree\Actions\GetWorkingCopyTaskAction;
 use Src\Worktree\Actions\GetWorktreesAction;
 use Src\Worktree\Actions\ReadDiffAction;
-use Src\Worktree\Actions\RemoveWorktreeAction;
 use Src\Worktree\Actions\RenameToTicketAction;
 use Src\Worktree\Actions\StartRepairAction;
 use Src\Worktree\Contracts\WorktreeDatabaseRepositoryContract;
@@ -212,8 +208,6 @@ class Drawer extends Component
 	public ?string $diffView = null;
 
 
-	public bool $confirmingDeleteTask = false;
-
 	public bool $linking = false;
 
 	public ?string $committed = null;
@@ -292,7 +286,6 @@ class Drawer extends Component
 		$this->attachments = [];
 		$this->pickedSources = [];
 		$this->composing = false;
-		$this->confirmingDeleteTask = false;
 		$this->failure = null;
 		$this->openDiffFile = null;
 		$this->committed = null;
@@ -857,73 +850,16 @@ class Drawer extends Component
 	}
 
 	/**
-	 * Takes the working copy off disk. The agent was opened in that folder, so
-	 * it cannot be carried on afterwards.
+	 * Closes the panel when its card was archived or deleted: it is no longer on the board.
+	 *
+	 * @param  list<string>  $cards
 	 */
-	public function removeWorktree(): void
+	#[On('cards-cleaned-up')]
+	public function closeCleanedUpCard(array $cards, string $action): void
 	{
-		$this->failure = null;
-
-		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
-		$worktreeEntity = $this->worktreeFor($cardObject);
-
-		if ($cardObject === null || $worktreeEntity === null) {
-			$this->failure = __('Er is geen werkkopie om op te ruimen.');
-
-			return;
+		if ($action !== CardActionEnum::CLEAN_UP->value && in_array($this->openCard, $cards, true)) {
+			$this->closeDrawer();
 		}
-
-		// the agent lives in this folder, so it goes only once the work is merged
-		$step = ResolveWorkflowStepAction::execute($cardObject, $this->latestRound($cardObject->id));
-
-		if ($step !== WorkflowStepEnum::MERGED) {
-			$this->failure = __('De werkkopie gaat pas weg als de pull request gemerged is.');
-
-			return;
-		}
-
-		if (! RemoveWorktreeAction::execute($worktreeEntity->worktreeId)) {
-			$this->failure = __('Git weigerde de werkkopie weg te halen: er staat nog werk in dat niet gecommit is.');
-
-			return;
-		}
-
-		// de lenzen schreven hun antwoorden buiten de werkkopie weg; die horen bij de taak en gaan nu mee
-		resolve(ReviewRoundRepositoryContract::class)->deleteLogsForCard($cardObject->id);
-		resolve(PromptRunRepositoryContract::class)->deleteLogsForCard($cardObject->id);
-	}
-
-	public function confirmDeleteTask(): void
-	{
-		$this->confirmingDeleteTask = true;
-	}
-
-	/**
-	 * Takes this task off the board. A to-do goes altogether; a task that
-	 * stands on a ticket or a pull request only loses what was pinned to it.
-	 */
-	public function deleteTask(): void
-	{
-		$this->failure = null;
-
-		if (! $this->confirmingDeleteTask || $this->openCard === null) {
-			$this->confirmingDeleteTask = true;
-
-			return;
-		}
-
-		$card = $this->openCard;
-
-		DeleteTaskAction::execute($card);
-		resolve(ReviewRoundRepositoryContract::class)->deleteForCard($card);
-		resolve(AttachmentRepositoryContract::class)->deleteFor($card);
-
-		if (str_starts_with($card, 'todo:')) {
-			DeleteTodoAction::execute(new TodoId(id: (int) substr($card, 5)));
-		}
-
-		$this->confirmingDeleteTask = false;
-		$this->closeDrawer();
 	}
 
 	public function toggleLinking(): void

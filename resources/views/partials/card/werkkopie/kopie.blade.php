@@ -82,11 +82,11 @@
 
 		<div class="kv">
 			<span class="k">{{ __('Opruimen') }}</span>
-			<span class="hint">{{ $card->isDone() ? __('De pull request is gemerged. Dit gaat weg:') : __('Kan pas als de pull request gemerged is. Dan gaat dit weg:') }}</span>
+			<span class="hint">{{ __('Dit gaat weg; het gesprek en de rondes blijven:') }}</span>
 			<ul class="cleanup">
 				@foreach ($cleanUp as $line)<li>{{ $line }}</li>@endforeach
 			</ul>
-			<span class="v"><x-busy-button action="removeWorktree" class="btn xs" :busy="__('Opruimen...')" :disabled="! $card->isDone()">{{ __('Opruimen') }}</x-busy-button></span>
+			<span class="v"><button class="btn xs" type="button" x-data x-on:click="$dispatch('clean-up-cards', { cards: [@js($card->id)], action: 'clean_up' })">{{ __('Opruimen') }}</button></span>
 		</div>
 	</div>
 </div>

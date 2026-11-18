@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Src\Board\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Src\Board\Contracts\CardArchiveRepositoryContract;
 use Src\Board\Contracts\CardViewRepositoryContract;
 use Src\Board\Contracts\TodoRepositoryContract;
+use Src\Board\Repositories\CardArchiveRepository;
 use Src\Board\Repositories\CardViewRepository;
 use Src\Board\Repositories\TodoRepository;
 
@@ -16,5 +18,6 @@ class BoardServiceProvider extends ServiceProvider
 	{
 		$this->app->singleton(TodoRepositoryContract::class, TodoRepository::class);
 		$this->app->singleton(CardViewRepositoryContract::class, CardViewRepository::class);
+		$this->app->singleton(CardArchiveRepositoryContract::class, CardArchiveRepository::class);
 	}
 }

@@ -53,7 +53,11 @@
 					<button type="button" role="menuitem" wire:click="planLater({{ $card->isInBacklog() ? 'false' : 'true' }})">{{ $card->isInBacklog() ? __('In de sprint zetten') : __('Naar de backlog') }}</button>
 				@endif
 				<hr>
-				<button class="danger" type="button" role="menuitem" wire:click="deleteTask">{{ $confirmingDeleteTask ? __('Zeker weten? Verwijderen') : __('Taak verwijderen') }}</button>
+				<button type="button" role="menuitem" @click="open = false; $dispatch('clean-up-cards', { cards: [@js($card->id)], action: 'clean_up' })">{{ __('Opruimen') }}</button>
+				<button type="button" role="menuitem" @click="open = false; $dispatch('clean-up-cards', { cards: [@js($card->id)], action: 'archive' })">{{ __('Archiveren') }}</button>
+				@if ($card->isTodo())
+					<button class="danger" type="button" role="menuitem" @click="open = false; $dispatch('clean-up-cards', { cards: [@js($card->id)], action: 'delete' })">{{ __('Verwijderen') }}</button>
+				@endif
 			</div>
 		</details>
 		<button class="icon-btn" type="button" @click="document.body.classList.add('drawer-closing')" wire:click="closeDrawer" aria-label="{{ __('Sluiten') }}"><x-icon name="x"/></button>

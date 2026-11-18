@@ -52,6 +52,11 @@ interface TaskRepositoryContract
 	public function activateAgent(TaskId $taskId, string $sessionUuid): TaskEntity;
 
 	/**
+	 * Leaves the task without an active agent; every agent it had stays as history.
+	 */
+	public function retireAgents(TaskId $taskId): TaskEntity;
+
+	/**
 	 * Writes down that a round has run on this key, so the next one resumes it
 	 * instead of claiming it again.
 	 */

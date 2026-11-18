@@ -6,6 +6,10 @@ namespace Src\Worktree\Actions;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
+use Src\Board\Actions\ArchiveCardAction;
+use Src\Board\Actions\CleanUpCardAction;
+use Src\Board\Actions\DeleteCardAction;
+use Src\Board\Objects\TodoId;
 use Src\Packages\Cqrs\Command;
 use Src\Project\Actions\GetProjectsAction;
 use Src\Project\Objects\ProjectEntity;
@@ -63,6 +67,9 @@ class RunWorkingCopyTaskAction extends Command
 				WorkingCopyTaskEnum::PROMPT => $this->promptEnding(),
 				WorkingCopyTaskEnum::ROUND => $this->roundEnding(),
 				WorkingCopyTaskEnum::RETARGET => $this->retargetEnding(),
+				WorkingCopyTaskEnum::CLEAN_UP => $this->cardEnding(CleanUpCardAction::execute($this->workingCopyTaskObject->card, $this->workingCopyTaskObject->discardsWork), __('Opgeruimd.')),
+				WorkingCopyTaskEnum::ARCHIVE => $this->cardEnding(ArchiveCardAction::execute($this->workingCopyTaskObject->card, $this->workingCopyTaskObject->discardsWork), __('Gearchiveerd.')),
+				WorkingCopyTaskEnum::DELETE => $this->cardEnding($this->deleteCard(), __('Verwijderd.')),
 			};
 		} catch (Throwable $exception) {
 			report($exception);
@@ -223,6 +230,23 @@ class RunWorkingCopyTaskAction extends Command
 			RebaseOutcomeEnum::DONE => ['notice' => __('Op :target gezet en gerebased. Push om origin bij te werken.', ['target' => $rebaseOutcomeObject->targetBranch])],
 			RebaseOutcomeEnum::FAILED => ['failure' => $rebaseOutcomeObject->failure],
 		};
+	}
+
+	/**
+	 * @return array{failure?: string, notice?: string}
+	 */
+	private function cardEnding(?string $failure, string $notice): array
+	{
+		return $failure === null ? ['notice' => $notice] : ['failure' => $failure];
+	}
+
+	private function deleteCard(): ?string
+	{
+		$todoId = TodoId::fromBoardKey($this->workingCopyTaskObject->card);
+
+		return $todoId === null
+			? __('Alleen een eigen to-do kan verwijderd worden; archiveer de rest.')
+			: DeleteCardAction::execute($todoId, $this->workingCopyTaskObject->discardsWork);
 	}
 
 	/**

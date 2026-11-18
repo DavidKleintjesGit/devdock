@@ -124,6 +124,13 @@ class TaskRepository implements TaskRepositoryContract
 		return $this->byId($taskId);
 	}
 
+	public function retireAgents(TaskId $taskId): TaskEntity
+	{
+		TaskAgentEloquent::query()->where('task_id', $taskId->id)->update(['is_active' => false]);
+
+		return $this->byId($taskId);
+	}
+
 	public function markAgentStarted(string $sessionUuid): void
 	{
 		TaskAgentEloquent::query()

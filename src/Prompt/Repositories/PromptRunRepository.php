@@ -206,6 +206,13 @@ class PromptRunRepository implements PromptRunRepositoryContract
 		return $logPaths->count();
 	}
 
+	public function deleteForCard(string $card): void
+	{
+		$this->deleteLogsForCard($card);
+
+		PromptRunEloquent::query()->where('card', $card)->delete();
+	}
+
 	private function instructionsPath(PromptRunId $promptRunId): string
 	{
 		return storage_path('app/prompts/' . $promptRunId->id . '.instructions.md');

@@ -14,4 +14,12 @@ final class TodoId extends ValueObject
 	) {
 		parent::__construct();
 	}
+
+	/**
+	 * The to-do a card key names, such as todo:12; null for a card of anything else.
+	 */
+	public static function fromBoardKey(string $card): ?self
+	{
+		return preg_match('/^todo:(\d+)$/', $card, $found) === 1 ? new self(id: (int) $found[1]) : null;
+	}
 }

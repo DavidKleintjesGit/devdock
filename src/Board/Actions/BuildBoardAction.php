@@ -6,6 +6,7 @@ namespace Src\Board\Actions;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Src\Board\Contracts\CardArchiveRepositoryContract;
 use Src\Board\Contracts\CardViewRepositoryContract;
 use Src\Board\Contracts\TodoRepositoryContract;
 use Src\Board\Enums\BoardColumnEnum;
@@ -13,6 +14,7 @@ use Src\Board\Enums\CardStatusEnum;
 use Src\Board\Enums\CopyPlaceEnum;
 use Src\Board\Enums\UnreadSourceEnum;
 use Src\Board\Objects\BoardColumnFactsObject;
+use Src\Board\Objects\CardArchiveEntity;
 use Src\Board\Objects\CardObject;
 use Src\Board\Objects\CardObjectCollection;
 use Src\Board\Objects\TodoEntity;
@@ -124,6 +126,9 @@ class BuildBoardAction extends Command
 	/** @var array<int, list<CarbonImmutable>> */
 	private array $commentedByPullRequest = [];
 
+	/** @var Collection<string, CardArchiveEntity> */
+	private Collection $archivesByCard;
+
 	public function handle(TodoRepositoryContract $todoRepository): CardObjectCollection
 	{
 		$projectEntities = collect(GetProjectsAction::execute());
@@ -135,6 +140,7 @@ class BuildBoardAction extends Command
 		$this->roundsByCard = resolve(ReviewRoundRepositoryContract::class)->getLatestPerCard();
 		$this->promptRunsByCard = resolve(PromptRunRepositoryContract::class)->getLatestPerCard();
 		$this->tasksByKey = collect(GetTasksAction::execute())->keyBy('key');
+		$this->archivesByCard = collect(resolve(CardArchiveRepositoryContract::class)->getAll())->keyBy(fn (CardArchiveEntity $cardArchiveEntity): string => $cardArchiveEntity->card);
 		$this->pinned = $this->pinned();
 		$this->sessionEntities = collect(GetSessionsAction::execute())
 			->filter(fn (SessionEntity $sessionEntity) => $sessionEntity->branch !== null)
@@ -363,7 +369,7 @@ class BuildBoardAction extends Command
 			hasOpenPullRequest: $pullRequestEntities->contains(fn (PullRequestEntity $pullRequestEntity): bool => $pullRequestEntity->isOpen()),
 			hasReviewRound: $latestRound !== null,
 			hasWorkingCopy: $worktreeEntity !== null,
-			isStarted: $branch !== null || $sessionEntities->isNotEmpty() || $agent !== null,
+			isStarted: $branch !== null || $this->hasSessionSinceCleanUp($key, $sessionEntities) || $agent !== null,
 			isForLater: $this->knowsSprints && $ticketEntity !== null && ! $ticketEntity->isInSprint(),
 		));
 
@@ -427,6 +433,7 @@ class BuildBoardAction extends Command
 			agentActiveAt: $this->agentActiveAt($promptRunEntity),
 			unreadPerSource: $this->unreadPerSource($key, $pullRequestEntities),
 			hasUnreadQuestion: $this->hasUnreadQuestion($key, $promptRunEntity),
+			isArchived: $this->isArchived($key, CardObject::signatureOf($ticketEntity?->status, $pullRequestEntities)),
 			originStanding: $column === BoardColumnEnum::REVIEW ? $worktreeEntity?->originStanding() : null,
 			unpushedCommits: $worktreeEntity?->ahead ?? 0,
 		);
@@ -491,6 +498,7 @@ class BuildBoardAction extends Command
 			agentActiveAt: $this->agentActiveAt($promptRunEntity),
 			unreadPerSource: $this->unreadPerSource($todoEntity->boardKey()),
 			hasUnreadQuestion: $this->hasUnreadQuestion($todoEntity->boardKey(), $promptRunEntity),
+			isArchived: $this->isArchived($todoEntity->boardKey(), CardObject::signatureOf($ticketEntity?->status, [])),
 		);
 	}
 
@@ -527,7 +535,11 @@ class BuildBoardAction extends Command
 				? [CardStatusEnum::YOURS, __('Gewijzigd na de ronde · opnieuw naar de lenzen')]
 				: $this->reviewStatus($latestRound, $staleDays, $this->maxRoundsFor($project)),
 			BoardColumnEnum::PULL_REQUEST => $this->pullRequestStatus($pullRequestEntities, $staleDays),
-			BoardColumnEnum::DONE => [CardStatusEnum::QUIET, $ticketEntity !== null || $pullRequestEntities->isNotEmpty() ? __('Gemerged') : __('Afgevinkt')],
+			BoardColumnEnum::DONE => match (true) {
+				$worktreeEntity?->holdsWork() ?? false => [CardStatusEnum::YOURS, __('Gemerged · niet opgeruimd: :work', ['work' => $worktreeEntity->waitingLabel()])],
+				$ticketEntity !== null || $pullRequestEntities->isNotEmpty() => [CardStatusEnum::QUIET, __('Gemerged')],
+				default => [CardStatusEnum::QUIET, __('Afgevinkt')],
+			},
 		};
 	}
 
@@ -895,6 +907,24 @@ class BuildBoardAction extends Command
 	 *
 	 * @return Collection<int, SessionEntity>
 	 */
+	/**
+	 * Whether a session ran on this task since its local work was cleaned up;
+	 * the sessions from before stay as history and do not count as work.
+	 *
+	 * @param  Collection<int, SessionEntity>  $sessionEntities
+	 */
+	private function hasSessionSinceCleanUp(string $key, Collection $sessionEntities): bool
+	{
+		$cleanedUpAt = $this->archivesByCard->get($key)?->cleanedUpAt;
+
+		return $sessionEntities->contains(fn (SessionEntity $sessionEntity): bool => $cleanedUpAt === null || ($sessionEntity->lastActiveAt?->greaterThan($cleanedUpAt) ?? false));
+	}
+
+	private function isArchived(string $key, string $signature): bool
+	{
+		return $this->archivesByCard->get($key)?->keepsOffBoard($signature) ?? false;
+	}
+
 	private function sessionsFor(string $key, ?string $branch): Collection
 	{
 		if (! $this->isTicketKey($key)) {

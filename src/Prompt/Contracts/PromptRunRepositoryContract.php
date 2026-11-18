@@ -90,4 +90,10 @@ interface PromptRunRepositoryContract
 	 * how many there were.
 	 */
 	public function deleteLogsForCard(string $card): int;
+
+	/**
+	 * Forgets the whole conversation with the agent of this card: every round,
+	 * with its log and instructions.
+	 */
+	public function deleteForCard(string $card): void;
 }

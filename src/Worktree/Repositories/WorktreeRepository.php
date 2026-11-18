@@ -204,7 +204,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		return $this->mapToEntity($worktreeEloquent->fresh());
 	}
 
-	public function remove(WorktreeId $worktreeId): bool
+	public function remove(WorktreeId $worktreeId, bool $discardsWork = false): bool
 	{
 		$worktreeEloquent = WorktreeEloquent::query()->find($worktreeId->id);
 
@@ -226,7 +226,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 			$removed = Process::path($repositoryPath)
 				->timeout(self::TIMEOUT)
-				->run(['git', 'worktree', 'remove', $path])
+				->run(['git', 'worktree', 'remove', ...($discardsWork ? ['--force'] : []), $path])
 				->successful();
 
 			if (! $removed) {
@@ -236,8 +236,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			}
 		}
 
-		if ($origin->isOurs() && $worktreeEloquent->branch_created) {
-			$this->deleteMergedBranch($repositoryPath, (string) $worktreeEloquent->branch);
+		if ($origin->isOurs()) {
+			$this->deleteLocalBranch($repositoryPath, (string) $worktreeEloquent->branch, $discardsWork);
 		}
 
 		$worktreeEloquent->delete();
@@ -252,12 +252,15 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	}
 
 	/**
-	 * Takes away a branch DevDock created, but only when the main line on
-	 * origin already holds every commit of it; otherwise it stays.
+	 * Takes away the local branch of a working copy once origin holds every
+	 * commit of it, under any branch; commits that would be discarded go only
+	 * when that was said.
 	 */
-	private function deleteMergedBranch(string $repositoryPath, string $branch): void
+	private function deleteLocalBranch(string $repositoryPath, string $branch, bool $discardsWork): void
 	{
-		if ($this->isMerged($repositoryPath, $branch)) {
+		$onlyHere = LocalCommand::run($repositoryPath, ['git', 'rev-list', '--count', 'refs/heads/' . $branch, '--not', '--remotes']);
+
+		if ($discardsWork || ($onlyHere->successful() && trim($onlyHere->output()) === '0')) {
 			Process::path($repositoryPath)->run(['git', 'branch', '-D', $branch]);
 		}
 	}

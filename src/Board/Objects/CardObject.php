@@ -56,8 +56,30 @@ class CardObject extends ValueObject
 		public readonly bool $hasUnreadQuestion = false,
 		public readonly ?OriginStandingEnum $originStanding = null,
 		public readonly int $unpushedCommits = 0,
+		public readonly bool $isArchived = false,
 	) {
 		parent::__construct();
+	}
+
+	/**
+	 * What a card looks like to the outside world: the status of its ticket and
+	 * the state and remarks of its pull requests. An archived card comes back
+	 * once this changes.
+	 */
+	public function resurfaceSignature(): string
+	{
+		return self::signatureOf($this->ticketStatus, $this->pullRequests);
+	}
+
+	/**
+	 * @param  iterable<PullRequestEntity>  $pullRequestEntities
+	 */
+	public static function signatureOf(?string $ticketStatus, iterable $pullRequestEntities): string
+	{
+		return md5(implode('|', [
+			(string) $ticketStatus,
+			...collect($pullRequestEntities)->map(fn (PullRequestEntity $pullRequestEntity): string => $pullRequestEntity->number . ':' . $pullRequestEntity->state->value . ':' . $pullRequestEntity->commentCount)->all(),
+		]));
 	}
 
 	/**
