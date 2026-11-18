@@ -94,7 +94,6 @@ return [
 		'own_files' => [
 			'.devdock/',
 			'.claude/rules/devdock-*.md',
-			'.wakatime-project',
 		],
 
 		// hoe lang de staat van een werkkopie blijft staan. git status over een

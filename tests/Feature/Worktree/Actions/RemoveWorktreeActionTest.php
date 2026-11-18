@@ -76,9 +76,9 @@ class RemoveWorktreeActionTest extends TestCase
 	{
 		$project = Project::factory()->create(['path' => $this->repository->path]);
 		$path = $this->repository->addWorktree('feature/billing');
-		// git took the working copy away, but its folder stayed behind with the pinned project name
+		// git took the working copy away, but its empty folder stayed behind
 		$this->repository->git('worktree', 'remove', $path);
-		$this->repository->write('.worktrees/feature-billing/.wakatime-project', $project->name);
+		mkdir($path);
 		$worktree = Worktree::factory()->create([
 			'project' => $project->name,
 			'branch' => 'feature/billing',

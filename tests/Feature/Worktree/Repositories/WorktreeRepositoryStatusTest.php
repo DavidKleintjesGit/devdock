@@ -58,7 +58,7 @@ class WorktreeRepositoryStatusTest extends TestCase
 		$this->repository = TemporaryGitRepository::create();
 		$path = $this->repository->addWorktree('feature/billing');
 		$this->repository->git('worktree', 'remove', $path);
-		$this->repository->write('.worktrees/feature-billing/.wakatime-project', fake()->slug());
+		mkdir($path);
 		// a change in the checkout itself, one folder above the copy
 		$this->repository->write('README.md', fake()->sentence());
 		Worktree::factory()->create(['branch' => 'feature/billing', 'path' => $path]);

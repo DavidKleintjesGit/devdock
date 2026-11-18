@@ -37,7 +37,7 @@ class WorktreeRepositoryCommitTest extends TestCase
 	public function commit_leaves_the_files_devdock_writes_out_of_a_commit_of_everything(): void
 	{
 		$this->repository->write('.devdock/rebase.json', '{}');
-		$this->repository->write('.wakatime-project', 'shop');
+		$this->repository->write('.claude/rules/devdock-review.md', fake()->sentence());
 		$this->repository->write('billing/Invoice.php', '<?php');
 
 		resolve(WorktreeRepositoryContract::class)->commit($this->repository->path, 'Add an invoice', '');
@@ -62,7 +62,7 @@ class WorktreeRepositoryCommitTest extends TestCase
 		// the exclude as DevDock writes it into every project it prepares
 		file_put_contents($this->repository->path . '/.git/info/exclude', "/.devdock/\n/.wakatime-project\n");
 		$this->repository->write('.devdock/rebase.json', '{}');
-		$this->repository->write('.wakatime-project', 'shop');
+		$this->repository->write('.claude/rules/devdock-review.md', fake()->sentence());
 		$this->repository->write('billing/Invoice.php', '<?php');
 
 		$failure = resolve(WorktreeRepositoryContract::class)->commit($this->repository->path, 'Add an invoice', '', ['billing/Invoice.php']);
@@ -87,10 +87,10 @@ class WorktreeRepositoryCommitTest extends TestCase
 	#[Test]
 	public function commit_refuses_when_only_files_devdock_writes_were_chosen(): void
 	{
-		$this->repository->write('.wakatime-project', 'shop');
+		$this->repository->write('.claude/rules/devdock-review.md', fake()->sentence());
 		$head = $this->repository->git('rev-parse', 'HEAD');
 
-		$failure = resolve(WorktreeRepositoryContract::class)->commit($this->repository->path, 'Nothing', '', ['.wakatime-project']);
+		$failure = resolve(WorktreeRepositoryContract::class)->commit($this->repository->path, 'Nothing', '', ['.claude/rules/devdock-review.md']);
 
 		$this->assertNotNull($failure);
 		$this->assertSame($head, $this->repository->git('rev-parse', 'HEAD'));

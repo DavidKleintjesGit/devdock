@@ -36,11 +36,6 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	private const TIMEOUT = 300;
 
 	/**
-	 * The file that tells WakaTime which project this folder belongs to.
-	 */
-	private const PROJECT_NAME_FILE = '.wakatime-project';
-
-	/**
 	 * Where DevDock keeps what it did in a working copy, out of git.
 	 */
 	private const DEVDOCK_FOLDER = '.devdock';
@@ -81,8 +76,6 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		// a folder that already stands there was not made here, and is not ours to remove
 		$isMadeHere = ! is_dir($worktreeObject->path);
 		$branchCreated = $isMadeHere && $this->addToGit($worktreeObject);
-
-		$this->pinProjectName($worktreeObject->path, $worktreeObject->project);
 
 		$worktreeEloquent = WorktreeEloquent::query()->updateOrCreate(
 			[
@@ -221,7 +214,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 		// git let go of the working copy but could not take its folder along, for instance while another program held it open
 		if ($origin->isOurs() && is_dir($path) && ! $isHeldByGit) {
-			if (! $this->removeLeftoverFolder($path)) {
+			// only an empty folder goes; anything left in it stays for someone to look at
+			if (! @rmdir($path)) {
 				return false;
 			}
 
@@ -230,18 +224,12 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 		// a folder DevDock did not make stays where it is; only the record goes
 		if ($origin->isOurs() && is_dir($path)) {
-			// the pinned project name is ours; without taking it back git sees an
-			// unknown file and refuses, while real work should still stop us
-			@unlink($path . '/' . self::PROJECT_NAME_FILE);
-
 			$removed = Process::path($repositoryPath)
 				->timeout(self::TIMEOUT)
 				->run(['git', 'worktree', 'remove', ...($discardsWork ? ['--force'] : []), $path])
 				->successful();
 
 			if (! $removed) {
-				$this->pinProjectName($path, (string) $worktreeEloquent->project);
-
 				return false;
 			}
 		}
@@ -340,7 +328,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 		// git diff leaves out what it has never seen; those files are new in full
 		foreach ($this->lines($path, ['git', 'ls-files', '--others', '--exclude-standard']) as $untracked) {
-			if ($untracked === self::PROJECT_NAME_FILE || isset($rows[$untracked])) {
+			if (isset($rows[$untracked])) {
 				continue;
 			}
 
@@ -762,7 +750,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 				$parts = [$diff->output()];
 
 				foreach (preg_split('/\R/', trim($untracked->output())) ?: [] as $file) {
-					if ($file !== '' && $file !== self::PROJECT_NAME_FILE && is_file($path . '/' . $file)) {
+					if ($file !== '' && is_file($path . '/' . $file)) {
 						$parts[] = $file . ':' . sha1_file($path . '/' . $file);
 					}
 				}
@@ -816,7 +804,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		foreach (preg_split('/\R/', $standing->output()) ?: [] as $line) {
 			$name = trim(substr($line, 3));
 
-			if ($name !== '' && ! str_ends_with($name, self::PROJECT_NAME_FILE)) {
+			if ($name !== '') {
 				$files[] = $name;
 			}
 		}
@@ -829,7 +817,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		// the files DevDock writes into a copy have no business in the history of
 		// the project, chosen or not. They are left out by name rather than by an
 		// exclude pathspec: git add refuses one for a file its exclude already ignores
-		$ownPatterns = [...(array) config('devdock.worktree.own_files'), self::PROJECT_NAME_FILE];
+		$ownPatterns = (array) config('devdock.worktree.own_files');
 		$chosen = array_values(array_filter(
 			$files ?? $this->lines($path, ['git', 'ls-files', '--modified', '--deleted', '--others', '--exclude-standard']),
 			fn (string $file): bool => ! collect($ownPatterns)->contains(fn (string $pattern): bool => str_ends_with($pattern, '/')
@@ -1030,10 +1018,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	public function getUntrackedFiles(string $path): array
 	{
 		return $this->isWorkingCopy($path)
-			? array_values(array_filter(
-				$this->lines($path, ['git', 'ls-files', '--others', '--exclude-standard']),
-				fn (string $file): bool => $file !== self::PROJECT_NAME_FILE,
-			))
+			? $this->lines($path, ['git', 'ls-files', '--others', '--exclude-standard'])
 			: [];
 	}
 
@@ -1515,32 +1500,6 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		return file_exists($path . '/.git');
 	}
 
-	/**
-	 * Takes away a folder git no longer holds as a working copy, as long as
-	 * nothing but the pinned project name is left in it.
-	 */
-	private function removeLeftoverFolder(string $path): bool
-	{
-		if (array_diff(scandir($path) ?: [], ['.', '..', self::PROJECT_NAME_FILE]) !== []) {
-			return false;
-		}
-
-		@unlink($path . '/' . self::PROJECT_NAME_FILE);
-
-		return @rmdir($path);
-	}
-
-	/**
-	 * WakaTime names a project after the folder it finds, which for a working
-	 * copy is the branch name. This file says which project it really is.
-	 */
-	private function pinProjectName(string $path, string $project): void
-	{
-		if (is_dir($path)) {
-			@file_put_contents($path . '/' . self::PROJECT_NAME_FILE, $project . "\n");
-		}
-	}
-
 	private function mapToEntity(WorktreeEloquent $worktreeEloquent): WorktreeEntity
 	{
 		$path = (string) $worktreeEloquent->path;
@@ -1878,11 +1837,6 @@ class WorktreeRepository implements WorktreeRepositoryContract
 					$onlyOnUpstream = (int) $counts[2];
 				}
 
-				continue;
-			}
-
-			// the pinned project name is ours, not work someone did here
-			if (str_ends_with($line, self::PROJECT_NAME_FILE)) {
 				continue;
 			}
 
