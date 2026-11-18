@@ -197,6 +197,8 @@ class RunPromptActionTest extends TestCase
 	#[Test]
 	public function execute_finishes_the_run_when_the_loop_is_at_its_maximum(): void
 	{
+		// the maximum holds only when the agent fixes by itself
+		config(['devdock.review.mode' => 'automatic']);
 		$todo = Todo::factory()->create();
 		Lens::factory()->create(['paths' => ['billing/*']]);
 		$reviewRound = ReviewRound::factory()->create([

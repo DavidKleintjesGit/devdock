@@ -115,6 +115,9 @@
 						@endif
 					</div>
 				@endforeach
+				@if ($roundAssessment)
+					@include('partials.card.assessment')
+				@endif
 			</div>
 		@else
 			<div class="dsec">

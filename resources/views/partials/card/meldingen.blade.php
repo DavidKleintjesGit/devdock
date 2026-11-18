@@ -12,7 +12,7 @@
 		<x-notice property="committed">{{ $committed }}</x-notice>
 	@endif
 
-	@if ($card->hasUnreadQuestion && $tab !== 'Agent')
+	@if ($card->hasUnreadQuestion && $tab !== 'Agent' && ! ($roundAssessment ?? null))
 		<div class="notice question">
 			<span class="notice-icon"><x-icon name="info" small/></span>
 			<span class="notice-text"><b>{{ __('De agent stelt een vraag') }}</b><span>{{ __('Antwoord in de chat; daarna gaat hij verder.') }}</span></span>
@@ -23,7 +23,7 @@
 	@include('partials.card.taak-balk')
 
 	@if ($tab === 'Review' && $subtab?->value !== 'lenzen')
-		@if ($loopStatus?->needsYou())
+		@if ($loopStatus?->needsYou() && ! ($roundAssessment ?? null))
 			<div class="notice blocks">
 				<span class="notice-icon"><x-icon name="arrow" small/></span>
 				@if ($loopStatus === \Src\Review\Enums\LoopStatusEnum::NEXT_ROUND)

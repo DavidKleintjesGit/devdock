@@ -6,8 +6,12 @@
 			<div class="loop-status">
 				<span class="sdot {{ $loopStatus->tone() }}"></span>
 				<b>{{ $loopStatus->label($latestRound?->positionInSeries() ?? 0, $maxRounds, $latestRound?->findingsSummary() ?? '') }}</b>
-				<span class="hint">{{ __('automatisch · hoogstens :max rondes', ['max' => $maxRounds]) }}</span>
+				<span class="hint">{{ $reviewMode->fixesByItself() ? __('automatisch · hoogstens :max rondes', ['max' => $maxRounds]) : mb_strtolower($reviewMode->label()) }}</span>
 			</div>
+
+			@if ($roundAssessment)
+				@include('partials.card.assessment', ['showsChatLink' => true])
+			@endif
 
 			@forelse ($roundRows as $roundRow)
 				<details class="round" wire:ignore.self wire:key="round-{{ $roundRow['round']->reviewRoundId->id }}" @if ($loop->first) open @endif>

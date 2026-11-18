@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Livewire\Concerns\WithContext;
 use App\Livewire\Concerns\WithDrawerStack;
+use App\Livewire\Concerns\WithRoundAssessment;
 use App\Livewire\Concerns\WithSessionActions;
 use App\Livewire\Concerns\WithSetup;
 use App\Livewire\Concerns\WithWorkingCopy;
@@ -130,6 +131,7 @@ class Drawer extends Component
 	use WithDrawerStack {
 		setDrawerTab as private switchDrawerTab;
 	}
+	use WithRoundAssessment;
 	use WithSessionActions;
 	use WithSetup;
 	use WithWorkingCopy;
@@ -356,6 +358,17 @@ class Drawer extends Component
 			return;
 		}
 
+		// a message made from your choices on a round settles them first; with nothing left to fix the agent gets no turn
+		$roundAssessment = $this->pendingAssessment($cardObject);
+
+		if ($roundAssessment !== null && ! $this->settleChoices($roundAssessment)) {
+			$this->committed = __('Alles beoordeeld; er start geen nieuwe ronde.');
+			$this->prompt = '';
+			$this->assessedRound = null;
+
+			return;
+		}
+
 		$paths = resolve(AttachmentRepositoryContract::class)->attach($cardObject->id, array_column($this->attachments, 'upload'));
 
 		$this->failure = $this->startLinking(new WorkingCopyTaskObject(
@@ -365,6 +378,7 @@ class Drawer extends Component
 			branch: $cardObject->branch,
 			ticketKey: $cardObject->ticketKey,
 			prompt: PromptRunEntity::withAttachments($this->prompt, $paths),
+			reviewRoundId: $roundAssessment?->reviewRoundId,
 		));
 
 		$this->prompt = '';
@@ -1142,7 +1156,8 @@ class Drawer extends Component
 		$diffTree = $this->openDiffFile === null ? [] : $this->diffTree($cardObject, $diffView);
 		$diffFiles = $this->openDiffFile === null || $worktreeEntity === null ? [] : $this->stackedDiffs($worktreeEntity, $diffView, $diffTree);
 		$workflowSetting = GetWorkflowSettingAction::execute($cardObject->project);
-		$loopStatus = GetLoopStatusAction::execute($latestRound, $latestRound === null ? null : $roundTurns[(int) $latestRound->reviewRoundId->id] ?? null, $workflowSetting->maxRounds);
+		$roundAssessment = in_array($tab, ['Agent', 'Review'], true) ? $this->roundAssessment($cardObject) : null;
+		$loopStatus =GetLoopStatusAction::execute($latestRound, $latestRound === null ? null : $roundTurns[(int) $latestRound->reviewRoundId->id] ?? null, $workflowSetting->maxRounds);
 		$tabHints = $this->tabHints($cardObject, $worktreeEntity, $readiness, $latestRound, $loopStatus);
 		$promptSources = $tab === 'Agent' ? $this->promptSources($cardObject, $reviewCommentEntities) : [];
 		$pullRequests = $cardObject->pullRequests
@@ -1187,9 +1202,12 @@ class Drawer extends Component
 			'renameTo' => $this->renameSuggestion($cardObject),
 			'canDeliver' => $tab === 'Review' ? $this->canDeliver($cardObject) : false,
 			'maxRounds' => $workflowSetting->maxRounds,
+			'reviewMode' => $workflowSetting->reviewMode,
 			'afterRounds' => $workflowSetting->afterRounds,
 			'agents' => $taskEntity?->agents,
 			'conversation' => $tab === 'Agent' ? GetConversationAction::execute($cardObject->id) : [],
+			'roundAssessment' => $roundAssessment,
+			'choiceSummary' => $roundAssessment === null ? '' : $this->choiceSummary($roundAssessment),
 			'promptSources' => $promptSources,
 			'promptSourceSummary' => collect($promptSources)->map(fn (array $source) => $source['case']->label())->implode(', '),
 			'pickedSourceCount' => count(array_intersect(

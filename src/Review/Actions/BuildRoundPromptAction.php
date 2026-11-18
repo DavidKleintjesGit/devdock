@@ -18,12 +18,16 @@ use Src\Review\Objects\ReviewRoundEntity;
  * finding you ignored or a lens saw fixed is left out; only a lens whose
  * answer could not be read has its report pasted in as it stands.
  *
- * @method static ?string execute(ReviewRoundEntity $reviewRoundEntity)
+ * Asked for an assessment, the agent judges each finding and changes nothing:
+ * you decide what is fixed, from what it answers.
+ *
+ * @method static ?string execute(ReviewRoundEntity $reviewRoundEntity, bool $asksAssessment = false)
  */
 class BuildRoundPromptAction extends Command
 {
 	public function __construct(
 		public readonly ReviewRoundEntity $reviewRoundEntity,
+		public readonly bool $asksAssessment = false,
 	) {}
 
 	public function handle(ReviewFindingRepositoryContract $reviewFindingRepository): ?string
@@ -56,7 +60,7 @@ class BuildRoundPromptAction extends Command
 			]),
 			$this->openFindings($open),
 			$this->unreadableReports($failed, $open),
-			$this->howToGoAbout(),
+			$this->asksAssessment ? $this->howToAssess() : $this->howToGoAbout(),
 		]));
 	}
 
@@ -72,7 +76,7 @@ class BuildRoundPromptAction extends Command
 		return collect($open)
 			->groupBy(fn (ReviewFindingEntity $reviewFindingEntity): string => $reviewFindingEntity->lensName)
 			->map(fn ($findings, string $lens): string => $lens . "\n" . $findings
-				->map(fn (ReviewFindingEntity $reviewFindingEntity): string => '- ' . $reviewFindingEntity->line())
+				->map(fn (ReviewFindingEntity $reviewFindingEntity): string => '- ' . ($this->asksAssessment ? $reviewFindingEntity->tag() . ' ' : '') . $reviewFindingEntity->line())
 				->implode("\n"))
 			->implode("\n\n");
 	}
@@ -93,6 +97,24 @@ class BuildRoundPromptAction extends Command
 		);
 
 		return $pasted === [] ? null : implode("\n\n", $pasted);
+	}
+
+	/**
+	 * The way of working when you decide: the agent judges every finding by its
+	 * tag and leaves the code alone, so its answer becomes your choice.
+	 */
+	private function howToAssess(): string
+	{
+		return implode("\n", [
+			__('Werkwijze:'),
+			__('- Beoordeel elke bevinding hierboven, maar verander nog niets: geen code, geen tests, geen bestanden. Ik kies daarna wat je fixt.'),
+			__('- Kijk per bevinding in de code of hij klopt, of hij al opgelost is, en wat de kleinste goede fix is.'),
+			__('- Sluit af met een assessment-blok: per bevinding één regel met de tag, je oordeel en je voorstel in één zin, gescheiden door |. Het oordeel is klopt, twijfel, oneens of opgelost.'),
+			'```assessment',
+			'F12 | klopt | <voorstel>',
+			'```',
+			__('- Sluit daarna af met status question: de beurt is dan aan mij.'),
+		]);
 	}
 
 	private function howToGoAbout(): string

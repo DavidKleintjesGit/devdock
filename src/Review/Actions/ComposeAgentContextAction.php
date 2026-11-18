@@ -51,6 +51,7 @@ class ComposeAgentContextAction extends Command
 			$this->whereYouAre($cardObject),
 			$this->whereToLookThingsUp($cardObject),
 			$this->theRoute($step),
+			$this->howRoundsGo($cardObject->project),
 			$this->whereTheReportsAre($agentContextRepository),
 			"## What is asked of you now\n\n" . ($blocks[$step->value] ?? ''),
 			$this->forThisProject($cardObject->project),
@@ -131,6 +132,30 @@ class ComposeAgentContextAction extends Command
 	 * The whole path, so the agent knows what comes after this step and not
 	 * only what it is doing now.
 	 */
+	/**
+	 * What happens after a round of the lenses in this project: who decides
+	 * on the findings, and what the agent does in between.
+	 */
+	private function howRoundsGo(?string $project): string
+	{
+		return GetWorkflowSettingAction::execute($project)->reviewMode->fixesByItself()
+			? implode("\n", [
+				'## After a round of the lenses',
+				'',
+				'When a lens finds something, you get the open findings and fix them right away; the lenses go again once you report done, up to the threshold of the project.',
+			])
+			: implode("\n", [
+				'## After a round of the lenses',
+				'',
+				'David decides on every round himself:',
+				'1. The lenses judge the work. When they find something, DevDock sends you the open findings, each with a tag such as F12.',
+				'2. You assess them and change nothing: per finding a line in an assessment block with the tag, your verdict (klopt, twijfel, oneens or opgelost) and a one-line proposal. You close with status question.',
+				'3. David picks per finding: fix, ignore with a reason, or already resolved. What he picks comes to you as one message.',
+				'4. You fix only what that message names and close with status done. DevDock then starts one new round, and the cycle begins again.',
+				'Never fix findings on your own initiative after a round; wait for his message.',
+			]);
+	}
+
 	private function theRoute(WorkflowStepEnum $step): string
 	{
 		$lines = [];

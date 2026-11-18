@@ -84,6 +84,11 @@ class EnvironmentSettingRepository implements SettingRepositoryContract
 		]);
 	}
 
+	public function saveReviewMode(string $reviewMode): void
+	{
+		$this->write(['DEVDOCK_REVIEW_MODE' => $reviewMode]);
+	}
+
 	/**
 	 * Puts the values in .env and throws away the config cache, so both the
 	 * pages and `devdock:fetch` read the same settings.

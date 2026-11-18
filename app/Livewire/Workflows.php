@@ -24,9 +24,11 @@ use Src\Review\Actions\SaveWorkflowSettingAction;
 use Src\Review\Actions\ToggleLensAction;
 use Src\Review\Actions\UpdateStandardLensAction;
 use Src\Review\Enums\AfterRoundsEnum;
+use Src\Review\Enums\ReviewModeEnum;
 use Src\Review\Enums\WorkflowStepEnum;
 use Src\Review\Objects\LensEntity;
 use Src\Review\Objects\LensId;
+use Src\Review\Objects\WorkflowSettingObject;
 use Src\Setting\Contracts\SettingRepositoryContract;
 
 class Workflows extends Component
@@ -261,7 +263,7 @@ class Workflows extends Component
 	{
 		$setting = GetWorkflowSettingAction::execute($this->project);
 
-		SaveWorkflowSettingAction::execute($this->project, $setting->hasOwnThreshold ? $setting->maxRounds : null, $setting->hasOwnThreshold ? $setting->afterRounds : null, $this->projectContext);
+		SaveWorkflowSettingAction::execute($this->project, $setting->hasOwnThreshold ? $setting->maxRounds : null, $setting->hasOwnThreshold ? $setting->afterRounds : null, $this->projectContext, $this->ownReviewMode($setting));
 
 		$this->saved = __('Opgeslagen. Het komt achter de tekst uit de standaard.');
 	}
@@ -279,7 +281,30 @@ class Workflows extends Component
 			return;
 		}
 
-		SaveWorkflowSettingAction::execute($this->project, $rounds, $afterRounds, $this->projectContext);
+		SaveWorkflowSettingAction::execute($this->project, $rounds, $afterRounds, $this->projectContext, $this->ownReviewMode(GetWorkflowSettingAction::execute($this->project)));
+	}
+
+	/**
+	 * Sets who decides on the findings of a round: in the standard, or in the project on screen.
+	 */
+	public function setReviewMode(string $mode): void
+	{
+		$reviewMode = ReviewModeEnum::tryFrom($mode) ?? ReviewModeEnum::HUMAN;
+
+		if ($this->project === '') {
+			resolve(SettingRepositoryContract::class)->saveReviewMode($reviewMode->value);
+
+			return;
+		}
+
+		$setting = GetWorkflowSettingAction::execute($this->project);
+
+		SaveWorkflowSettingAction::execute($this->project, $setting->hasOwnThreshold ? $setting->maxRounds : null, $setting->hasOwnThreshold ? $setting->afterRounds : null, $this->projectContext, $reviewMode);
+	}
+
+	private function ownReviewMode(WorkflowSettingObject $workflowSettingObject): ?ReviewModeEnum
+	{
+		return $workflowSettingObject->hasOwnReviewMode ? $workflowSettingObject->reviewMode : null;
 	}
 
 	/**
@@ -288,7 +313,7 @@ class Workflows extends Component
 	public function resetThreshold(): void
 	{
 		if ($this->project !== '') {
-			SaveWorkflowSettingAction::execute($this->project, null, null, $this->projectContext);
+			SaveWorkflowSettingAction::execute($this->project, null, null, $this->projectContext, $this->ownReviewMode(GetWorkflowSettingAction::execute($this->project)));
 		}
 
 		$this->editingThreshold = false;

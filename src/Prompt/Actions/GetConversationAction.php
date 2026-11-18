@@ -26,7 +26,7 @@ class GetConversationAction extends Command
 	 * The blocks an answer closes with. They are read out separately, so they
 	 * are taken out of what the agent said in its own words.
 	 */
-	private const FENCES = ['report', 'commit', 'choices', 'actions'];
+	private const FENCES = ['report', 'commit', 'choices', 'actions', 'assessment'];
 
 	public function __construct(
 		public readonly string $card,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Src\Worktree\Objects;
 
 use Src\Packages\ValueObject\ValueObject;
+use Src\Review\Objects\ReviewRoundId;
 use Src\Worktree\Enums\DatabaseFillEnum;
 use Src\Worktree\Enums\WorkingCopyTaskEnum;
 
@@ -34,6 +35,7 @@ class WorkingCopyTaskObject extends ValueObject
 		public readonly bool $restartsLoop = false,
 		public readonly ?string $target = null,
 		public readonly bool $discardsWork = false,
+		public readonly ?ReviewRoundId $reviewRoundId = null,
 	) {
 		parent::__construct();
 	}
@@ -60,6 +62,7 @@ class WorkingCopyTaskObject extends ValueObject
 			restartsLoop: (bool) ($data['restarts_loop'] ?? false),
 			target: $data['target'] ?? null,
 			discardsWork: (bool) ($data['discards_work'] ?? false),
+			reviewRoundId: isset($data['review_round_id']) ? new ReviewRoundId(id: (int) $data['review_round_id']) : null,
 		);
 	}
 
@@ -85,6 +88,7 @@ class WorkingCopyTaskObject extends ValueObject
 			'restarts_loop' => $this->restartsLoop,
 			'target' => $this->target,
 			'discards_work' => $this->discardsWork,
+			'review_round_id' => $this->reviewRoundId?->id,
 		]));
 	}
 

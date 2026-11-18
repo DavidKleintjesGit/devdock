@@ -22,4 +22,9 @@ interface SettingRepositoryContract
 	 * what happens after.
 	 */
 	public function saveThreshold(int $maxRounds, string $afterRounds): void;
+
+	/**
+	 * Sets who decides on the findings of a round, for every project without a choice of its own.
+	 */
+	public function saveReviewMode(string $reviewMode): void;
 }

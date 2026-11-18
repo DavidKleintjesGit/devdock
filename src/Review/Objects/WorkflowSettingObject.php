@@ -6,6 +6,7 @@ namespace Src\Review\Objects;
 
 use Src\Packages\ValueObject\ValueObject;
 use Src\Review\Enums\AfterRoundsEnum;
+use Src\Review\Enums\ReviewModeEnum;
 
 /**
  * How the rounds run in a project: the standard, or what the project set for
@@ -18,6 +19,8 @@ class WorkflowSettingObject extends ValueObject
 		public readonly AfterRoundsEnum $afterRounds,
 		public readonly ?string $context,
 		public readonly bool $hasOwnThreshold,
+		public readonly ReviewModeEnum $reviewMode = ReviewModeEnum::HUMAN,
+		public readonly bool $hasOwnReviewMode = false,
 	) {
 		parent::__construct();
 	}

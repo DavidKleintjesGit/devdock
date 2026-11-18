@@ -12,6 +12,7 @@ class ProjectWorkflow extends Model
 		'project',
 		'max_rounds',
 		'after_rounds',
+		'review_mode',
 		'context',
 	];
 }

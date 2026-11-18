@@ -57,7 +57,8 @@ class ContinueReviewAction extends Command
 				return null;
 			}
 
-			$prompt = BuildRoundPromptAction::execute($this->reviewRoundEntity);
+			// when you decide, the agent only assesses; it fixes what you pick afterwards
+			$prompt = BuildRoundPromptAction::execute($this->reviewRoundEntity, ! GetWorkflowSettingAction::execute($cardObject->project)->reviewMode->fixesByItself());
 
 			// a copy that is not ready or still busy waits without a failed turn; the card says why, and the next fetch round tries again
 			if ($prompt === null || ! $this->isReady()) {
@@ -75,11 +76,17 @@ class ContinueReviewAction extends Command
 		}) ?: null;
 	}
 
+	/**
+	 * Whether the round goes to the agent: it found something, and either you
+	 * decide after every round or the threshold is not reached yet.
+	 */
 	private function keepsGoing(?string $project): bool
 	{
+		$workflowSettingObject = GetWorkflowSettingAction::execute($project);
+
 		return $this->reviewRoundEntity->status === RoundStatusEnum::FAILED
 			&& $this->reviewRoundEntity->openFindings() > 0
-			&& $this->reviewRoundEntity->positionInSeries() < GetWorkflowSettingAction::execute($project)->maxRounds;
+			&& (! $workflowSettingObject->reviewMode->fixesByItself() || $this->reviewRoundEntity->positionInSeries() < $workflowSettingObject->maxRounds);
 	}
 
 	private function isReady(): bool

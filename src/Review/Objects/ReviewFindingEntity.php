@@ -60,6 +60,14 @@ class ReviewFindingEntity extends ValueObject
 	}
 
 	/**
+	 * The tag the agent names the finding by in its assessment.
+	 */
+	public function tag(): string
+	{
+		return 'F' . $this->reviewFindingId->id;
+	}
+
+	/**
 	 * The finding in one line, as a lens or the agent reads it.
 	 */
 	public function line(): string

@@ -154,6 +154,8 @@ class RunWorkingCopyTaskAction extends Command
 			'branch' => $this->workingCopyTaskObject->branch,
 			'ticket_key' => $this->workingCopyTaskObject->ticketKey,
 			'prompt' => (string) $this->workingCopyTaskObject->prompt,
+			// a fix you picked from a round belongs to it, so the lenses go again once it is done
+			'review_round_id' => $this->workingCopyTaskObject->reviewRoundId?->id,
 		]));
 
 		return [];

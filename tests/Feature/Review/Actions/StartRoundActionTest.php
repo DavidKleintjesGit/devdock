@@ -217,6 +217,8 @@ class StartRoundActionTest extends TestCase
 	#[Test]
 	public function execute_refuses_a_round_past_the_maximum_while_findings_are_open(): void
 	{
+		// the maximum holds only when the agent fixes by itself
+		config(['devdock.review.mode' => 'automatic']);
 		$todo = Todo::factory()->create();
 		Lens::factory()->create(['paths' => ['billing/*']]);
 		$reviewRound = ReviewRound::factory()->create([

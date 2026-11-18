@@ -46,6 +46,12 @@ class DescribeChatAction extends Command
 			'target <branch>',
 			'```',
 			'',
+			__('- Vraagt DevDock je de bevindingen van een ronde te beoordelen, sluit dan af met een assessment-blok: per bevinding één regel met haar tag, je oordeel (klopt, twijfel, oneens of opgelost) en je voorstel in één zin, gescheiden door |. DevDock maakt er een lijst van waarin ik per bevinding kies wat je fixt.'),
+			'',
+			'```assessment',
+			'F12 | klopt | <voorstel>',
+			'```',
+			'',
 			__('- Een attachments-blok onder mijn bericht noemt de bestanden die ik meestuur, één volledig pad per regel. Lees ze met de Read-tool voor je antwoordt; een afbeelding of pdf zie je dan zoals ik hem zie. Lees een pdf zonder de pages-parameter: die heeft pdftoppm nodig, en dat staat niet op deze machine.'),
 		]);
 	}

@@ -169,6 +169,23 @@
 				</section>
 
 				<section class="section">
+					<div class="section-head"><h2>{{ __('Na een ronde') }}</h2></div>
+					<div class="list">
+						<div class="row" style="gap:20px;flex-wrap:wrap;padding:16px 20px">
+							<span class="title" style="flex:1 1 260px"><b>{{ $setting->reviewMode->label() }}</b><small>{{ $setting->reviewMode->explanation() }}</small></span>
+							<span class="seg" role="group" aria-label="{{ __('Wie beslist over de bevindingen') }}">
+								@foreach (\Src\Review\Enums\ReviewModeEnum::cases() as $mode)
+									<button type="button" aria-pressed="{{ $setting->reviewMode === $mode ? 'true' : 'false' }}" wire:click="setReviewMode('{{ $mode->value }}')">{{ $mode->label() }}</button>
+								@endforeach
+							</span>
+						</div>
+					</div>
+					@if (! $isStandard && ! $setting->hasOwnReviewMode)
+						<span class="hint">{{ __('Volgt de standaard; een keuze hier geldt alleen voor dit project.') }}</span>
+					@endif
+				</section>
+
+				<section class="section">
 					<div class="section-head"><h2>{{ __('Drempel') }}</h2></div>
 					@if ($isStandard || $setting->hasOwnThreshold || $editingThreshold)
 						<div class="list">

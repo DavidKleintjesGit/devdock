@@ -207,6 +207,9 @@ return [
 		// what happens once the rounds run out: back, continue or blocking
 		'after_rounds' => env('DEVDOCK_AFTER_ROUNDS', 'back'),
 
+		// who decides on the findings of a round: human (you, after the agent assessed them) or automatic
+		'mode' => env('DEVDOCK_REVIEW_MODE', 'human'),
+
 		// the longest a lens may run in total; silence is measured by lens_idle,
 		// and the lenses queue hands a job on only after this has passed
 		'lens_timeout' => (int) env('DEVDOCK_LENS_TIMEOUT', 1800),

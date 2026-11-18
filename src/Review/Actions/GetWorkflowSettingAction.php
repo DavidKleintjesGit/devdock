@@ -6,6 +6,7 @@ namespace Src\Review\Actions;
 
 use Src\Packages\Cqrs\Command;
 use Src\Review\Enums\AfterRoundsEnum;
+use Src\Review\Enums\ReviewModeEnum;
 use Src\Review\Models\ProjectWorkflow;
 use Src\Review\Objects\WorkflowSettingObject;
 
@@ -34,6 +35,8 @@ class GetWorkflowSettingAction extends Command
 			afterRounds: AfterRoundsEnum::tryFrom((string) $projectWorkflow?->after_rounds) ?? $standardAfter,
 			context: $projectWorkflow?->context,
 			hasOwnThreshold: $projectWorkflow?->max_rounds !== null,
+			reviewMode: ReviewModeEnum::tryFrom((string) $projectWorkflow?->review_mode) ?? ReviewModeEnum::tryFrom((string) config('devdock.review.mode')) ?? ReviewModeEnum::HUMAN,
+			hasOwnReviewMode: $projectWorkflow?->review_mode !== null,
 		);
 	}
 }

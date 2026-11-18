@@ -84,9 +84,11 @@ class StartRoundAction extends Command
 		$startsSeries = $this->startsSeries
 			|| $latest?->isClean() === true
 			|| $latest?->status === RoundStatusEnum::STOPPED;
-		$maxRounds = GetWorkflowSettingAction::execute($cardObject->project)->maxRounds;
+		$workflowSettingObject = GetWorkflowSettingAction::execute($cardObject->project);
+		$maxRounds = $workflowSettingObject->maxRounds;
 
-		if (! $startsSeries && $latest !== null && $latest->positionInSeries() >= $maxRounds) {
+		// when you decide after every round, you are the threshold
+		if ($workflowSettingObject->reviewMode->fixesByItself() && ! $startsSeries && $latest !== null && $latest->positionInSeries() >= $maxRounds) {
 			throw RoundNotStartedException::maximumReached($maxRounds);
 		}
 
