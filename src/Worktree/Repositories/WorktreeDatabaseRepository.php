@@ -197,7 +197,7 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 			}
 
 			try {
-				$this->createAndFill($this->server($own, $keys), $projectDatabase, $name);
+				$this->createAndFill($this->server($own, $keys, $this->defaultKeys($path, $own)), $projectDatabase, $name);
 			} catch (Throwable $failure) {
 				return $connection . ': ' . $failure->getMessage();
 			}
@@ -471,11 +471,15 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 		$file = $path . '/' . $envFile;
 		$contents = is_file($file) ? (string) file_get_contents($file) : '';
 		$line = $key . '=' . $name;
-		$pattern = '/^#?\s*' . preg_quote($key, '/') . '=.*$/m';
+		$active = '/^\s*' . preg_quote($key, '/') . '=.*$/m';
+		$commented = '/^#\s*' . preg_quote($key, '/') . '=.*$/m';
 
-		$contents = preg_match($pattern, $contents) === 1
-			? (string) preg_replace($pattern, $line, $contents, 1)
-			: rtrim($contents, "\n") . "\n" . $line . "\n";
+		// every active line counts, since the last one wins; a commented one only comes back when there is none
+		$contents = match (true) {
+			preg_match($active, $contents) === 1 => (string) preg_replace($active, $line, $contents),
+			preg_match($commented, $contents) === 1 => (string) preg_replace($commented, $line, $contents, 1),
+			default => rtrim($contents, "\n") . "\n" . $line . "\n",
+		};
 
 		file_put_contents($file, $contents);
 	}
@@ -551,20 +555,32 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 	}
 
 	/**
-	 * A connection to the server of one connection, with its own account.
+	 * A connection to the server of one connection. Its account is its own;
+	 * a connection that leaves its user name empty works with the account of
+	 * the default connection, and else with Laravel's own keys.
 	 *
 	 * @param  array<string, string|null>  $environment
 	 * @param  array<string, string|null>  $keys
+	 * @param  array<string, string|null>  $fallbackKeys
 	 */
-	private function server(array $environment, array $keys): PDO
+	private function server(array $environment, array $keys, array $fallbackKeys = []): PDO
 	{
-		$dsn = sprintf(
-			'mysql:host=%s;port=%s',
-			$environment[(string) $keys['host']] ?? $environment['DB_HOST'] ?? '127.0.0.1',
-			$environment[(string) $keys['port']] ?? $environment['DB_PORT'] ?? '3306',
-		);
+		$filled = fn (?string $key): ?string => $key !== null && filled($environment[$key] ?? null) ? (string) $environment[$key] : null;
 
-		return new PDO($dsn, $environment[(string) $keys['username']] ?? $environment['DB_USERNAME'] ?? 'root', $environment[(string) $keys['password']] ?? $environment['DB_PASSWORD'] ?? '', [
+		$host = $filled($keys['host'] ?? null) ?? $filled($fallbackKeys['host'] ?? null) ?? $filled('DB_HOST') ?? '127.0.0.1';
+		$port = $filled($keys['port'] ?? null) ?? $filled($fallbackKeys['port'] ?? null) ?? $filled('DB_PORT') ?? '3306';
+
+		// user name and password belong together: the account is taken whole from the first place that names a user
+		$account = collect([
+			[$keys['username'] ?? null, $keys['password'] ?? null],
+			[$fallbackKeys['username'] ?? null, $fallbackKeys['password'] ?? null],
+			['DB_USERNAME', 'DB_PASSWORD'],
+		])->first(fn (array $accountKeys): bool => $filled($accountKeys[0]) !== null);
+
+		$username = $account === null ? 'root' : (string) $filled($account[0]);
+		$password = $account === null || $account[1] === null ? '' : (string) ($environment[$account[1]] ?? '');
+
+		return new PDO(sprintf('mysql:host=%s;port=%s', $host, $port), $username, $password, [
 			PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
 			PDO::ATTR_TIMEOUT => 5,
 		]);
