@@ -1,8 +1,6 @@
 {{-- The code reader itself: which changes, the tree of files and the files under each other. The panel on a card and the window of its own both show it. --}}
-<div class="code-reader" x-data="codeReader">
 <div class="diff-toolbar">
 	<b class="grow">{{ __('Alle wijzigingen') }}</b>
-	<button class="icon-btn" type="button" x-on:click="switchTheme()" :aria-label="isDark() ? @js(__('Lichte code')) : @js(__('Donkere code'))" :title="isDark() ? @js(__('Lichte code')) : @js(__('Donkere code'))"><span class="swap" x-show="! isDark()"><x-icon name="moon"/></span><span class="swap" x-show="isDark()" x-cloak><x-icon name="sun"/></span></button>
 	<span class="hint" x-text="@js(__(':viewed van :total bestanden bekeken', ['total' => count($diffFiles)])).replace(':viewed', viewedCount())"></span>
 	<div class="diff-views">
 		<div class="seg counted" role="group" aria-label="{{ __('Welke wijzigingen') }}">
@@ -33,13 +31,13 @@
 	</div>
 @endif
 
-<div class="diffsplit" :data-code-theme="theme">
-	<nav class="difffiles tree" x-ref="tree" aria-label="{{ __('Bestanden') }}">
+<div class="diffsplit">
+	<nav class="difffiles tree" aria-label="{{ __('Bestanden') }}">
 		<div class="diff-total"><b class="grow">{{ __('Regels gewijzigd') }}</b><span class="plus">+{{ $diffAdded }}</span><span class="minus">−{{ $diffRemoved }}</span></div>
 		@include('partials.diff-tree', ['nodes' => $diffTree, 'depth' => 0])
 	</nav>
 	<div class="resize-bar" data-resize="--diff-files" data-edge="end" data-min="140" data-max="520" aria-hidden="true" title="{{ __('Sleep om breder of smaller te maken') }}"></div>
-	<div class="diffpatch stacked" x-ref="patch" x-init="$nextTick(() => followScroll())" x-on:scroll.passive="followScroll()" x-on:wheel.passive="jumping = false" x-on:touchmove.passive="jumping = false" x-on:keydown="jumping = false" x-on:pointerdown="jumping = false">
+	<div class="diffpatch stacked" x-init="$nextTick(() => followScroll($el))" x-on:scroll.passive="followScroll($el)" x-on:wheel.passive="jumping = false" x-on:touchmove.passive="jumping = false" x-on:keydown="jumping = false" x-on:pointerdown="jumping = false">
 		@forelse ($diffFiles as $diffFile)
 			<section id="{{ $diffFile['change']->anchor() }}" class="dfile" wire:key="dfile-{{ $diffView->value }}-{{ $diffFile['change']->anchor() }}-{{ $diffFile['fingerprint'] }}" x-data="{ open: @js(! $diffFile['isLarge'] && ! $diffFile['isGenerated']) && ! isViewed(@js($diffFile['change']->path)) }">
 				<header class="dfile-head">
@@ -64,5 +62,4 @@
 			<p class="hint" style="padding:24px">{{ __('In dit overzicht is niets veranderd.') }}</p>
 		@endforelse
 	</div>
-</div>
 </div>

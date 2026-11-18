@@ -1250,7 +1250,7 @@ body.is-working .working{opacity:1}
 .diff-total .plus,.diff-total .minus{font-family:var(--mono);font-size:12px}
 .diffpatch.stacked{display:flex;flex-direction:column;gap:14px;padding:14px 18px 24px;background:var(--bg);overflow:auto}
 .dfile{border:1px solid var(--line-strong);border-radius:10px;background:var(--surface)}
-.dfile-head{position:sticky;top:-14px;z-index:1;display:flex;align-items:center;gap:8px;min-height:46px;padding:0 12px;background:var(--surface);border-bottom:1px solid var(--line);border-radius:10px 10px 0 0}
+.dfile-head{position:sticky;top:-14px;z-index:2;display:flex;align-items:center;gap:8px;min-height:46px;padding:0 12px;background:var(--surface);border-bottom:1px solid var(--line);border-radius:10px 10px 0 0}
 .dfile-head .icon-btn{width:28px;height:28px}
 .dfile-path{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
 .dfile-path b{font-weight:600}

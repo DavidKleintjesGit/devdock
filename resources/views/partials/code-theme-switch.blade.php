@@ -1,0 +1,1 @@
+<button class="icon-btn" type="button" x-on:click="switchTheme()" :aria-label="isDark() ? @js(__('Lichte code')) : @js(__('Donkere code'))" :title="isDark() ? @js(__('Lichte code')) : @js(__('Donkere code'))"><span class="swap" x-show="! isDark()"><x-icon name="moon"/></span><span class="swap" x-show="isDark()" x-cloak><x-icon name="sun"/></span></button>

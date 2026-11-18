@@ -703,12 +703,11 @@ document.addEventListener('alpine:init', () => {
 		},
 
 		// The file whose section reaches the top of the code pane is the one being read.
-		followScroll() {
+		followScroll(patch) {
 			if (this.jumping) {
 				return;
 			}
 
-			const patch = this.$refs.patch;
 			const top = patch.getBoundingClientRect().top + 24;
 			let reading = null;
 
@@ -720,7 +719,7 @@ document.addEventListener('alpine:init', () => {
 				reading = section.id;
 			}
 
-			this.mark(reading ?? patch.querySelector(':scope > .dfile')?.id ?? null);
+			this.mark(reading ?? patch.querySelector(':scope > .dfile')?.id ?? null, patch);
 		},
 
 		jumpTo(anchor) {
@@ -733,18 +732,18 @@ document.addEventListener('alpine:init', () => {
 			// the chosen file stays marked until you scroll yourself, also when it is
 			// one of the last files that never reach the top
 			this.jumping = true;
-			this.mark(anchor);
+			this.mark(anchor, section.parentElement);
 			section.scrollIntoView({ block: 'start', behavior: 'smooth' });
 		},
 
 		// Keeps the marked row inside the visible part of the tree.
-		mark(anchor) {
+		mark(anchor, patch) {
 			if (anchor === this.current) {
 				return;
 			}
 
 			this.current = anchor;
-			const tree = this.$refs.tree;
+			const tree = patch.closest('.diffsplit').querySelector('.difffiles');
 			const row = anchor === null ? null : tree.querySelector(`[data-anchor="${CSS.escape(anchor)}"]`);
 
 			if (row === null || row.offsetParent === null) {
