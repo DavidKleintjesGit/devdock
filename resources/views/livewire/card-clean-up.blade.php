@@ -40,7 +40,7 @@
 				<div class="dfoot">
 					<span class="hint">{{ __('Jira, Bitbucket en origin blijven zoals ze zijn') }}</span>
 					<button class="btn text" type="button" wire:click="close">{{ __('Annuleren') }}</button>
-					<button @class(['btn', 'danger' => $cardAction->deletesHistory() || $losesWork, 'primary' => ! $cardAction->deletesHistory() && ! $losesWork]) type="button" wire:click="confirm" @disabled($losesWork && ! $acceptsLoss)>{{ $cardAction->label() }}</button>
+					<x-busy-button action="confirm" :class="Arr::toCssClasses(['danger' => $cardAction->deletesHistory() || $losesWork, 'primary' => ! $cardAction->deletesHistory() && ! $losesWork])" :busy="__('Starten...')" :disabled="$losesWork && ! $acceptsLoss">{{ $cardAction->label() }}</x-busy-button>
 				</div>
 			</div>
 		</div>

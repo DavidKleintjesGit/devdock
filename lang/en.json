@@ -1848,5 +1848,13 @@
     "Heropend: DevDock maakt een nieuwe werkkopie vanaf origin.": "Reopened: DevDock makes a new working copy from origin.",
     "Archief": "Archive",
     "Geselecteerde kaarten": "Selected cards",
-    "geselecteerd": "selected"
+    "geselecteerd": "selected",
+    "Werkkopie maken...": "Making working copy...",
+    "Conflicten oplossen...": "Resolving conflicts...",
+    "Testdatabase maken...": "Making test database...",
+    "Commitbericht schrijven...": "Writing commit message...",
+    "Branchnaam bedenken...": "Naming the branch...",
+    "Bericht naar de agent...": "Message to the agent...",
+    "Archiveren...": "Archiving...",
+    "Verwijderen...": "Deleting..."
 }

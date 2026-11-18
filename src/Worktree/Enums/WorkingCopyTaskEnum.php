@@ -49,6 +49,29 @@ enum WorkingCopyTaskEnum: string
 	}
 
 	/**
+	 * What a card on the board says while the task runs, short enough for one line.
+	 */
+	public function cardLabel(): string
+	{
+		return __(match ($this) {
+			self::LINK => 'Werkkopie maken...',
+			self::REBASE => 'Rebasen...',
+			self::RESOLVE_CONFLICTS => 'Conflicten oplossen...',
+			self::PUSH => 'Pushen...',
+			self::OWN_TEST_DATABASE => 'Testdatabase maken...',
+			self::COMMIT_MESSAGE => 'Commitbericht schrijven...',
+			self::BRANCH_NAME => 'Branchnaam bedenken...',
+			self::COMMIT => 'Committen...',
+			self::PROMPT => 'Bericht naar de agent...',
+			self::ROUND => 'Lenzen oproepen...',
+			self::RETARGET => 'Verplaatsen...',
+			self::CLEAN_UP => 'Opruimen...',
+			self::ARCHIVE => 'Archiveren...',
+			self::DELETE => 'Verwijderen...',
+		});
+	}
+
+	/**
 	 * What the card says when the task failed.
 	 */
 	public function failedLabel(): string

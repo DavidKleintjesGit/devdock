@@ -408,6 +408,10 @@ button.row{width:100%;border:0;background:transparent;text-align:left;cursor:poi
 .kcard.open{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .kcard.done{background:var(--surface-2)}
 .kcard.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent);background:var(--accent-soft)}
+.kcard.busy{border-color:var(--amber-dot);box-shadow:0 0 0 1px var(--amber-dot);cursor:progress}
+.kcard.busy .ktitle,.kcard.busy .kline{opacity:.55}
+.kcard .kbusy{color:var(--amber);font-weight:500}
+.kcard .kbusy .txt{color:inherit}
 .bulk-bar{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:8px;padding:8px 8px 8px 16px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-lg);font-size:13px}
 .bulk-bar b{font-weight:500;margin-right:6px;white-space:nowrap}
 .kcard.todo{border-style:dashed;border-color:var(--line-strong)}

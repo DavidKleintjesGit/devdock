@@ -1,4 +1,4 @@
-<button type="button" @class(['kcard', 'done' => $card->isDone(), 'todo' => $card->isTodo()]) :class="{ open: $store.board.openCard === @js($card->id), selected: $store.board.selected.includes(@js($card->id)) }" wire:key="card-{{ $card->id }}" @click="if ($event.ctrlKey || $event.metaKey) { $store.board.toggle(@js($card->id)); return; } $store.board.pending = { card: @js($card->id), key: @js($card->ticketKey ?? $card->project ?? __('to-do')), title: @js($card->title) }; $wire.$dispatchTo('drawer', 'open-card', { card: @js($card->id) })">
+<button type="button" @class(['kcard', 'done' => $card->isDone(), 'todo' => $card->isTodo(), 'busy' => isset($busyLabels[$card->id])]) @if (isset($busyLabels[$card->id])) aria-busy="true" @endif :class="{ open: $store.board.openCard === @js($card->id), selected: $store.board.selected.includes(@js($card->id)) }" wire:key="card-{{ $card->id }}" @click="if ($event.ctrlKey || $event.metaKey) { $store.board.toggle(@js($card->id)); return; } $store.board.pending = { card: @js($card->id), key: @js($card->ticketKey ?? $card->project ?? __('to-do')), title: @js($card->title) }; $wire.$dispatchTo('drawer', 'open-card', { card: @js($card->id) })">
 	@if ($card->hasUnread())
 		<span @class(['kunread', 'question' => $card->hasUnreadQuestion]) title="{{ $card->hasUnreadQuestion ? __('De agent stelt een vraag') : trans_choice(':count nieuwe melding|:count nieuwe meldingen', $card->unreadCount(), ['count' => $card->unreadCount()]) }}">{{ $card->unreadCount() }}</span>
 	@endif
@@ -12,6 +12,9 @@
 		<span>{{ $card->ageLabel() }}</span>
 	</span>
 	<span class="ktitle">{{ $card->title }}</span>
+	@if (isset($busyLabels[$card->id]))
+		<span class="kstatus kbusy"><span class="spin" aria-hidden="true"></span><span class="txt">{{ $busyLabels[$card->id] }}</span></span>
+	@else
 	<span class="kstatus">
 		@if ($card->lensStates !== [])
 			<span class="ldots" aria-hidden="true">@foreach ($card->lensStates as $state)<span class="ldot {{ $state }}"></span>@endforeach</span>
@@ -26,6 +29,7 @@
 			<span class="wicon pause" title="{{ __('Stilgevallen') }}"><svg class="ic s" width="12" height="12" role="img" aria-label="{{ __('Stilgevallen') }}"><use href="#i-pause"/></svg></span>
 		@endif
 	</span>
+	@endif
 	@if ($card->originStanding)
 		<span class="korigin {{ $card->originStanding->tone() }}"><svg class="ic s" width="12" height="12" aria-hidden="true"><use href="#i-up"/></svg>{{ $card->originLabel() }}</span>
 	@endif

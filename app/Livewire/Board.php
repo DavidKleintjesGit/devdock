@@ -10,6 +10,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Session;
 use Livewire\Component;
 use Src\Board\Actions\CreateTodoAction;
@@ -26,6 +27,7 @@ use Src\Project\Actions\GetProjectsAction;
 use Src\Ticket\Actions\GetTicketsAction;
 use Src\Ticket\Objects\TicketEntity;
 use Src\Worktree\Actions\GetWorkingCopyTaskAction;
+use Src\Worktree\Objects\WorkingCopyTaskStateObject;
 
 class Board extends Component
 {
@@ -55,6 +57,15 @@ class Board extends Component
 	/**
 	 * Draws the board again once a newer one was built on the side; otherwise the page stays as it is.
 	 */
+	/**
+	 * Draws the board at once after cards were handed to a clean-up, so they show as busy.
+	 */
+	#[On('cards-cleaned-up')]
+	public function followCleanUp(): void
+	{
+		$this->cardObjects = null;
+	}
+
 	public function followBoard(): void
 	{
 		if (GetBoardAction::builtAt() <= $this->builtAt) {
@@ -346,23 +357,49 @@ class Board extends Component
 	}
 
 	/**
-	 * The dot of each card with background work: amber while it runs, red when a task failed that you have not seen yet.
+	 * The background task of each card that has one.
 	 *
 	 * @param  Collection<int, CardObject>  $cardObjects
-	 * @return array<string, list<HintToneEnum>>
+	 * @return Collection<string, WorkingCopyTaskStateObject>
 	 */
-	private function taskTones(Collection $cardObjects): array
+	private function taskStates(Collection $cardObjects): Collection
 	{
 		return $cardObjects
-			->mapWithKeys(function (CardObject $cardObject): array {
-				$workingCopyTaskStateObject = GetWorkingCopyTaskAction::execute($cardObject->id);
-				$hasFailed = $workingCopyTaskStateObject?->hasUnshownFailure() === true
-					|| ($workingCopyTaskStateObject?->isRunning === false && $workingCopyTaskStateObject->failure !== null);
+			->mapWithKeys(fn (CardObject $cardObject): array => [$cardObject->id => GetWorkingCopyTaskAction::execute($cardObject->id)])
+			->filter();
+	}
 
-				return [$cardObject->id => array_values(array_filter([
+	/**
+	 * What each card with a task under way says while it runs.
+	 *
+	 * @param  Collection<string, WorkingCopyTaskStateObject>  $taskStates
+	 * @return array<string, string>
+	 */
+	private function busyLabels(Collection $taskStates): array
+	{
+		return $taskStates
+			->filter(fn (WorkingCopyTaskStateObject $workingCopyTaskStateObject): bool => $workingCopyTaskStateObject->isRunning)
+			->map(fn (WorkingCopyTaskStateObject $workingCopyTaskStateObject): string => $workingCopyTaskStateObject->task->cardLabel())
+			->all();
+	}
+
+	/**
+	 * The dot of each card with background work: amber while it runs, red when a task failed that you have not seen yet.
+	 *
+	 * @param  Collection<string, WorkingCopyTaskStateObject>  $taskStates
+	 * @return array<string, list<HintToneEnum>>
+	 */
+	private function taskTones(Collection $taskStates): array
+	{
+		return $taskStates
+			->map(function (WorkingCopyTaskStateObject $workingCopyTaskStateObject): array {
+				$hasFailed = $workingCopyTaskStateObject->hasUnshownFailure()
+					|| (! $workingCopyTaskStateObject->isRunning && $workingCopyTaskStateObject->failure !== null);
+
+				return array_values(array_filter([
 					$hasFailed ? HintToneEnum::RED : null,
-					$workingCopyTaskStateObject?->isRunning === true ? HintToneEnum::AMBER : null,
-				]))];
+					$workingCopyTaskStateObject->isRunning ? HintToneEnum::AMBER : null,
+				]));
 			})
 			->filter()
 			->all();
@@ -399,11 +436,13 @@ class Board extends Component
 			$this->mobileColumn = $columns->first()['case']->value;
 		}
 
-		$taskTones = $this->taskTones($visible);
+		$taskStates = $this->taskStates($visible);
+		$taskTones = $this->taskTones($taskStates);
 
 		return view('livewire.board', [
 			'columns' => $columns,
 			'taskTones' => $taskTones,
+			'busyLabels' => $this->busyLabels($taskStates),
 			'hasRunningTask' => collect($taskTones)->contains(fn (array $tones): bool => in_array(HintToneEnum::AMBER, $tones, true)),
 			'archiveCount' => collect(GetBoardAction::execute())->filter(fn (CardObject $card): bool => $card->isArchived)->count(),
 			'allColumns' => collect(BoardColumnEnum::cases())->map(fn (BoardColumnEnum $column) => [
