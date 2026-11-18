@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Str;
+use Src\Board\Actions\CleanUpMergedCardsAction;
 use Src\Board\Actions\GetBoardAction;
 use Src\Fetch\Contracts\FetchRunRepositoryContract;
 use Src\Fetch\Enums\FetchSourceEnum;
@@ -105,6 +106,13 @@ class RunFetchAction extends Command
 			ForgetMovedLinksAction::execute();
 		} catch (Throwable $failure) {
 			$failures[] = 'links: ' . $this->shortened($failure);
+		}
+
+		// a merged task leaves no local work behind; one that would lose work stays and says so
+		try {
+			CleanUpMergedCardsAction::execute();
+		} catch (Throwable $failure) {
+			$failures[] = 'clean-up: ' . $this->shortened($failure);
 		}
 
 		// a review loop that lost its way is picked up here, at most a round later
