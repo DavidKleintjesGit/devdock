@@ -14,10 +14,12 @@ use Livewire\Attributes\Session;
 use Livewire\Component;
 use Src\Board\Actions\CreateTodoAction;
 use Src\Board\Actions\GetBoardAction;
+use Src\Board\Actions\PlanTodoLaterAction;
 use Src\Board\Enums\BoardColumnEnum;
 use Src\Board\Enums\BoardSignalEnum;
 use Src\Board\Enums\HintToneEnum;
 use Src\Board\Objects\CardObject;
+use Src\Board\Objects\TodoId;
 use Src\Board\Objects\TodoObject;
 use Src\Fetch\Actions\StartFetchAction;
 use Src\Project\Actions\GetProjectsAction;
@@ -175,6 +177,24 @@ class Board extends Component
 	public function toggleAttention(string $filter): void
 	{
 		$this->attention = $this->attention === $filter ? '' : $filter;
+	}
+
+	/**
+	 * Moves the picked to-dos to the backlog; a card of anything else stays where it is.
+	 *
+	 * @param  list<string>  $cards
+	 */
+	public function planLater(array $cards): void
+	{
+		foreach ($cards as $card) {
+			$todoId = TodoId::fromBoardKey($card);
+
+			if ($todoId !== null) {
+				PlanTodoLaterAction::execute($todoId, true);
+			}
+		}
+
+		$this->cardObjects = null;
 	}
 
 	public function toggleArchive(): void

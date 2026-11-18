@@ -407,6 +407,9 @@ button.row{width:100%;border:0;background:transparent;text-align:left;cursor:poi
 .kcard:hover{border-color:var(--line-strong);color:inherit}
 .kcard.open{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .kcard.done{background:var(--surface-2)}
+.kcard.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent);background:var(--accent-soft)}
+.bulk-bar{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:8px;padding:8px 8px 8px 16px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-lg);font-size:13px}
+.bulk-bar b{font-weight:500;margin-right:6px;white-space:nowrap}
 .kcard.todo{border-style:dashed;border-color:var(--line-strong)}
 .kcard .kline{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);min-width:0}
 .kcard .kkey{font-family:var(--mono);color:var(--accent-ink);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%;flex:none}

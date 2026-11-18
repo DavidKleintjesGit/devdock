@@ -4,7 +4,28 @@ import './highlight.js';
 // hij hier, zodat het bord die kaart kan markeren zonder zelf te hertekenen.
 document.addEventListener('alpine:init', () => {
 	// pending is the card that was clicked and is still on its way: its skeleton shows until the panel arrives
-	Alpine.store('board', { openCard: null, pending: null });
+	// selected holds the cards picked with Ctrl+click, for the bulk bar
+	Alpine.store('board', {
+		openCard: null,
+		pending: null,
+		selected: [],
+		toggle(card) {
+			this.selected = this.selected.includes(card) ? this.selected.filter((picked) => picked !== card) : [...this.selected, card];
+		},
+		onlyTodos() {
+			return this.selected.length > 0 && this.selected.every((card) => card.startsWith('todo:'));
+		},
+	});
+
+	window.addEventListener('cards-cleaned-up', () => {
+		Alpine.store('board').selected = [];
+	});
+
+	window.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape' && Alpine.store('board').selected.length > 0) {
+			Alpine.store('board').selected = [];
+		}
+	});
 
 	window.addEventListener('drawer-card', (event) => {
 		Alpine.store('board').openCard = event.detail.card ?? null;

@@ -119,5 +119,14 @@
 
 	<livewire:drawer/>
 	<livewire:card-clean-up/>
+
+	<div class="bulk-bar" x-cloak x-show="$store.board.selected.length > 0" x-transition.opacity role="toolbar" aria-label="{{ __('Geselecteerde kaarten') }}">
+		<b x-text="$store.board.selected.length + ' ' + @js(__('geselecteerd'))"></b>
+		<button class="btn sm" type="button" @click="$dispatch('clean-up-cards', { cards: $store.board.selected, action: 'clean_up' })">{{ __('Opruimen') }}</button>
+		<button class="btn sm" type="button" @click="$dispatch('clean-up-cards', { cards: $store.board.selected, action: 'archive' })">{{ __('Archiveren') }}</button>
+		<button class="btn sm danger" type="button" x-show="$store.board.onlyTodos()" @click="$dispatch('clean-up-cards', { cards: $store.board.selected, action: 'delete' })">{{ __('Verwijderen') }}</button>
+		<button class="btn sm" type="button" x-show="$store.board.onlyTodos()" @click="$wire.planLater($store.board.selected).then(() => $store.board.selected = [])">{{ __('Naar de backlog') }}</button>
+		<button class="icon-btn" type="button" @click="$store.board.selected = []" aria-label="{{ __('Selectie wissen') }}"><x-icon name="x"/></button>
+	</div>
 	@include('partials.skeletons.card')
 </div>
