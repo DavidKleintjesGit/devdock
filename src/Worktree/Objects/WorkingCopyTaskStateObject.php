@@ -17,6 +17,7 @@ class WorkingCopyTaskStateObject extends ValueObject
 {
 	/**
 	 * @param  array<string, string>  $result  what the task brings back for the panel, such as a written commit message
+	 * @param  ?string  $current  the task that runs now, as its process reads it
 	 * @param  list<string>  $queued  the tasks waiting their turn, as their process carries them
 	 * @param  list<array{task: string, failure: ?string, notice: ?string, result: array<string, string>}>  $endings
 	 */
@@ -28,6 +29,7 @@ class WorkingCopyTaskStateObject extends ValueObject
 		public readonly ?string $notice = null,
 		public readonly array $result = [],
 		public readonly ?string $next = null,
+		public readonly ?string $current = null,
 		public readonly array $queued = [],
 		public readonly array $endings = [],
 	) {
@@ -47,6 +49,7 @@ class WorkingCopyTaskStateObject extends ValueObject
 			notice: $data['notice'] ?? null,
 			result: (array) ($data['result'] ?? []),
 			next: $data['next'] ?? null,
+			current: $data['current'] ?? null,
 			queued: array_values((array) ($data['queued'] ?? [])),
 			endings: array_values((array) ($data['endings'] ?? [])),
 		);

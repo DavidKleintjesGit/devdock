@@ -94,6 +94,7 @@ class RunWorkingCopyTaskAction extends Command
 				'endings' => $endings,
 			] : [
 				'task' => WorkingCopyTaskObject::fromArgument($next)->task->value,
+				'current' => $next,
 				'is_running' => true,
 				'started_at' => CarbonImmutable::now()->toIso8601String(),
 				'failure' => null,

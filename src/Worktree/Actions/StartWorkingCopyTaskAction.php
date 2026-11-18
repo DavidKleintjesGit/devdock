@@ -55,6 +55,7 @@ class StartWorkingCopyTaskAction extends Command
 
 			Cache::forever(self::keyFor($card), [
 				'task' => $this->workingCopyTaskObject->task->value,
+				'current' => $this->workingCopyTaskObject->toArgument(),
 				'is_running' => true,
 				'started_at' => CarbonImmutable::now()->toIso8601String(),
 				'failure' => null,
@@ -62,7 +63,8 @@ class StartWorkingCopyTaskAction extends Command
 				'endings' => (array) ($kept['endings'] ?? []),
 			]);
 
-			$detachedCommand->artisan('devdock:working-copy-task --task=' . $this->workingCopyTaskObject->toArgument());
+			// the process reads the task from the card, so a long prompt or commit message never meets the length limit of a command line
+			$detachedCommand->artisan('devdock:working-copy-task --card=' . escapeshellarg($card));
 
 			return true;
 		});

@@ -27,9 +27,21 @@ class StartWorkingCopyTaskActionTest extends TestCase
 		$this->mock(DetachedCommand::class)
 			->shouldReceive('artisan')
 			->once()
-			->with(Mockery::on(fn (string $command): bool => $command === 'devdock:working-copy-task --task=' . $workingCopyTaskObject->toArgument()));
+			->with(Mockery::on(fn (string $command): bool => $command === 'devdock:working-copy-task --card=' . escapeshellarg($workingCopyTaskObject->card)));
 
 		StartWorkingCopyTaskAction::execute($workingCopyTaskObject);
+	}
+
+	#[Test]
+	public function execute_keeps_a_long_prompt_off_the_command_line(): void
+	{
+		// a prompt far beyond the 8191 characters a Windows command line holds
+		$workingCopyTaskObject = new WorkingCopyTaskObject(card: 'todo:' . fake()->numberBetween(1, 100), task: WorkingCopyTaskEnum::PROMPT, project: fake()->slug(2), branch: 'feature/billing', prompt: fake()->realTextBetween(20000, 25000));
+		$this->mock(DetachedCommand::class)->shouldReceive('artisan')->once();
+
+		StartWorkingCopyTaskAction::execute($workingCopyTaskObject);
+
+		$this->assertSame($workingCopyTaskObject->prompt, WorkingCopyTaskObject::fromArgument(GetWorkingCopyTaskAction::execute($workingCopyTaskObject->card)->current)->prompt);
 	}
 
 	#[Test]

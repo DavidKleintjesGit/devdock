@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Src\Worktree\Actions\GetWorkingCopyTaskAction;
 use Src\Worktree\Actions\RunWorkingCopyTaskAction;
 use Src\Worktree\Objects\WorkingCopyTaskObject;
 
@@ -15,13 +16,21 @@ use Src\Worktree\Objects\WorkingCopyTaskObject;
  */
 class WorkingCopyTaskCommand extends Command
 {
-	protected $signature = 'devdock:working-copy-task {--task= : The task, as StartWorkingCopyTaskAction hands it over}';
+	protected $signature = 'devdock:working-copy-task {--card= : The card whose task runs now}';
 
 	protected $description = 'Run a task on the working copy of a card in the background';
 
 	public function handle(): int
 	{
-		$workingCopyTaskStateObject = RunWorkingCopyTaskAction::execute(WorkingCopyTaskObject::fromArgument((string) $this->option('task')));
+		$current = GetWorkingCopyTaskAction::execute((string) $this->option('card'))?->current;
+
+		if ($current === null) {
+			$this->components->error('This card has no task to run.');
+
+			return self::FAILURE;
+		}
+
+		$workingCopyTaskStateObject = RunWorkingCopyTaskAction::execute(WorkingCopyTaskObject::fromArgument($current));
 
 		while ($workingCopyTaskStateObject->next !== null) {
 			$workingCopyTaskStateObject = RunWorkingCopyTaskAction::execute(WorkingCopyTaskObject::fromArgument($workingCopyTaskStateObject->next));
