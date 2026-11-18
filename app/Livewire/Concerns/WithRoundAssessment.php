@@ -8,17 +8,22 @@ use Src\Board\Objects\CardObject;
 use Src\Review\Actions\BuildFixPromptAction;
 use Src\Review\Actions\BuildRoundPromptAction;
 use Src\Review\Actions\GetRoundAssessmentAction;
+use Src\Review\Actions\GetRoundChoicesAction;
+use Src\Review\Actions\KeepRoundChoicesAction;
 use Src\Review\Actions\SetFindingStatusAction;
 use Src\Review\Enums\FindingChoiceEnum;
 use Src\Review\Objects\AssessedFindingObject;
+use Src\Review\Objects\ReviewRoundId;
 use Src\Review\Objects\RoundAssessmentObject;
+use Src\Review\Objects\RoundChoicesObject;
 use Src\Worktree\Enums\WorkingCopyTaskEnum;
 use Src\Worktree\Objects\WorkingCopyTaskObject;
 
 /**
  * Your choice on a round that the agent assessed: per finding fix, ignore
- * or resolved. Every click writes the message to the agent again, which you
- * can still change before it goes.
+ * or resolved. The choices add up to a message of their own, next to the
+ * findings, which you can change before you hand it to the agent. The chat
+ * stays yours.
  */
 trait WithRoundAssessment
 {
@@ -31,15 +36,36 @@ trait WithRoundAssessment
 	/** The round the choices above belong to. */
 	public ?int $assessedRound = null;
 
+	/** The message to the agent your choices add up to. */
+	public string $fixMessage = '';
+
+	/** Whether you wrote the message yourself; then your clicks leave it alone. */
+	public bool $isFixMessageOwn = false;
+
 	public function chooseFinding(int $finding, string $choice): void
 	{
 		$this->findingChoices[$finding] = (FindingChoiceEnum::tryFrom($choice) ?? FindingChoiceEnum::FIX)->value;
-		$this->writeFixPrompt();
+		$this->keepChoices();
 	}
 
 	public function updatedIgnoreReasons(): void
 	{
-		$this->writeFixPrompt();
+		$this->keepChoices();
+	}
+
+	public function updatedFixMessage(): void
+	{
+		$this->isFixMessageOwn = true;
+		$this->keepChoices();
+	}
+
+	/**
+	 * Lets the message follow your choices again.
+	 */
+	public function rebuildFixMessage(): void
+	{
+		$this->isFixMessageOwn = false;
+		$this->keepChoices();
 	}
 
 	/**
@@ -72,17 +98,48 @@ trait WithRoundAssessment
 	}
 
 	/**
-	 * Goes to the chat, where the message your choices make stands ready.
+	 * Settles your choices and hands what is left to fix to the agent, with the
+	 * message next to the findings. With nothing left to fix the round closes
+	 * without a turn of the agent.
 	 */
-	public function toChatWithChoices(): void
+	public function handFindingsToAgent(): void
 	{
-		$this->setDrawerTab('Agent');
+		$this->failure = null;
+
+		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
+		$roundAssessmentObject = $cardObject === null ? null : $this->pendingAssessment($cardObject);
+
+		if ($cardObject?->project === null || $cardObject->branch === null || $roundAssessmentObject === null) {
+			$this->failure = __('Deze ronde wacht niet meer op je keuze.');
+
+			return;
+		}
+
+		$hasFix = $this->settleChoices($roundAssessmentObject);
+		KeepRoundChoicesAction::execute($roundAssessmentObject->reviewRoundId, null);
+		$this->assessedRound = null;
+
+		if (! $hasFix) {
+			$this->committed = __('Alles beoordeeld; er start geen nieuwe ronde.');
+
+			return;
+		}
+
+		$this->failure = $this->startLinking(new WorkingCopyTaskObject(
+			card: $cardObject->id,
+			task: WorkingCopyTaskEnum::PROMPT,
+			project: $cardObject->project,
+			branch: $cardObject->branch,
+			ticketKey: $cardObject->ticketKey,
+			prompt: $this->fixMessage,
+			reviewRoundId: $roundAssessmentObject->reviewRoundId,
+		));
 	}
 
 	/**
-	 * The round of the card that waits on your choice. A round seen for the
-	 * first time starts on what the agent's verdicts suggest, and its message
-	 * is written into the chat.
+	 * The round of the card that waits on your choice, with the choices you
+	 * kept for it. A round without kept choices starts on what the agent's
+	 * verdicts suggest.
 	 */
 	protected function roundAssessment(CardObject $cardObject): ?RoundAssessmentObject
 	{
@@ -93,16 +150,18 @@ trait WithRoundAssessment
 		}
 
 		$this->assessedRound = $roundAssessmentObject->reviewRoundId->id;
+		$roundChoicesObject = GetRoundChoicesAction::execute($roundAssessmentObject->reviewRoundId);
 		$this->findingChoices = [];
 		$this->ignoreReasons = [];
 
 		foreach ($roundAssessmentObject->findings as $assessedFindingObject) {
 			$findingId = (int) $assessedFindingObject->finding->reviewFindingId->id;
-			$this->findingChoices[$findingId] = $assessedFindingObject->suggestedChoice()->value;
-			$this->ignoreReasons[$findingId] = $assessedFindingObject->assessment->proposal ?? '';
+			$this->findingChoices[$findingId] = $roundChoicesObject?->choices[$findingId] ?? $assessedFindingObject->suggestedChoice()->value;
+			$this->ignoreReasons[$findingId] = $roundChoicesObject?->reasons[$findingId] ?? $assessedFindingObject->assessment->proposal ?? '';
 		}
 
-		$this->prompt = BuildFixPromptAction::execute($roundAssessmentObject, $this->findingChoices, $this->ignoreReasons);
+		$this->isFixMessageOwn = $roundChoicesObject?->message !== null;
+		$this->fixMessage = $roundChoicesObject?->message ?? BuildFixPromptAction::execute($roundAssessmentObject, $this->findingChoices, $this->ignoreReasons);
 
 		return $roundAssessmentObject;
 	}
@@ -142,14 +201,27 @@ trait WithRoundAssessment
 		return $roundAssessmentObject !== null && $roundAssessmentObject->reviewRoundId->id === $this->assessedRound ? $roundAssessmentObject : null;
 	}
 
-	private function writeFixPrompt(): void
+	/**
+	 * Keeps your choices with the round, and has the message follow them unless you wrote it yourself.
+	 */
+	private function keepChoices(): void
 	{
 		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
 		$roundAssessmentObject = $cardObject === null ? null : $this->pendingAssessment($cardObject);
 
-		if ($roundAssessmentObject !== null) {
-			$this->prompt = BuildFixPromptAction::execute($roundAssessmentObject, $this->findingChoices, $this->ignoreReasons);
+		if ($roundAssessmentObject === null) {
+			return;
 		}
+
+		if (! $this->isFixMessageOwn) {
+			$this->fixMessage = BuildFixPromptAction::execute($roundAssessmentObject, $this->findingChoices, $this->ignoreReasons);
+		}
+
+		KeepRoundChoicesAction::execute(new ReviewRoundId(id: $this->assessedRound), new RoundChoicesObject(
+			choices: $this->findingChoices,
+			reasons: $this->ignoreReasons,
+			message: $this->isFixMessageOwn ? $this->fixMessage : null,
+		));
 	}
 
 	/**

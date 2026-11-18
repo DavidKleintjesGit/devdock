@@ -358,17 +358,6 @@ class Drawer extends Component
 			return;
 		}
 
-		// a message made from your choices on a round settles them first; with nothing left to fix the agent gets no turn
-		$roundAssessment = $this->pendingAssessment($cardObject);
-
-		if ($roundAssessment !== null && ! $this->settleChoices($roundAssessment)) {
-			$this->committed = __('Alles beoordeeld; er start geen nieuwe ronde.');
-			$this->prompt = '';
-			$this->assessedRound = null;
-
-			return;
-		}
-
 		$paths = resolve(AttachmentRepositoryContract::class)->attach($cardObject->id, array_column($this->attachments, 'upload'));
 
 		$this->failure = $this->startLinking(new WorkingCopyTaskObject(
@@ -378,7 +367,6 @@ class Drawer extends Component
 			branch: $cardObject->branch,
 			ticketKey: $cardObject->ticketKey,
 			prompt: PromptRunEntity::withAttachments($this->prompt, $paths),
-			reviewRoundId: $roundAssessment?->reviewRoundId,
 		));
 
 		$this->prompt = '';

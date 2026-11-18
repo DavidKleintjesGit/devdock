@@ -10,7 +10,7 @@
 			</div>
 
 			@if ($roundAssessment)
-				@include('partials.card.assessment', ['showsChatLink' => true])
+				@include('partials.card.assessment')
 			@endif
 
 			@forelse ($roundRows as $roundRow)
