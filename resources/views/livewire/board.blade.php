@@ -43,6 +43,10 @@
 					</div>
 				</details>
 
+				@if ($archiveCount > 0 || $showArchive)
+					<button class="fbtn" type="button" aria-pressed="{{ $showArchive ? 'true' : 'false' }}" wire:click="toggleArchive"><x-icon name="backlog" small/>{{ __('Archief') }} <span class="n">{{ $archiveCount }}</span></button>
+				@endif
+
 				<span class="vsep"></span>
 
 				@foreach ($signals as $signal)

@@ -84,6 +84,9 @@ class Board extends Component
 
 	public bool $backlogExpanded = false;
 
+	/** Whether the board shows the archived cards instead of the ones on it. */
+	public bool $showArchive = false;
+
 	/**
 	 * Any write to the database can change what the board shows, so it
 	 * also clears the board this request already built.
@@ -172,6 +175,12 @@ class Board extends Component
 	public function toggleAttention(string $filter): void
 	{
 		$this->attention = $this->attention === $filter ? '' : $filter;
+	}
+
+	public function toggleArchive(): void
+	{
+		$this->showArchive = ! $this->showArchive;
+		$this->cardObjects = null;
 	}
 
 	public function toggleColumn(string $column): void
@@ -270,7 +279,7 @@ class Board extends Component
 	private function inView(Collection $cardObjects): Collection
 	{
 		return $cardObjects
-			->filter(fn (CardObject $card) => in_array($card->column->value, $this->shownColumns, true))
+			->filter(fn (CardObject $card) => $this->showArchive || in_array($card->column->value, $this->shownColumns, true))
 			->filter(fn (CardObject $card) => $this->showsProject($card->project))
 			->when(filled($this->query), fn (Collection $all) => $all->filter(
 				fn (CardObject $card) => $card->matches($this->query),
@@ -298,8 +307,8 @@ class Board extends Component
 	 */
 	private function board(): Collection
 	{
-		// an archived card stays off the board
-		return $this->cardObjects ??= collect(GetBoardAction::execute())->reject(fn (CardObject $card): bool => $card->isArchived)->values();
+		// an archived card stays off the board; the archive shows only those
+		return $this->cardObjects ??= collect(GetBoardAction::execute())->filter(fn (CardObject $card): bool => $card->isArchived === $this->showArchive)->values();
 	}
 
 	/**
@@ -346,7 +355,7 @@ class Board extends Component
 		$visible = $this->visible($cardObjects);
 
 		$columns = collect(BoardColumnEnum::cases())
-			->filter(fn (BoardColumnEnum $column) => in_array($column->value, $this->shownColumns, true))
+			->filter(fn (BoardColumnEnum $column) => $this->showArchive || in_array($column->value, $this->shownColumns, true))
 			->map(function (BoardColumnEnum $column) use ($cardObjects, $visible): array {
 				$cards = $visible->filter(fn (CardObject $card) => $card->column === $column)->values();
 
@@ -362,6 +371,8 @@ class Board extends Component
 					'hidden' => $limit === null ? 0 : max(0, $cards->count() - $limit),
 				];
 			})
+			// the archive shows only the columns that hold an archived card
+			->filter(fn (array $column): bool => ! $this->showArchive || $column['total'] > 0)
 			->values();
 
 		if (! $columns->contains(fn (array $column) => $column['case']->value === $this->mobileColumn) && $columns->isNotEmpty()) {
@@ -374,6 +385,7 @@ class Board extends Component
 			'columns' => $columns,
 			'taskTones' => $taskTones,
 			'hasRunningTask' => collect($taskTones)->contains(fn (array $tones): bool => in_array(HintToneEnum::AMBER, $tones, true)),
+			'archiveCount' => collect(GetBoardAction::execute())->filter(fn (CardObject $card): bool => $card->isArchived)->count(),
 			'allColumns' => collect(BoardColumnEnum::cases())->map(fn (BoardColumnEnum $column) => [
 				'case' => $column,
 				'total' => $cardObjects->filter(fn (CardObject $card) => $card->column === $column)->count(),

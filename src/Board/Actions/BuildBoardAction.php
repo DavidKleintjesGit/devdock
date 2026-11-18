@@ -434,6 +434,7 @@ class BuildBoardAction extends Command
 			unreadPerSource: $this->unreadPerSource($key, $pullRequestEntities),
 			hasUnreadQuestion: $this->hasUnreadQuestion($key, $promptRunEntity),
 			isArchived: $this->isArchived($key, CardObject::signatureOf($ticketEntity?->status, $pullRequestEntities)),
+			isCleanedUp: $this->archivesByCard->has($key),
 			originStanding: $column === BoardColumnEnum::REVIEW ? $worktreeEntity?->originStanding() : null,
 			unpushedCommits: $worktreeEntity?->ahead ?? 0,
 		);
@@ -499,6 +500,7 @@ class BuildBoardAction extends Command
 			unreadPerSource: $this->unreadPerSource($todoEntity->boardKey()),
 			hasUnreadQuestion: $this->hasUnreadQuestion($todoEntity->boardKey(), $promptRunEntity),
 			isArchived: $this->isArchived($todoEntity->boardKey(), CardObject::signatureOf($ticketEntity?->status, [])),
+			isCleanedUp: $this->archivesByCard->has($todoEntity->boardKey()),
 		);
 	}
 

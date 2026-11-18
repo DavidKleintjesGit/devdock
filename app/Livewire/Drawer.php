@@ -23,6 +23,7 @@ use Src\Board\Actions\BuildTaskPromptAction;
 use Src\Board\Actions\GetBoardAction;
 use Src\Board\Actions\PlanTodoLaterAction;
 use Src\Board\Contracts\CardViewRepositoryContract;
+use Src\Board\Actions\ReopenCardAction;
 use Src\Board\Enums\BoardColumnEnum;
 use Src\Board\Enums\CardActionEnum;
 use Src\Board\Enums\HintToneEnum;
@@ -859,6 +860,17 @@ class Drawer extends Component
 	{
 		if ($action !== CardActionEnum::CLEAN_UP->value && in_array($this->openCard, $cards, true)) {
 			$this->closeDrawer();
+		}
+	}
+
+	/**
+	 * Puts a cleaned-up or archived task back to work, with a new working copy from its branch on origin.
+	 */
+	public function reopen(): void
+	{
+		if ($this->openCard !== null) {
+			ReopenCardAction::execute($this->openCard);
+			$this->committed = __('Heropend: DevDock maakt een nieuwe werkkopie vanaf origin.');
 		}
 	}
 

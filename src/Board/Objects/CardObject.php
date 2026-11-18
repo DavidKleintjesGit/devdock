@@ -57,6 +57,7 @@ class CardObject extends ValueObject
 		public readonly ?OriginStandingEnum $originStanding = null,
 		public readonly int $unpushedCommits = 0,
 		public readonly bool $isArchived = false,
+		public readonly bool $isCleanedUp = false,
 	) {
 		parent::__construct();
 	}
