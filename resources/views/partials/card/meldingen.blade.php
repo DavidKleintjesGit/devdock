@@ -30,6 +30,10 @@
 					<span class="notice-text"><b>{{ __('De lenzen gingen er niet vanzelf weer over') }}</b><span>{{ __('De agent meldde dat hij klaar is, maar de werkkopie was nog bezig of er veranderde niets.') }}</span></span>
 					<button class="btn sm" type="button" wire:click="setDrawerTab('Agent')">{{ __('Naar de agent') }}</button>
 					<x-busy-button action="startRound" :pending="(bool) $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::ROUND)" class="btn sm primary" :busy="__('Lenzen oproepen...')">{{ __('Volgende ronde starten') }}</x-busy-button>
+				@elseif (! $reviewMode->fixesByItself())
+					<span class="notice-text"><b>{{ __('Ronde :number wacht op jouw beoordeling', ['number' => $latestRound?->number]) }}</b><span>{{ __('Laat de agent de bevindingen beoordelen; daarna kies jij wat er gefixt wordt.') }}</span></span>
+					<x-busy-button action="startRound" :pending="(bool) $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::ROUND)" class="btn sm" :busy="__('Lenzen oproepen...')">{{ __('Nieuwe ronde starten') }}</x-busy-button>
+					<x-busy-button action="assessLatestRound" :pending="(bool) $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::PROMPT)" class="btn sm primary" :busy="__('Versturen...')">{{ __('Laat de agent beoordelen') }}</x-busy-button>
 				@else
 					<span class="notice-text"><b>{{ $loopStatus === \Src\Review\Enums\LoopStatusEnum::AGENT_ASKS ? __('De agent stelde een vraag of liet bevindingen open') : __('De loop is klaar en wacht op jou') }}</b><span>{{ $loopStatus === \Src\Review\Enums\LoopStatusEnum::AGENT_ASKS ? __('Geef antwoord bij de agent en start de loop daarna opnieuw.') : __('Kijk de rondes na, geef de agent aanwijzingen en start de loop opnieuw.') }}</span></span>
 					<button class="btn sm" type="button" wire:click="setDrawerTab('Agent')">{{ __('Naar de agent') }}</button>

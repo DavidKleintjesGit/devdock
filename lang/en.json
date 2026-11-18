@@ -1884,5 +1884,11 @@
     "Na een ronde": "After a round",
     "Wie beslist over de bevindingen": "Who decides on the findings",
     "Volgt de standaard; een keuze hier geldt alleen voor dit project.": "Follows the standard; a choice here holds for this project only.",
-    "- Vraagt DevDock je de bevindingen van een ronde te beoordelen, sluit dan af met een assessment-blok: per bevinding één regel met haar tag, je oordeel (klopt, twijfel, oneens of opgelost) en je voorstel in één zin, gescheiden door |. DevDock maakt er een lijst van waarin ik per bevinding kies wat je fixt.": "- When DevDock asks you to assess the findings of a round, close with an assessment block: per finding one line with its tag, your verdict (klopt, twijfel, oneens or opgelost) and your proposal in one sentence, separated by |. DevDock turns it into a list where I pick per finding what you fix."
+    "- Vraagt DevDock je de bevindingen van een ronde te beoordelen, sluit dan af met een assessment-blok: per bevinding één regel met haar tag, je oordeel (klopt, twijfel, oneens of opgelost) en je voorstel in één zin, gescheiden door |. DevDock maakt er een lijst van waarin ik per bevinding kies wat je fixt.": "- When DevDock asks you to assess the findings of a round, close with an assessment block: per finding one line with its tag, your verdict (klopt, twijfel, oneens or opgelost) and your proposal in one sentence, separated by |. DevDock turns it into a list where I pick per finding what you fix.",
+    "Ronde :number wacht op jouw beoordeling": "Round :number waits for your assessment",
+    "Laat de agent de bevindingen beoordelen; daarna kies jij wat er gefixt wordt.": "Let the agent assess the findings; then you pick what gets fixed.",
+    "Nieuwe ronde starten": "Start a new round",
+    "Laat de agent beoordelen": "Let the agent assess",
+    "Deze ronde heeft geen open bevindingen om te beoordelen.": "This round has no open findings to assess.",
+    "Na elke ronde beslis jij wat er gefixt wordt": "After every round you decide what gets fixed"
 }

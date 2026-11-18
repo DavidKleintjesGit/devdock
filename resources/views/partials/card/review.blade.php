@@ -101,7 +101,7 @@
 
 	<div class="dfoot">
 		<span class="hint" style="display:flex;flex-direction:column">
-			<span>{{ $latestRound ? __('Ronde :number van hoogstens :max, daarna :after', ['number' => $latestRound->positionInSeries(), 'max' => $maxRounds, 'after' => mb_strtolower($afterRounds->label())]) : __('Hoogstens :max rondes, daarna :after', ['max' => $maxRounds, 'after' => mb_strtolower($afterRounds->label())]) }}</span>
+			<span>{{ ! $reviewMode->fixesByItself() ? __('Na elke ronde beslis jij wat er gefixt wordt') : ($latestRound ? __('Ronde :number van hoogstens :max, daarna :after', ['number' => $latestRound->positionInSeries(), 'max' => $maxRounds, 'after' => mb_strtolower($afterRounds->label())]) : __('Hoogstens :max rondes, daarna :after', ['max' => $maxRounds, 'after' => mb_strtolower($afterRounds->label())])) }}</span>
 			<a href="{{ route('workflows', ['project' => $card->project]) }}" style="text-decoration:none">{{ __('Lenzen en drempel staan in de workflow') }}</a>
 		</span>
 		@if ($latestRound?->isRunning())

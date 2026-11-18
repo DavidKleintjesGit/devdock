@@ -6,11 +6,14 @@ namespace App\Livewire\Concerns;
 
 use Src\Board\Objects\CardObject;
 use Src\Review\Actions\BuildFixPromptAction;
+use Src\Review\Actions\BuildRoundPromptAction;
 use Src\Review\Actions\GetRoundAssessmentAction;
 use Src\Review\Actions\SetFindingStatusAction;
 use Src\Review\Enums\FindingChoiceEnum;
 use Src\Review\Objects\AssessedFindingObject;
 use Src\Review\Objects\RoundAssessmentObject;
+use Src\Worktree\Enums\WorkingCopyTaskEnum;
+use Src\Worktree\Objects\WorkingCopyTaskObject;
 
 /**
  * Your choice on a round that the agent assessed: per finding fix, ignore
@@ -37,6 +40,35 @@ trait WithRoundAssessment
 	public function updatedIgnoreReasons(): void
 	{
 		$this->writeFixPrompt();
+	}
+
+	/**
+	 * Asks the agent to assess the findings of the last round, for a round that
+	 * was not assessed yet, such as one from before you decided yourself.
+	 */
+	public function assessLatestRound(): void
+	{
+		$this->failure = null;
+
+		$cardObject = $this->cardById($this->board(), (string) $this->openCard);
+		$latestRound = $cardObject === null ? null : $this->latestRound($cardObject->id);
+		$prompt = $latestRound === null ? null : BuildRoundPromptAction::execute($latestRound, true);
+
+		if ($cardObject?->project === null || $cardObject->branch === null || $prompt === null) {
+			$this->failure = __('Deze ronde heeft geen open bevindingen om te beoordelen.');
+
+			return;
+		}
+
+		$this->failure = $this->startLinking(new WorkingCopyTaskObject(
+			card: $cardObject->id,
+			task: WorkingCopyTaskEnum::PROMPT,
+			project: $cardObject->project,
+			branch: $cardObject->branch,
+			ticketKey: $cardObject->ticketKey,
+			prompt: $prompt,
+			reviewRoundId: $latestRound->reviewRoundId,
+		));
 	}
 
 	/**
