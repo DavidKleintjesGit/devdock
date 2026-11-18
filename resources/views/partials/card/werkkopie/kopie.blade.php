@@ -22,9 +22,9 @@
 		@if ($database)
 			<div class="kv">
 				<span class="k">{{ __('Database') }}</span>
-				<span class="v"><span class="grow">{{ $database->isSqlite() ? basename((string) $database->database) : $database->database }}</span>@if ($database->isShared)<span class="label amber">{{ __('gedeeld met het project') }}</span>@else<span class="label green">{{ __('eigen') }}</span>@endif</span>
+				<span class="v"><span class="grow">{{ $database->isSqlite() ? basename((string) $database->database) : $database->database }}</span>@if ($database->touchesProject())<span class="label amber">{{ __('gedeeld met het project') }}</span>@else<span class="label green">{{ __('eigen') }}</span>@endif</span>
 				<span class="hint">{{ $database->serverLabel() }} · {{ __('uit de .env van deze kopie') }}</span>
-				@if ($database->isShared)
+				@if ($database->touchesProject())
 					<span class="hint" style="color:var(--amber)">{{ __('Een migratie hier verandert ook de database van het project en van andere werkkopieën.') }}</span>
 				@endif
 				<span class="v" style="margin-top:4px">
@@ -37,9 +37,9 @@
 		@if ($testDatabase)
 			<div class="kv">
 				<span class="k">{{ __('Testdatabase') }}</span>
-				<span class="v"><span class="grow">{{ $testDatabase->database }}</span>@if ($testDatabase->isShared)<span class="label amber">{{ __('gedeeld met het project') }}</span>@else<span class="label green">{{ __('eigen') }}</span>@endif</span>
+				<span class="v"><span class="grow">{{ $testDatabase->database }}</span>@if ($testDatabase->touchesProject())<span class="label amber">{{ __('gedeeld met het project') }}</span>@else<span class="label green">{{ __('eigen') }}</span>@endif</span>
 				<span class="hint">{{ $testDatabase->serverLabel() }} · {{ __('uit de .env.testing van deze kopie') }}</span>
-				@if ($testDatabase->isShared)
+				@if ($testDatabase->touchesProject())
 					<span class="hint" style="color:var(--amber)">{{ __('Draaien hier en ergens anders tegelijk tests, dan legen ze elkaars database.') }}</span>
 					<span class="v" style="margin-top:4px"><x-busy-button action="giveOwnTestDatabase" :pending="(bool) $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::OWN_TEST_DATABASE)" class="btn xs" :busy="__('Aanmaken...')">{{ __('Eigen testdatabase aanmaken') }}</x-busy-button></span>
 				@endif

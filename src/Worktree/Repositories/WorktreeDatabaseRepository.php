@@ -27,35 +27,36 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 	 */
 	private const TESTING_FILE = '.env.testing';
 
+	/**
+	 * The keys a Laravel app reads its database from when its config names none of its own.
+	 */
+	private const STANDARD_KEYS = [
+		'driver' => null,
+		'database' => 'DB_DATABASE',
+		'databaseDefault' => null,
+		'host' => 'DB_HOST',
+		'port' => 'DB_PORT',
+		'username' => 'DB_USERNAME',
+		'password' => 'DB_PASSWORD',
+	];
+
+	/** @var array<string, array<string, array<string, string|null>>> the connections of the config per working copy, read once */
+	private array $connectionsByPath = [];
+
+	/** @var array<string, list<string>> the connections the migrations write to per working copy, read once */
+	private array $migratedByPath = [];
+
 	public function describe(string $repositoryPath, string $path): DatabaseObject
 	{
-		$own = $this->environment($path);
-		$project = $this->environment($repositoryPath);
-		$connection = $own['DB_CONNECTION'] ?? 'sqlite';
-
-		$database = $connection === 'sqlite'
-			? $this->sqlitePath($path, $own['DB_DATABASE'] ?? null)
-			: ($own['DB_DATABASE'] ?? null);
-
-		$projectDatabase = $connection === 'sqlite'
-			? $this->sqlitePath($repositoryPath, $project['DB_DATABASE'] ?? null)
-			: ($project['DB_DATABASE'] ?? null);
-
-		return new DatabaseObject(
-			connection: $connection,
-			host: $own['DB_HOST'] ?? '127.0.0.1',
-			port: $own['DB_PORT'] ?? '3306',
-			database: $database,
-			projectDatabase: $projectDatabase,
-			isShared: $database !== null && $database === $projectDatabase,
-		);
+		return $this->describeIn($repositoryPath, $path, '.env');
 	}
 
 	public function getDatabases(string $path): array
 	{
 		$environment = $this->environment($path);
+		$keys = $this->defaultKeys($path, $environment);
 
-		if (($environment['DB_CONNECTION'] ?? 'sqlite') === 'sqlite') {
+		if ($keys['driver'] === 'sqlite') {
 			return array_values(array_map(
 				fn (string $file) => str_replace('\\', '/', $file),
 				glob($path . '/database/*.sqlite') ?: [],
@@ -63,7 +64,7 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 		}
 
 		try {
-			$names = $this->server($environment)->query('SHOW DATABASES')->fetchAll(PDO::FETCH_COLUMN);
+			$names = $this->server($environment, $keys)->query('SHOW DATABASES')->fetchAll(PDO::FETCH_COLUMN);
 		} catch (Throwable) {
 			return [];
 		}
@@ -73,9 +74,7 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 
 	public function exists(string $path, string $name): bool
 	{
-		$environment = $this->environment($path);
-
-		if (($environment['DB_CONNECTION'] ?? 'sqlite') === 'sqlite') {
+		if ($this->defaultKeys($path, $this->environment($path))['driver'] === 'sqlite') {
 			return is_file($this->sqliteFileFor($path, $name));
 		}
 
@@ -110,7 +109,7 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 
 				$this->use($path, $file);
 			} else {
-				$server = $this->server($environment);
+				$server = $this->server($environment, $this->defaultKeys($path, $environment));
 				$server->exec('CREATE DATABASE `' . $name . '`');
 
 				if ($fill === DatabaseFillEnum::COPY && $describe->projectDatabase !== null) {
@@ -143,27 +142,15 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 
 	public function use(string $path, string $name): void
 	{
-		$this->pointAt($path, '.env', $name);
+		$this->pointAt($path, '.env', (string) $this->defaultKeys($path, $this->environment($path))['database'], $name);
 	}
 
 	public function describeTesting(string $repositoryPath, string $path): ?DatabaseObject
 	{
-		$own = $this->environment($path, self::TESTING_FILE);
-		$project = $this->environment($repositoryPath, self::TESTING_FILE);
+		$describe = $this->describeIn($repositoryPath, $path, self::TESTING_FILE);
 
 		// a sqlite test database lives in memory or in its own file; only a server is shared
-		if (($own['DB_CONNECTION'] ?? 'sqlite') === 'sqlite') {
-			return null;
-		}
-
-		return new DatabaseObject(
-			connection: (string) $own['DB_CONNECTION'],
-			host: $own['DB_HOST'] ?? '127.0.0.1',
-			port: $own['DB_PORT'] ?? '3306',
-			database: $own['DB_DATABASE'] ?? null,
-			projectDatabase: $project['DB_DATABASE'] ?? null,
-			isShared: ($own['DB_DATABASE'] ?? null) !== null && ($own['DB_DATABASE'] ?? null) === ($project['DB_DATABASE'] ?? null),
-		);
+		return $describe->isSqlite() || ! is_file($path . '/' . self::TESTING_FILE) ? null : $describe;
 	}
 
 	public function giveOwnTestDatabase(string $repositoryPath, string $path, string $branch): ?string
@@ -174,53 +161,51 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 			return null;
 		}
 
-		// the part after the last slash names the task: feature/CSM-3554 becomes test_partnerportal_csm_3554
-		$suffix = trim((string) preg_replace('/[^a-z0-9]+/', '_', strtolower(basename($branch))), '_');
-		$name = $describe->isShared ? substr($describe->projectDatabase . '_' . $suffix, 0, 64) : (string) $describe->database;
+		$name = $describe->isShared ? $this->nameFor((string) $describe->projectDatabase, $branch) : (string) $describe->database;
 
 		if (preg_match('/^[A-Za-z0-9_]+$/', $name) !== 1) {
 			return null;
 		}
 
-		try {
-			$server = $this->server($this->environment($path, self::TESTING_FILE));
-			$server->exec('CREATE DATABASE IF NOT EXISTS `' . $name . '`');
+		$environment = $this->environment($path, self::TESTING_FILE);
+		$keys = $this->defaultKeys($path, $environment);
 
-			// a test run that does not migrate expects the tables of the project's test database
-			if ($this->tableCount($server, $name) === 0) {
-				$this->copyTables($server, $describe->projectDatabase, $name);
-			}
+		try {
+			$this->createAndFill($this->server($environment, $keys), (string) $describe->projectDatabase, $name);
 		} catch (Throwable $failure) {
 			return $failure->getMessage();
 		}
 
-		$this->pointAt($path, self::TESTING_FILE, $name);
+		$this->pointAt($path, self::TESTING_FILE, (string) $keys['database'], $name);
 
 		return null;
 	}
 
-	private function tableCount(PDO $server, string $database): int
+	public function giveOwnConnections(string $repositoryPath, string $path, string $branch, bool $forTesting): ?string
 	{
-		$count = $server->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?');
-		$count->execute([$database]);
+		$envFile = $forTesting ? self::TESTING_FILE : '.env';
+		$own = $this->environment($path, $envFile);
+		$project = $this->environment($repositoryPath, $envFile);
 
-		return (int) $count->fetchColumn();
-	}
+		foreach ($this->sharedConnections($path, $own, $project) as $connection) {
+			$keys = $this->connections($path)[$connection];
+			$projectDatabase = (string) $this->valueOf($keys, $project);
+			$name = $this->nameFor($projectDatabase, $branch);
 
-	/**
-	 * Points DB_DATABASE in one env file of the working copy at a database.
-	 */
-	private function pointAt(string $path, string $envFile, string $name): void
-	{
-		$file = $path . '/' . $envFile;
-		$contents = is_file($file) ? (string) file_get_contents($file) : '';
-		$line = 'DB_DATABASE=' . $name;
+			if (preg_match('/^[A-Za-z0-9_]+$/', $name) !== 1 || $keys['database'] === null) {
+				return __('DevDock kan de database van de verbinding :connection niet omzetten.', ['connection' => $connection]);
+			}
 
-		$contents = preg_match('/^#?\s*DB_DATABASE=.*$/m', $contents) === 1
-			? (string) preg_replace('/^#?\s*DB_DATABASE=.*$/m', $line, $contents, 1)
-			: rtrim($contents, "\n") . "\n" . $line . "\n";
+			try {
+				$this->createAndFill($this->server($own, $keys), $projectDatabase, $name);
+			} catch (Throwable $failure) {
+				return $connection . ': ' . $failure->getMessage();
+			}
 
-		file_put_contents($file, $contents);
+			$this->pointAt($path, $envFile, (string) $keys['database'], $name);
+		}
+
+		return null;
 	}
 
 	public function ownTestDatabase(string $repositoryPath, string $path): ?string
@@ -238,23 +223,261 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 		$name = $this->ownTestDatabase($repositoryPath, $path);
 
 		if ($name !== null && preg_match('/^[A-Za-z0-9_]+$/', $name) === 1) {
-			$this->server($this->environment($path, self::TESTING_FILE))->exec('DROP DATABASE IF EXISTS `' . $name . '`');
+			$environment = $this->environment($path, self::TESTING_FILE);
+			$this->server($environment, $this->defaultKeys($path, $environment))->exec('DROP DATABASE IF EXISTS `' . $name . '`');
 		}
 	}
 
 	public function drop(string $path, string $name): void
 	{
 		$environment = $this->environment($path);
+		$keys = $this->defaultKeys($path, $environment);
 
-		if (($environment['DB_CONNECTION'] ?? 'sqlite') === 'sqlite') {
+		if ($keys['driver'] === 'sqlite') {
 			@unlink($this->sqliteFileFor($path, $name));
 
 			return;
 		}
 
 		if (preg_match('/^[A-Za-z0-9_]+$/', $name) === 1) {
-			$this->server($environment)->exec('DROP DATABASE IF EXISTS `' . $name . '`');
+			$this->server($environment, $keys)->exec('DROP DATABASE IF EXISTS `' . $name . '`');
 		}
+	}
+
+	/**
+	 * Which database the default connection of the working copy uses in one
+	 * env file, and which of the other connections its migrations write to
+	 * still point at the project's own database. A database the copy cannot
+	 * name counts as the project's: nothing may be run on a guess.
+	 */
+	private function describeIn(string $repositoryPath, string $path, string $envFile): DatabaseObject
+	{
+		$own = $this->environment($path, $envFile);
+		$project = $this->environment($repositoryPath, $envFile);
+		$keys = $this->defaultKeys($path, $own);
+		$driver = (string) $keys['driver'];
+
+		$database = $driver === 'sqlite'
+			? $this->sqlitePath($path, $this->valueOf($keys, $own))
+			: $this->valueOf($keys, $own);
+
+		$projectDatabase = $driver === 'sqlite'
+			? $this->sqlitePath($repositoryPath, $this->valueOf($keys, $project))
+			: $this->valueOf($keys, $project);
+
+		return new DatabaseObject(
+			connection: $driver,
+			host: $this->valueOf(['database' => $keys['host'], 'databaseDefault' => '127.0.0.1'], $own),
+			port: $this->valueOf(['database' => $keys['port'], 'databaseDefault' => '3306'], $own),
+			database: $database,
+			projectDatabase: $projectDatabase,
+			isShared: ($driver !== 'sqlite' && $database === null) || ($database !== null && $database === $projectDatabase),
+			sharedConnections: $driver === 'sqlite' ? [] : $this->sharedConnections($path, $own, $project),
+		);
+	}
+
+	/**
+	 * The other connections the migrations write to whose database is the
+	 * same as the project's in these env files.
+	 *
+	 * @param  array<string, string|null>  $own
+	 * @param  array<string, string|null>  $project
+	 * @return list<string>
+	 */
+	private function sharedConnections(string $path, array $own, array $project): array
+	{
+		$connections = $this->connections($path);
+		$default = $this->defaultConnection($path, $own);
+
+		return array_values(array_filter(
+			$this->migratedConnections($path),
+			fn (string $connection): bool => $connection !== $default
+				&& isset($connections[$connection])
+				&& in_array($connections[$connection]['driver'], ['mysql', 'mariadb'], true)
+				&& $this->valueOf($connections[$connection], $own) === $this->valueOf($connections[$connection], $project),
+		));
+	}
+
+	/**
+	 * The env keys of the default connection, as the config of the working
+	 * copy names them, else Laravel's own.
+	 *
+	 * @param  array<string, string|null>  $environment
+	 * @return array<string, string|null>
+	 */
+	private function defaultKeys(string $path, array $environment): array
+	{
+		$keys = $this->connections($path)[$this->defaultConnection($path, $environment)] ?? null;
+
+		return $keys ?? [...self::STANDARD_KEYS, 'driver' => $environment['DB_CONNECTION'] ?? 'sqlite'];
+	}
+
+	/**
+	 * The connection the app uses unless it names another: what the config's
+	 * default reads from the env file, or its fallback.
+	 *
+	 * @param  array<string, string|null>  $environment
+	 */
+	private function defaultConnection(string $path, array $environment): string
+	{
+		$config = $this->configText($path);
+
+		if (preg_match("/'default'\s*=>\s*env\(\s*'([A-Z0-9_]+)'\s*(?:,\s*'([^']*)')?/", $config, $found) === 1) {
+			return (string) ($environment[$found[1]] ?? $found[2] ?? 'mysql');
+		}
+
+		if (preg_match("/'default'\s*=>\s*'([^']+)'/", $config, $found) === 1) {
+			return $found[1];
+		}
+
+		return (string) ($environment['DB_CONNECTION'] ?? 'sqlite');
+	}
+
+	/**
+	 * Per connection in config/database.php: its driver and the env keys of
+	 * its database, server and account, with the fallback the config gives.
+	 *
+	 * @return array<string, array<string, string|null>>
+	 */
+	private function connections(string $path): array
+	{
+		if (isset($this->connectionsByPath[$path])) {
+			return $this->connectionsByPath[$path];
+		}
+
+		$config = $this->configText($path);
+		$start = strpos($config, "'connections'");
+		$connections = [];
+
+		if ($start !== false) {
+			preg_match_all("/'([A-Za-z0-9_]+)'\s*=>\s*\[(.*?)\n\s*\],/s", substr($config, $start + strlen("'connections'")), $blocks, PREG_SET_ORDER);
+
+			foreach ($blocks as [, $name, $body]) {
+				if (preg_match("/'driver'\s*=>\s*'([a-z]+)'/", $body, $driver) !== 1) {
+					continue;
+				}
+
+				[$database, $databaseDefault] = $this->envKey($body, 'database');
+
+				$connections[$name] = [
+					'driver' => $driver[1],
+					'database' => $database,
+					'databaseDefault' => $databaseDefault,
+					'host' => $this->envKey($body, 'host')[0] ?? 'DB_HOST',
+					'port' => $this->envKey($body, 'port')[0] ?? 'DB_PORT',
+					'username' => $this->envKey($body, 'username')[0] ?? 'DB_USERNAME',
+					'password' => $this->envKey($body, 'password')[0] ?? 'DB_PASSWORD',
+				];
+			}
+		}
+
+		return $this->connectionsByPath[$path] = $connections;
+	}
+
+	/**
+	 * The env key a setting of a connection reads, and the fallback it gives.
+	 *
+	 * @return array{0: ?string, 1: ?string}
+	 */
+	private function envKey(string $body, string $setting): array
+	{
+		return preg_match("/'" . $setting . "'\s*=>\s*env\(\s*'([A-Z0-9_]+)'\s*(?:,\s*'([^']*)')?/", $body, $found) === 1
+			? [$found[1], $found[2] ?? null]
+			: [null, null];
+	}
+
+	/**
+	 * The connections the migrations of the working copy name, besides the default one.
+	 *
+	 * @return list<string>
+	 */
+	private function migratedConnections(string $path): array
+	{
+		if (isset($this->migratedByPath[$path])) {
+			return $this->migratedByPath[$path];
+		}
+
+		$names = [];
+
+		foreach (glob($path . '/database/migrations/*.php') ?: [] as $file) {
+			preg_match_all("/(?:connection\(\s*|\\\$connection\s*=\s*)'([A-Za-z0-9_]+)'/", (string) file_get_contents($file), $found);
+			$names = [...$names, ...$found[1]];
+		}
+
+		return $this->migratedByPath[$path] = array_values(array_unique($names));
+	}
+
+	/**
+	 * What a setting comes to in an env file: its value there, else the fallback of the config.
+	 *
+	 * @param  array<string, string|null>  $keys
+	 * @param  array<string, string|null>  $environment
+	 */
+	private function valueOf(array $keys, array $environment): ?string
+	{
+		$value = $keys['database'] === null ? null : ($environment[$keys['database']] ?? null);
+
+		return filled($value) ? (string) $value : $keys['databaseDefault'];
+	}
+
+	private function configText(string $path): string
+	{
+		$file = $path . '/config/database.php';
+
+		return is_file($file) ? (string) file_get_contents($file) : '';
+	}
+
+	/**
+	 * The database of a task: the project's with the last part of the branch behind it,
+	 * so feature/CSM-3554 becomes test_partnerportal_csm_3554.
+	 */
+	private function nameFor(string $projectDatabase, string $branch): string
+	{
+		$suffix = trim((string) preg_replace('/[^a-z0-9]+/', '_', strtolower(basename($branch))), '_');
+
+		return substr($projectDatabase . '_' . $suffix, 0, 64);
+	}
+
+	/**
+	 * Creates a database when it is not there, and gives an empty one the
+	 * tables of the project's; a project database that does not exist leaves
+	 * it empty for the migrations.
+	 */
+	private function createAndFill(PDO $server, string $from, string $name): void
+	{
+		$server->exec('CREATE DATABASE IF NOT EXISTS `' . $name . '`');
+
+		$projectExists = $server->prepare('SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?');
+		$projectExists->execute([$from]);
+
+		if ((int) $projectExists->fetchColumn() > 0 && $this->tableCount($server, $name) === 0) {
+			$this->copyTables($server, $from, $name);
+		}
+	}
+
+	private function tableCount(PDO $server, string $database): int
+	{
+		$count = $server->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?');
+		$count->execute([$database]);
+
+		return (int) $count->fetchColumn();
+	}
+
+	/**
+	 * Points one env key in one env file of the working copy at a database.
+	 */
+	private function pointAt(string $path, string $envFile, string $key, string $name): void
+	{
+		$file = $path . '/' . $envFile;
+		$contents = is_file($file) ? (string) file_get_contents($file) : '';
+		$line = $key . '=' . $name;
+		$pattern = '/^#?\s*' . preg_quote($key, '/') . '=.*$/m';
+
+		$contents = preg_match($pattern, $contents) === 1
+			? (string) preg_replace($pattern, $line, $contents, 1)
+			: rtrim($contents, "\n") . "\n" . $line . "\n";
+
+		file_put_contents($file, $contents);
 	}
 
 	/**
@@ -328,20 +551,20 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 	}
 
 	/**
-	 * A connection to the server itself, with the account of the working
-	 * copy, which is the account of the project.
+	 * A connection to the server of one connection, with its own account.
 	 *
 	 * @param  array<string, string|null>  $environment
+	 * @param  array<string, string|null>  $keys
 	 */
-	private function server(array $environment): PDO
+	private function server(array $environment, array $keys): PDO
 	{
 		$dsn = sprintf(
 			'mysql:host=%s;port=%s',
-			$environment['DB_HOST'] ?? '127.0.0.1',
-			$environment['DB_PORT'] ?? '3306',
+			$environment[(string) $keys['host']] ?? $environment['DB_HOST'] ?? '127.0.0.1',
+			$environment[(string) $keys['port']] ?? $environment['DB_PORT'] ?? '3306',
 		);
 
-		return new PDO($dsn, $environment['DB_USERNAME'] ?? 'root', $environment['DB_PASSWORD'] ?? '', [
+		return new PDO($dsn, $environment[(string) $keys['username']] ?? $environment['DB_USERNAME'] ?? 'root', $environment[(string) $keys['password']] ?? $environment['DB_PASSWORD'] ?? '', [
 			PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
 			PDO::ATTR_TIMEOUT => 5,
 		]);
@@ -371,7 +594,7 @@ class WorktreeDatabaseRepository implements WorktreeDatabaseRepositoryContract
 	 */
 	private function sqlitePath(string $path, ?string $database): string
 	{
-		$file = blank($database) ? $path . '/database/database.sqlite' : (string) $database;
+		$file = blank($database) || str_contains((string) $database, 'database_path') ? $path . '/database/database.sqlite' : (string) $database;
 
 		if (! str_starts_with($file, '/') && preg_match('/^[A-Za-z]:/', $file) !== 1) {
 			$file = $path . '/' . $file;

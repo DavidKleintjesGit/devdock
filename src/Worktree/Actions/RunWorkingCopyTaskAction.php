@@ -272,11 +272,11 @@ class RunWorkingCopyTaskAction extends Command
 	 */
 	private function ownTestDatabaseEnding(): array
 	{
-		$failure = resolve(WorktreeDatabaseRepositoryContract::class)->giveOwnTestDatabase(
-			(string) $this->projectEntity()?->path,
-			(string) $this->workingCopyTaskObject->path,
-			$this->workingCopyTaskObject->branch,
-		);
+		$worktreeDatabaseRepository = resolve(WorktreeDatabaseRepositoryContract::class);
+		$projectPath = (string) $this->projectEntity()?->path;
+
+		$failure = $worktreeDatabaseRepository->giveOwnTestDatabase($projectPath, (string) $this->workingCopyTaskObject->path, $this->workingCopyTaskObject->branch)
+			?? $worktreeDatabaseRepository->giveOwnConnections($projectPath, (string) $this->workingCopyTaskObject->path, $this->workingCopyTaskObject->branch, true);
 
 		return $failure === null
 			? ['notice' => __('Deze kopie test nu in een eigen database.')]

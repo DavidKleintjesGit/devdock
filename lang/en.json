@@ -1890,5 +1890,8 @@
     "Nieuwe ronde starten": "Start a new round",
     "Laat de agent beoordelen": "Let the agent assess",
     "Deze ronde heeft geen open bevindingen om te beoordelen.": "This round has no open findings to assess.",
-    "Na elke ronde beslis jij wat er gefixt wordt": "After every round you decide what gets fixed"
+    "Na elke ronde beslis jij wat er gefixt wordt": "After every round you decide what gets fixed",
+    "DevDock kan de database van de verbinding :connection niet omzetten.": "DevDock cannot point the connection :connection at a database of its own.",
+    "een database die DevDock niet kan lezen": "a database DevDock cannot read",
+    "de verbindingen :connections": "the connections :connections"
 }

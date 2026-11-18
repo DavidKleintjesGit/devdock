@@ -17,6 +17,7 @@ use Src\Worktree\Enums\CheckStateEnum;
 use Src\Worktree\Enums\ProjectKindEnum;
 use Src\Worktree\Enums\SetupCheckEnum;
 use Src\Worktree\Enums\WorktreeOriginEnum;
+use Src\Worktree\Objects\DatabaseObject;
 use Src\Worktree\Objects\ReadinessObject;
 use Src\Worktree\Objects\SetupCheckObject;
 use Src\Worktree\Objects\WorkingCopyStateObject;
@@ -279,26 +280,37 @@ class CheckReadinessAction extends Command
 	/**
 	 * @return list<SetupCheckObject>
 	 */
+	/**
+	 * What still points at the project, in words: the default database, or the connections that do.
+	 */
+	private function sharedNames(DatabaseObject $databaseObject): string
+	{
+		return implode(', ', array_filter([
+			$databaseObject->isShared ? ($databaseObject->database ?? __('een database die DevDock niet kan lezen')) : null,
+			$databaseObject->sharedConnections === [] ? null : __('de verbindingen :connections', ['connections' => implode(', ', $databaseObject->sharedConnections)]),
+		]));
+	}
+
 	private function databases(WorktreeDatabaseRepositoryContract $worktreeDatabaseRepository, string $repositoryPath, string $path): array
 	{
 		$databaseObject = $worktreeDatabaseRepository->describe($repositoryPath, $path);
 		$testDatabaseObject = $worktreeDatabaseRepository->describeTesting($repositoryPath, $path);
 
 		return [
-			$databaseObject->isShared
+			$databaseObject->touchesProject()
 				? new SetupCheckObject(
 					SetupCheckEnum::OWN_DATABASE,
 					CheckStateEnum::OPEN,
-					__('Deelt :database met het project. Een test of een lens die schrijft, zou jouw data veranderen.', ['database' => $databaseObject->database]),
+					__('Deelt :database met het project. Een test of een lens die schrijft, zou jouw data veranderen.', ['database' => $this->sharedNames($databaseObject)]),
 					__('kopiëren naar een eigen'),
 				)
 				: new SetupCheckObject(SetupCheckEnum::OWN_DATABASE, CheckStateEnum::READY, (string) $databaseObject->database),
 			match (true) {
 				$testDatabaseObject === null => new SetupCheckObject(SetupCheckEnum::OWN_TEST_DATABASE, CheckStateEnum::READY, __('De tests draaien op sqlite in deze map.')),
-				$testDatabaseObject->isShared => new SetupCheckObject(
+				$testDatabaseObject->touchesProject() => new SetupCheckObject(
 					SetupCheckEnum::OWN_TEST_DATABASE,
 					CheckStateEnum::OPEN,
-					__('Deelt :database met het project; tests van twee werkkopieën zouden elkaar leeghalen.', ['database' => $testDatabaseObject->database]),
+					__('Deelt :database met het project; tests van twee werkkopieën zouden elkaar leeghalen.', ['database' => $this->sharedNames($testDatabaseObject)]),
 					__('een eigen maken'),
 				),
 				default => new SetupCheckObject(SetupCheckEnum::OWN_TEST_DATABASE, CheckStateEnum::READY, (string) $testDatabaseObject->database),

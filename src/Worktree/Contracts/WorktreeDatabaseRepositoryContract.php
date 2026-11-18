@@ -50,6 +50,13 @@ interface WorktreeDatabaseRepositoryContract
 	public function giveOwnTestDatabase(string $repositoryPath, string $path, string $branch): ?string;
 
 	/**
+	 * Gives every other connection the migrations write to that still points
+	 * at the project's database a copy of its own, named after the branch, in
+	 * the .env or the .env.testing of the working copy. Returns why it failed, or null.
+	 */
+	public function giveOwnConnections(string $repositoryPath, string $path, string $branch, bool $forTesting): ?string;
+
+	/**
 	 * The test database DevDock made for this working copy; null when it uses
 	 * sqlite, the project's own test database, or one DevDock did not name.
 	 */

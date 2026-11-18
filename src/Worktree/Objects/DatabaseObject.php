@@ -7,7 +7,9 @@ namespace Src\Worktree\Objects;
 use Src\Packages\ValueObject\ValueObject;
 
 /**
- * The database a working copy points at, as its own .env says.
+ * The database a working copy points at, as its own .env says, and the
+ * other connections its migrations write to that still point at the
+ * project's own database.
  */
 class DatabaseObject extends ValueObject
 {
@@ -18,8 +20,18 @@ class DatabaseObject extends ValueObject
 		public readonly ?string $database,
 		public readonly ?string $projectDatabase,
 		public readonly bool $isShared,
+		/** @var list<string> */
+		public readonly array $sharedConnections = [],
 	) {
 		parent::__construct();
+	}
+
+	/**
+	 * Whether anything of this copy still writes to a database of the project.
+	 */
+	public function touchesProject(): bool
+	{
+		return $this->isShared || $this->sharedConnections !== [];
 	}
 
 	public function isSqlite(): bool

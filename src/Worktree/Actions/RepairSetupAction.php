@@ -170,16 +170,19 @@ class RepairSetupAction extends Command
 			SetupCheckEnum::JS_PACKAGES => $this->installPackages($projectPath, $path, 'node_modules', is_file($path . '/package-lock.json') ? ['npm', 'ci'] : ['npm', 'install'], $prepare, $logPath, $workingCopyStateRepository, $workingCopyRepository),
 			SetupCheckEnum::ASSETS => $workingCopyStateRepository->runStep($path, ['npm', 'run', (string) ProjectKindEnum::of($path)->assetScript()], $logPath, self::STEP_SECONDS),
 			SetupCheckEnum::APP_KEY => $workingCopyStateRepository->runStep($path, [$php, 'artisan', 'key:generate', '--force'], $logPath, self::STEP_SECONDS),
-			SetupCheckEnum::OWN_DATABASE => CreateWorktreeDatabaseAction::execute(
-				$worktreeEntity,
-				$worktreeDatabaseRepository->describe($projectPath, $path)->suggestionFor((string) ($worktreeEntity->card ?? basename($worktreeEntity->branch))),
-				DatabaseFillEnum::COPY,
-			),
-			SetupCheckEnum::OWN_TEST_DATABASE => $worktreeDatabaseRepository->giveOwnTestDatabase($projectPath, $path, $worktreeEntity->branch),
-			SetupCheckEnum::MIGRATIONS => $worktreeDatabaseRepository->describe($projectPath, $path)->isShared
+			SetupCheckEnum::OWN_DATABASE => ($worktreeDatabaseRepository->describe($projectPath, $path)->isShared
+				? CreateWorktreeDatabaseAction::execute(
+					$worktreeEntity,
+					$worktreeDatabaseRepository->describe($projectPath, $path)->suggestionFor((string) ($worktreeEntity->card ?? basename($worktreeEntity->branch))),
+					DatabaseFillEnum::COPY,
+				)
+				: null) ?? $worktreeDatabaseRepository->giveOwnConnections($projectPath, $path, $worktreeEntity->branch, false),
+			SetupCheckEnum::OWN_TEST_DATABASE => $worktreeDatabaseRepository->giveOwnTestDatabase($projectPath, $path, $worktreeEntity->branch)
+				?? $worktreeDatabaseRepository->giveOwnConnections($projectPath, $path, $worktreeEntity->branch, true),
+			SetupCheckEnum::MIGRATIONS => $worktreeDatabaseRepository->describe($projectPath, $path)->touchesProject()
 				? __('DevDock migreert nooit de database van het project.')
 				: $workingCopyStateRepository->runStep($path, [$php, 'artisan', 'migrate', '--force'], $logPath, self::STEP_SECONDS),
-			SetupCheckEnum::TEST_MIGRATIONS => $worktreeDatabaseRepository->ownTestDatabase($projectPath, $path) === null
+			SetupCheckEnum::TEST_MIGRATIONS => $worktreeDatabaseRepository->ownTestDatabase($projectPath, $path) === null || $worktreeDatabaseRepository->describeTesting($projectPath, $path)?->sharedConnections !== []
 				? __('DevDock migreert nooit de testdatabase van het project.')
 				: $workingCopyStateRepository->runStep($path, [$php, 'artisan', 'migrate', '--force', '--env=testing'], $logPath, self::STEP_SECONDS),
 			SetupCheckEnum::STORAGE_LINK => $workingCopyStateRepository->runStep($path, [$php, 'artisan', 'storage:link'], $logPath, self::STEP_SECONDS),
