@@ -1121,6 +1121,11 @@ class Drawer extends Component
 			return null;
 		}
 
+		// Takes the endings after reading the state: a task that ends in between still counts as running, so the task bar keeps polling for it.
+		$workingCopyTask = GetWorkingCopyTaskAction::execute($cardObject->id);
+		$this->followWorkingCopyTask();
+		$top = $this->currentDrawer() ?? $top;
+
 		$tab = $top['tab'];
 		$taskEntity = resolve(TaskRepositoryContract::class)->getByKey($cardObject->id);
 		$reviewCommentEntities = $this->reviewCommentsOn($cardObject);
@@ -1137,7 +1142,6 @@ class Drawer extends Component
 		$isSetup = in_array($cardObject->column, [BoardColumnEnum::TO_DO, BoardColumnEnum::LATER, BoardColumnEnum::NOT_SET_UP], true)
 			|| ($cardObject->column === BoardColumnEnum::BUILDING && $cardObject->agent === null && $promptRunEntity === null);
 		$cardSteps = $this->cardSteps($cardObject);
-		$workingCopyTask = GetWorkingCopyTaskAction::execute($cardObject->id);
 		$readiness = $worktreeEntity === null ? null : GetReadinessAction::execute($worktreeEntity->path);
 		$repairState = $worktreeEntity === null ? null : GetRepairStateAction::execute($worktreeEntity->path);
 		$diffView = $worktreeEntity === null ? DiffViewEnum::BRANCH : $this->diffViewFor($worktreeEntity);
