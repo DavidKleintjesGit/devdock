@@ -216,7 +216,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		$origin = $worktreeEloquent->origin ?? WorktreeOriginEnum::MADE;
 
 		// a working copy stands two folders deep in its checkout; once git let go of the folder it cannot say so itself
-		$isHeldByGit = file_exists($path . '/.git');
+		$isHeldByGit = $this->isWorkingCopy($path);
 		$repositoryPath = $isHeldByGit ? $this->repositoryPathOf($path) : dirname($path, 2);
 
 		// git let go of the working copy but could not take its folder along, for instance while another program held it open
@@ -277,7 +277,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getBranchChanges(string $path): ChangeObjectCollection
 	{
-		if (! is_dir($path)) {
+		if (! $this->isWorkingCopy($path)) {
 			return ChangeObjectCollection::fromArray([]);
 		}
 
@@ -451,7 +451,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getChanges(string $path): ChangeObjectCollection
 	{
-		if (! is_dir($path)) {
+		if (! $this->isWorkingCopy($path)) {
 			return ChangeObjectCollection::fromArray([]);
 		}
 
@@ -480,7 +480,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return $view === DiffViewEnum::UNCOMMITTED ? $this->getChanges($path) : $this->getBranchChanges($path);
 		}
 
-		if (! is_dir($path)) {
+		if (! $this->isWorkingCopy($path)) {
 			return ChangeObjectCollection::fromArray([]);
 		}
 
@@ -497,7 +497,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getDiff(string $path, string $file, DiffViewEnum $view = DiffViewEnum::BRANCH, int $context = 3): ?string
 	{
-		if (! is_dir($path) || $file === '') {
+		if (! $this->isWorkingCopy($path) || $file === '') {
 			return null;
 		}
 
@@ -539,7 +539,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getChangesBetween(string $path, string $from, string $until): ChangeObjectCollection
 	{
-		if (! is_dir($path) || ! $this->hasObject($path, $from) || ! $this->hasObject($path, $until)) {
+		if (! $this->isWorkingCopy($path) || ! $this->hasObject($path, $from) || ! $this->hasObject($path, $until)) {
 			return ChangeObjectCollection::fromArray([]);
 		}
 
@@ -557,7 +557,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getDiffBetween(string $path, string $file, string $from, string $until, int $context = 3): ?string
 	{
-		if (! is_dir($path) || $file === '') {
+		if (! $this->isWorkingCopy($path) || $file === '') {
 			return null;
 		}
 
@@ -576,7 +576,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getGeneratedFiles(string $path, array $files): array
 	{
-		if (! is_dir($path) || $files === []) {
+		if (! $this->isWorkingCopy($path) || $files === []) {
 			return [];
 		}
 
@@ -743,7 +743,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getFingerprint(string $path, bool $isFresh = false): ?string
 	{
-		if (! is_dir($path)) {
+		if (! $this->isWorkingCopy($path)) {
 			return null;
 		}
 
@@ -774,7 +774,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getHead(string $path): ?string
 	{
-		if (! is_dir($path)) {
+		if (! $this->isWorkingCopy($path)) {
 			return null;
 		}
 
@@ -785,7 +785,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getChangedFiles(string $path): array
 	{
-		if (! is_dir($path)) {
+		if (! $this->isWorkingCopy($path)) {
 			return [];
 		}
 
@@ -1024,12 +1024,12 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getBranchBase(string $path): ?string
 	{
-		return is_dir($path) ? $this->branchBase($path) : null;
+		return $this->isWorkingCopy($path) ? $this->branchBase($path) : null;
 	}
 
 	public function getUntrackedFiles(string $path): array
 	{
-		return is_dir($path)
+		return $this->isWorkingCopy($path)
 			? array_values(array_filter(
 				$this->lines($path, ['git', 'ls-files', '--others', '--exclude-standard']),
 				fn (string $file): bool => $file !== self::PROJECT_NAME_FILE,
@@ -1048,7 +1048,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getConflictedFiles(string $path): array
 	{
-		return is_dir($path) ? $this->conflictedFilesIn($path) : [];
+		return $this->isWorkingCopy($path) ? $this->conflictedFilesIn($path) : [];
 	}
 
 	/**
@@ -1190,7 +1190,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getUnpushedCommits(string $path): array
 	{
-		if (! is_dir($path)) {
+		if (! $this->isWorkingCopy($path)) {
 			return [];
 		}
 
@@ -1444,8 +1444,8 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 */
 	private function targetBranch(string $path): string
 	{
-		// a copy that is gone has no branch to ask git about
-		$branch = is_dir($path) ? $this->getBranch($path) : null;
+		// a copy that is gone, or that git let go of, has no branch to ask git about
+		$branch = $this->isWorkingCopy($path) ? $this->getBranch($path) : null;
 
 		return $branch === null ? $this->mainBranch($path) : $this->targetOf($path, $branch);
 	}
@@ -1504,6 +1504,15 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		}
 
 		return null;
+	}
+
+	/**
+	 * Whether git holds the folder as a checkout of its own. A folder git let
+	 * go of would otherwise answer every git command with the checkout above it.
+	 */
+	private function isWorkingCopy(string $path): bool
+	{
+		return file_exists($path . '/.git');
 	}
 
 	/**
@@ -1571,7 +1580,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 */
 	private function statusOf(string $path): array
 	{
-		if (! is_dir($path)) {
+		if (! $this->isWorkingCopy($path)) {
 			return $this->emptyStatus();
 		}
 
@@ -1746,7 +1755,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	{
 		$cold = array_values(array_filter(
 			$paths,
-			fn (string $path) => is_dir($path) && ($again || ! Cache::has($this->statusKey($path))),
+			fn (string $path) => $this->isWorkingCopy($path) && ($again || ! Cache::has($this->statusKey($path))),
 		));
 
 		// a single copy is read on its own when it is asked for; refreshing does them all

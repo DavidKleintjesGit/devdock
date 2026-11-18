@@ -51,4 +51,20 @@ class WorktreeRepositoryStatusTest extends TestCase
 		$this->assertSame('main', $worktreeEntities['feature/loose']->targetBranch);
 		$this->assertSame(1, $worktreeEntities['feature/loose']->changedFiles);
 	}
+
+	#[Test]
+	public function get_all_leaves_the_changes_of_the_checkout_out_of_a_folder_git_let_go_of(): void
+	{
+		$this->repository = TemporaryGitRepository::create();
+		$path = $this->repository->addWorktree('feature/billing');
+		$this->repository->git('worktree', 'remove', $path);
+		$this->repository->write('.worktrees/feature-billing/.wakatime-project', fake()->slug());
+		// a change in the checkout itself, one folder above the copy
+		$this->repository->write('README.md', fake()->sentence());
+		Worktree::factory()->create(['branch' => 'feature/billing', 'path' => $path]);
+
+		$worktreeEntity = resolve(WorktreeRepositoryContract::class)->getAll()->first();
+
+		$this->assertSame(0, $worktreeEntity->changedFiles);
+	}
 }
