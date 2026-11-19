@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Review\Actions;
 
+use Src\Access\Enums\GitGrantEnum;
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Support\Facades\Bus;
 use PHPUnit\Framework\Attributes\Test;
@@ -346,7 +347,7 @@ class StartRoundActionTest extends TestCase
 	}
 
 	#[Test]
-	public function execute_refuses_a_round_while_the_agent_works_in_the_copy(): void
+	public function execute_refuses_a_round_while_the_agent_finishes_a_rebase_in_the_copy(): void
 	{
 		$todo = Todo::factory()->create();
 		Lens::factory()->create(['paths' => ['billing/*']]);
@@ -355,6 +356,7 @@ class StartRoundActionTest extends TestCase
 			'directory' => $this->repository->path,
 			'status' => PromptStatusEnum::RUNNING->value,
 			'started_at' => now(),
+			'git_grant' => GitGrantEnum::REBASE->value,
 		]);
 
 		$this->expectException(WorkingCopyBusyException::class);

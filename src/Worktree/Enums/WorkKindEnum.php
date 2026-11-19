@@ -18,18 +18,30 @@ enum WorkKindEnum: string
 	case TERMINAL = 'terminal';
 
 	/**
-	 * Whether this work waits while an agent turn runs in the same copy.
+	 * Whether this work waits while an agent turn runs in the same copy: one
+	 * agent works in a copy at a time.
 	 */
 	public function waitsForAgent(): bool
 	{
-		return in_array($this, [self::AGENT_TURN, self::CONFLICT_TURN, self::ROUND], true);
+		return $this === self::AGENT_TURN || $this === self::CONFLICT_TURN;
+	}
+
+	/**
+	 * Whether this work waits while the agent finishes a rebase in the same
+	 * copy. A round goes alongside every other turn of the agent; a rebase
+	 * moves the whole branch under it.
+	 */
+	public function waitsForRebase(): bool
+	{
+		return $this === self::ROUND;
 	}
 
 	/**
 	 * Whether this work waits while the lenses of a round run in the same copy.
+	 * Only a rebase does; a turn of the agent goes alongside the lenses.
 	 */
 	public function waitsForLenses(): bool
 	{
-		return $this === self::AGENT_TURN || $this === self::CONFLICT_TURN;
+		return $this === self::CONFLICT_TURN;
 	}
 }

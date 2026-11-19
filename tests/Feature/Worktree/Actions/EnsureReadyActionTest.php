@@ -90,7 +90,7 @@ class EnsureReadyActionTest extends TestCase
 	}
 
 	#[Test]
-	public function execute_refuses_an_agent_turn_while_the_lenses_look_in_the_copy(): void
+	public function execute_refuses_a_conflict_turn_while_the_lenses_look_in_the_copy(): void
 	{
 		ReviewRound::factory()->create([
 			'directory' => $this->path,
@@ -101,7 +101,22 @@ class EnsureReadyActionTest extends TestCase
 
 		$this->expectException(WorkingCopyBusyException::class);
 
-		EnsureReadyAction::execute($this->path, WorkKindEnum::AGENT_TURN);
+		EnsureReadyAction::execute($this->path, WorkKindEnum::CONFLICT_TURN);
+	}
+
+	#[Test]
+	public function execute_lets_an_agent_turn_run_beside_the_lenses_in_the_copy(): void
+	{
+		ReviewRound::factory()->create([
+			'directory' => $this->path,
+			'status' => RoundStatusEnum::RUNNING->value,
+			'started_at' => now(),
+			'finished_at' => null,
+		]);
+
+		$readinessObject = EnsureReadyAction::execute($this->path, WorkKindEnum::AGENT_TURN);
+
+		$this->assertTrue($readinessObject->isReady());
 	}
 
 	#[Test]

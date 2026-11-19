@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Src\Worktree\Actions;
 
 use Carbon\CarbonImmutable;
+use Src\Access\Enums\GitGrantEnum;
 use Src\Packages\Cqrs\Command;
 use Src\Prompt\Contracts\PromptRunRepositoryContract;
 use Src\Prompt\Objects\PromptRunEntity;
@@ -50,10 +51,11 @@ class EnsureReadyAction extends Command
 
 		$directory = CheckReadinessAction::normalize($readinessObject->directory);
 
-		if ($this->workKind->waitsForAgent()) {
+		if ($this->workKind->waitsForAgent() || $this->workKind->waitsForRebase()) {
 			$since = CarbonImmutable::now()->subSeconds((int) config('devdock.prompt_timeout'));
 			$isAgentBusy = collect($promptRunRepository->getRunningSince($since))
-				->contains(fn (PromptRunEntity $promptRunEntity): bool => CheckReadinessAction::normalize((string) $promptRunEntity->directory) === $directory);
+				->contains(fn (PromptRunEntity $promptRunEntity): bool => CheckReadinessAction::normalize((string) $promptRunEntity->directory) === $directory
+					&& ($this->workKind->waitsForAgent() || $promptRunEntity->gitGrant === GitGrantEnum::REBASE));
 
 			if ($isAgentBusy) {
 				throw new WorkingCopyBusyException(__('De agent werkt nog in deze werkkopie. Wacht tot zijn beurt klaar is.'));
