@@ -347,6 +347,7 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 		// a script such as phpunit looks for the autoload from the folder it stands in;
 		// through a junction that is the checkout, whose autoload then meets the copy's
 		$folders = $this->scriptFolders($target);
+		$packages = $this->scriptPackages($target);
 
 		foreach (array_filter($folders, fn (string $folder) => ! str_contains($folder, '/')) as $name) {
 			if ($this->isLink($link . '/' . $name)) {
@@ -354,9 +355,27 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 			}
 
 			if (! file_exists($link . '/' . $name) && is_dir($target . '/' . $name)) {
-				$this->borrowFolder($target . '/' . $name, $link . '/' . $name, $name, $folders);
+				$this->borrowFolder($target . '/' . $name, $link . '/' . $name, $name, $folders, $packages);
 			}
 		}
+	}
+
+	/**
+	 * The packages that bring a script, by their name. Such a package runs
+	 * from its own folder and finds its other files from there, so it stands
+	 * in the copy as a whole: one folder of it that leads to the checkout
+	 * would start the checkout's files with the checkout's autoload.
+	 *
+	 * @return list<string>
+	 */
+	private function scriptPackages(string $vendor): array
+	{
+		$installed = json_decode((string) @file_get_contents($vendor . '/composer/installed.json'), true);
+
+		return array_values(array_map(
+			fn (array $package): string => (string) $package['name'],
+			array_filter((array) ($installed['packages'] ?? $installed ?? []), fn (mixed $package): bool => is_array($package) && ($package['bin'] ?? []) !== []),
+		));
 	}
 
 	/**
@@ -386,12 +405,13 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 
 	/**
 	 * A real folder in the copy: its files are hard links to the checkout's,
-	 * the folders on the way to a script are made the same way, and every
-	 * other folder is borrowed as a whole.
+	 * the folders on the way to a script and every folder of a package with a
+	 * script are made the same way, and every other folder is borrowed as a whole.
 	 *
 	 * @param  array<int, string>  $scriptFolders
+	 * @param  list<string>  $scriptPackages
 	 */
-	private function borrowFolder(string $target, string $link, string $relative, array $scriptFolders): void
+	private function borrowFolder(string $target, string $link, string $relative, array $scriptFolders, array $scriptPackages): void
 	{
 		File::ensureDirectoryExists($link);
 
@@ -412,8 +432,10 @@ class WorkingCopyRepository implements WorkingCopyRepositoryContract
 				continue;
 			}
 
-			in_array($child, $scriptFolders, true)
-				? $this->borrowFolder($directory, $link . '/' . $name, $child, $scriptFolders)
+			$isInScriptPackage = collect($scriptPackages)->contains(fn (string $package): bool => str_starts_with($child . '/', $package . '/'));
+
+			in_array($child, $scriptFolders, true) || $isInScriptPackage
+				? $this->borrowFolder($directory, $link . '/' . $name, $child, $scriptFolders, $scriptPackages)
 				: $this->link($directory, $link . '/' . $name);
 		}
 	}

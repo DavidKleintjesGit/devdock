@@ -60,6 +60,7 @@ class WorkingCopyStateRepository implements WorkingCopyStateRepositoryContract
 			needsStorageLink: file_exists($repositoryPath . '/public/storage'),
 			hasStorageLink: file_exists($path . '/public/storage'),
 			appUrl: $environment['APP_URL'] ?? null,
+			linkedScriptPackages: $this->isBorrowed($path . '/vendor') ? $this->linkedScriptPackages($repositoryPath . '/vendor', $path . '/vendor') : [],
 		);
 	}
 
@@ -262,6 +263,44 @@ class WorkingCopyStateRepository implements WorkingCopyStateRepositoryContract
 	 * Whether a package folder is the project's: one link to it, or a real
 	 * folder whose packages are links, as a borrowed vendor is.
 	 */
+	/**
+	 * The packages with a script whose folder in the copy, or a folder inside
+	 * it, leads to the checkout. Such a script starts the checkout's files,
+	 * which load the checkout's autoload next to the copy's.
+	 *
+	 * @return list<string>
+	 */
+	private function linkedScriptPackages(string $projectVendor, string $vendor): array
+	{
+		$installed = json_decode((string) @file_get_contents($projectVendor . '/composer/installed.json'), true);
+
+		return array_values(array_map(
+			fn (array $package): string => (string) $package['name'],
+			array_filter(
+				(array) ($installed['packages'] ?? $installed ?? []),
+				fn (mixed $package): bool => is_array($package) && ($package['bin'] ?? []) !== [] && is_dir($vendor . '/' . $package['name']) && $this->leadsToCheckout($vendor . '/' . $package['name']),
+			),
+		));
+	}
+
+	/**
+	 * Whether a folder is a link, or holds one somewhere below it. The walk stops at the first link.
+	 */
+	private function leadsToCheckout(string $folder): bool
+	{
+		if ($this->isLink($folder)) {
+			return true;
+		}
+
+		foreach (@scandir($folder) ?: [] as $entry) {
+			if ($entry !== '.' && $entry !== '..' && is_dir($folder . '/' . $entry) && $this->leadsToCheckout($folder . '/' . $entry)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	private function isBorrowed(string $folder): bool
 	{
 		if (! file_exists($folder)) {

@@ -215,6 +215,12 @@ class CheckReadinessAction extends Command
 				__('Geleend, maar deze pakketten ontbreken: :packages.', ['packages' => implode(', ', $workingCopyStateObject->missingVendorPackages)]),
 				__('opnieuw lenen'),
 			),
+			$workingCopyStateObject->linkedScriptPackages !== [] => new SetupCheckObject(
+				SetupCheckEnum::PHP_PACKAGES,
+				CheckStateEnum::OPEN,
+				__('Geleend, maar :packages lopen deels via het project; zo laden tests twee autoloads en stopt paratest.', ['packages' => implode(', ', $workingCopyStateObject->linkedScriptPackages)]),
+				__('opnieuw lenen'),
+			),
 			$workingCopyStateObject->staleVendorPackages !== [] && $workingCopyStateObject->isComposerLockSame => new SetupCheckObject(
 				SetupCheckEnum::PHP_PACKAGES,
 				CheckStateEnum::OPEN,

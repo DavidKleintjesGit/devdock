@@ -1516,6 +1516,7 @@
     "De exclude van git mist :lines, dus dat zou als wijziging verschijnen.": "Git's exclude lacks :lines, so it would show up as a change.",
     "toevoegen aan de exclude": "add to the exclude",
     "Geleend, maar deze pakketten ontbreken: :packages.": "Borrowed, but these packages are missing: :packages.",
+    "Geleend, maar :packages lopen deels via het project; zo laden tests twee autoloads en stopt paratest.": "Borrowed, but :packages partly run from the project; tests then load two autoloads and paratest stops.",
     "opnieuw lenen": "borrow again",
     "Artisan start niet in deze werkkopie: :failure": "Artisan does not start in this working copy: :failure",
     "DevDock maakt de werkkopie": "DevDock is making the working copy",
