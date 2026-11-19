@@ -115,7 +115,7 @@
 			<div class="subbar">
 				<nav class="segmented" aria-label="{{ __($tab) }}">
 					@foreach ($tabSubtabs as $subtabRow)
-						<button type="button" @if ($subtab === $subtabRow['subtab']) aria-current="page" @endif @click="if (@js($subtab->value) !== @js($subtabRow['subtab']->value)) { pendingView = @js($tab . ':' . $subtabRow['subtab']->value); compact = false }" wire:click="setDrawerSubtab('{{ $subtabRow['subtab']->value }}')">
+						<button type="button" @if ($subtab === $subtabRow['subtab']) aria-current="page" @endif :aria-current="((pendingView ?? @js($tab . ':' . $subtab->value)) === @js($tab . ':' . $subtabRow['subtab']->value)) ? 'page' : null" @click="pendingView = @js($subtab === $subtabRow['subtab'] ? null : $tab . ':' . $subtabRow['subtab']->value); compact = false" wire:click="setDrawerSubtab('{{ $subtabRow['subtab']->value }}')">
 							<x-hint-dot :tones="$subtabRow['tones']"/>
 							{{ $subtabRow['subtab']->label() }}
 							@if ($subtabRow['count'] > 0)<span class="note">{{ $subtabRow['count'] }}</span>@endif
