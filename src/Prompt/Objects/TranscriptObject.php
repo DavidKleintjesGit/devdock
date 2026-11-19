@@ -86,6 +86,16 @@ class TranscriptObject extends ValueObject
 		return count(array_filter($this->steps, fn (StepObject $stepObject) => $stepObject->runsCommand()));
 	}
 
+	/**
+	 * The last steps, oldest first, as a turn that is still running shows them.
+	 *
+	 * @return list<StepObject>
+	 */
+	public function recentSteps(int $count): array
+	{
+		return array_values(array_slice($this->steps, -$count));
+	}
+
 	public function latestStep(): ?StepObject
 	{
 		return $this->steps === [] ? null : $this->steps[array_key_last($this->steps)];

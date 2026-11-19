@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use Src\Prompt\Actions\SendPromptAction;
 use Src\Board\Objects\CardObject;
 use Src\Review\Actions\BuildFixPromptAction;
 use Src\Review\Actions\BuildRoundPromptAction;
@@ -86,7 +87,7 @@ trait WithRoundAssessment
 			return;
 		}
 
-		$this->failure = $this->startLinking(new WorkingCopyTaskObject(
+		SendPromptAction::execute(new WorkingCopyTaskObject(
 			card: $cardObject->id,
 			task: WorkingCopyTaskEnum::PROMPT,
 			project: $cardObject->project,
@@ -125,7 +126,7 @@ trait WithRoundAssessment
 			return;
 		}
 
-		$this->failure = $this->startLinking(new WorkingCopyTaskObject(
+		SendPromptAction::execute(new WorkingCopyTaskObject(
 			card: $cardObject->id,
 			task: WorkingCopyTaskEnum::PROMPT,
 			project: $cardObject->project,

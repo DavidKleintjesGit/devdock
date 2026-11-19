@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Src\Review\Actions;
 
 use Src\Packages\Cqrs\Command;
+use Src\Prompt\Actions\GetQueuedPromptsAction;
+use Src\Prompt\Objects\QueuedPromptObject;
 use Src\Prompt\Contracts\PromptRunRepositoryContract;
 use Src\Review\Contracts\ReviewFindingRepositoryContract;
 use Src\Review\Contracts\ReviewRoundRepositoryContract;
@@ -17,7 +19,8 @@ use Src\Review\Objects\RoundAssessmentObject;
 /**
  * The round of a card that waits on your choice, when there is one: you
  * decide on the findings in this project, the last round found something,
- * and the last turn of the agent was its assessment of that round.
+ * and they are not on their way to the agent yet. When the last turn of the
+ * agent assessed that round, its verdicts come along.
  *
  * @method static ?RoundAssessmentObject execute(string $card, ?string $project)
  */
@@ -40,14 +43,21 @@ class GetRoundAssessmentAction extends Command
 		$reviewRoundEntity = $reviewRoundRepository->getLatestForCard($this->card);
 		$promptRunEntity = $promptRunRepository->getLatestForCard($this->card);
 
-		if ($reviewRoundEntity?->status !== RoundStatusEnum::FAILED
-			|| $promptRunEntity === null
-			|| $promptRunEntity->isRunning()
-			|| $promptRunEntity->reviewRoundId !== $reviewRoundEntity->reviewRoundId->id) {
+		if ($reviewRoundEntity?->status !== RoundStatusEnum::FAILED) {
 			return null;
 		}
 
-		$assessmentsByFinding = collect(ReadAssessmentAction::execute($promptRunEntity->output))
+		$roundId = $reviewRoundEntity->reviewRoundId->id;
+		$isTurnOnRound = $promptRunEntity !== null && $promptRunEntity->reviewRoundId === $roundId;
+		$isHandedOver = collect(GetQueuedPromptsAction::execute($this->card))
+			->contains(fn (QueuedPromptObject $queuedPromptObject): bool => $queuedPromptObject->workingCopyTaskObject->reviewRoundId?->id === $roundId);
+
+		// a turn of the agent on this round, running or waiting in line, has the findings already
+		if (($isTurnOnRound && $promptRunEntity->isRunning()) || $isHandedOver) {
+			return null;
+		}
+
+		$assessmentsByFinding = collect($isTurnOnRound ? ReadAssessmentAction::execute($promptRunEntity->output) : [])
 			->keyBy(fn (AssessmentObject $assessmentObject): int => (int) $assessmentObject->reviewFindingId->id);
 
 		$findings = collect($reviewFindingRepository->getForCard($this->card))

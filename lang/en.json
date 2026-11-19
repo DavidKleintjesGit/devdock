@@ -1889,7 +1889,6 @@
     "Na de fix start één nieuwe ronde van de lenzen.": "After the fix one new round of the lenses starts.",
     "Geef aan de agent": "Hand to the agent",
     "Bericht aan de agent aanpassen": "Edit the message to the agent",
-    "Bericht aan de agent": "Message to the agent",
     "zelf aangepast": "edited by you",
     "Opnieuw opbouwen uit je keuzes": "Rebuild from your choices",
     "Deze ronde wacht niet meer op je keuze.": "This round no longer waits on your choice.",
@@ -1906,5 +1905,10 @@
     "Na elke ronde beslis jij wat er gefixt wordt": "After every round you decide what gets fixed",
     "DevDock kan de database van de verbinding :connection niet omzetten.": "DevDock cannot point the connection :connection at a database of its own.",
     "een database die DevDock niet kan lezen": "a database DevDock cannot read",
-    "de verbindingen :connections": "the connections :connections"
+    "de verbindingen :connections": "the connections :connections",
+    "In de rij": "Queued",
+    "wijzigen": "change",
+    "weghalen": "remove",
+    "Bevindingen voor de agent": "Findings for the agent",
+    "Ronde :number · :count bevinding · jij kiest|Ronde :number · :count bevindingen · jij kiest": "Round :number · :count finding · your call|Round :number · :count findings · your call"
 }

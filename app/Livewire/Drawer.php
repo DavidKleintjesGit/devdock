@@ -18,6 +18,11 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Src\Prompt\Actions\GetQueuedPromptsAction;
+use Src\Prompt\Actions\StartNextQueuedPromptAction;
+use Src\Prompt\Actions\TakeQueuedPromptAction;
+use Src\Prompt\Objects\QueuedPromptId;
+use Src\Prompt\Actions\SendPromptAction;
 use Src\Access\Actions\GetRoleAccessAction;
 use Src\Access\Enums\AgentRoleEnum;
 use Src\Board\Actions\BuildTaskPromptAction;
@@ -362,7 +367,7 @@ class Drawer extends Component
 
 		$paths = resolve(AttachmentRepositoryContract::class)->attach($cardObject->id, array_column($this->attachments, 'upload'));
 
-		$this->failure = $this->startLinking(new WorkingCopyTaskObject(
+		SendPromptAction::execute(new WorkingCopyTaskObject(
 			card: $cardObject->id,
 			task: WorkingCopyTaskEnum::PROMPT,
 			project: $cardObject->project,
@@ -411,6 +416,26 @@ class Drawer extends Component
 	/**
 	 * One of the answers the agent offered, sent back as your message.
 	 */
+	/**
+	 * Drops a message that still waits for the agent.
+	 */
+	public function dropQueuedPrompt(string $uuid): void
+	{
+		TakeQueuedPromptAction::execute((string) $this->openCard, new QueuedPromptId(uuid: $uuid));
+	}
+
+	/**
+	 * Takes a waiting message back into the field, to change it and send it again.
+	 */
+	public function editQueuedPrompt(string $uuid): void
+	{
+		$queuedPromptObject = TakeQueuedPromptAction::execute((string) $this->openCard, new QueuedPromptId(uuid: $uuid));
+
+		if ($queuedPromptObject !== null) {
+			$this->prompt = trim($queuedPromptObject->prompt() . ($this->prompt === '' ? '' : "\n\n" . $this->prompt));
+		}
+	}
+
 	public function answer(string $choice): void
 	{
 		$this->prompt = $choice;
@@ -1151,6 +1176,8 @@ class Drawer extends Component
 		$diffFiles = $this->openDiffFile === null || $worktreeEntity === null ? [] : $this->stackedDiffs($worktreeEntity, $diffView, $diffTree);
 		$workflowSetting = GetWorkflowSettingAction::execute($cardObject->project);
 		$roundAssessment = in_array($tab, ['Agent', 'Review'], true) ? $this->roundAssessment($cardObject) : null;
+		// a turn that ended without handing over the queue, such as one that was stopped, gets it moving again
+		StartNextQueuedPromptAction::execute($cardObject->id);
 		$loopStatus =GetLoopStatusAction::execute($latestRound, $latestRound === null ? null : $roundTurns[(int) $latestRound->reviewRoundId->id] ?? null, $workflowSetting->maxRounds);
 		$tabHints = $this->tabHints($cardObject, $worktreeEntity, $readiness, $latestRound, $loopStatus);
 		$promptSources = $tab === 'Agent' ? $this->promptSources($cardObject, $reviewCommentEntities) : [];
@@ -1211,6 +1238,7 @@ class Drawer extends Component
 			'claudeAvailable' => resolve(ClaudeProcessRepositoryContract::class)->isAvailable(),
 			...($tab === 'Werkkopie' ? $this->workingCopyData($cardObject, $worktreeEntity, $changes) : ['worktree' => $worktreeEntity]),
 			'workingCopyTask' => $workingCopyTask,
+			'queuedPrompts' => $tab === 'Agent' ? GetQueuedPromptsAction::execute($cardObject->id) : [],
 			// a working copy that could not be set up, shown at the step where it can be solved
 			'setupRefusal' => $isSetup && $worktreeEntity === null && $cardObject->project !== null ? $this->failure ?? ($workingCopyTask?->isRunning ? null : $workingCopyTask?->failure) : null,
 			'readiness' => $readiness,

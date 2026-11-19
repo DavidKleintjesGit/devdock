@@ -17,6 +17,7 @@ use Src\Prompt\Objects\PromptRunId;
 use Src\Review\Actions\StartRoundAction;
 use Src\Review\Contracts\AgentContextRepositoryContract;
 use Src\Review\Exceptions\RoundNotStartedException;
+use Src\Review\Objects\ReviewRoundId;
 use Src\Session\Actions\RenameSessionAction;
 use Src\Session\Actions\ScanSessionsAction;
 use Src\Session\Contracts\SessionFileRepositoryContract;
@@ -113,7 +114,12 @@ class RunPromptAction extends Command
 
 		// a turn on a round sends the lenses back over the work, but only when the
 		// agent reports it done; a question or open points wait for you
-		if ($promptRunEntity->reviewRoundId !== null && ReadReportAction::execute($promptRunEntity->output)?->status === ReportStatusEnum::DONE) {
+		$isRoundDone = $promptRunEntity->reviewRoundId !== null && ReadReportAction::execute($promptRunEntity->output)?->status === ReportStatusEnum::DONE;
+
+		// a message you sent meanwhile goes first, and takes the round along to after it
+		$isNextSent = StartNextQueuedPromptAction::execute($promptRunEntity->card, $isRoundDone ? new ReviewRoundId(id: $promptRunEntity->reviewRoundId) : null);
+
+		if ($isRoundDone && ! $isNextSent) {
 			try {
 				StartRoundAction::execute($promptRunEntity->card, $promptRunEntity->directory);
 			} catch (WorktreeNotPossibleException|RoundNotStartedException|SetupIncompleteException|WorkingCopyBusyException) {

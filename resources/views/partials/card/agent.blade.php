@@ -49,6 +49,17 @@
 							@endif
 						</span>
 
+						@if ($exchange->run->isRunning() && $exchange->transcript && $exchange->transcript->steps !== [])
+							<ol class="live-steps" aria-live="polite">
+								@foreach ($exchange->transcript->recentSteps(3) as $step)
+									<li @class(['now' => $loop->last])>
+										@if ($loop->last)<span class="spin" aria-hidden="true"></span>@else<x-icon name="check" small/>@endif
+										<span>{{ $step->tool }}</span><span class="mono subject">{{ $step->subject }}</span>
+									</li>
+								@endforeach
+							</ol>
+						@endif
+
 						@if ($exchange->transcript && $exchange->transcript->steps !== [])
 							<details class="agent-steps" wire:ignore.self wire:key="steps-{{ $loop->index }}">
 								<summary>
@@ -118,6 +129,18 @@
 				@if ($roundAssessment)
 					@include('partials.card.assessment')
 				@endif
+				@foreach ($queuedPrompts as $queuedPrompt)
+					<div class="chat-turn you queued" wire:key="queued-{{ $queuedPrompt->queuedPromptId->uuid }}">
+						<div class="bubble">{{ $queuedPrompt->carriesFindings() ? __('Bevindingen voor de agent') : $queuedPrompt->prompt() }}</div>
+						<span class="chat-time queued-actions">
+							<x-icon name="klok" small/>{{ __('In de rij') }}
+							@unless ($queuedPrompt->carriesFindings())
+								· <button class="link" type="button" wire:click="editQueuedPrompt(@js($queuedPrompt->queuedPromptId->uuid))">{{ __('wijzigen') }}</button>
+							@endunless
+							· <button class="link" type="button" wire:click="dropQueuedPrompt(@js($queuedPrompt->queuedPromptId->uuid))">{{ __('weghalen') }}</button>
+						</span>
+					</div>
+				@endforeach
 			</div>
 		@else
 			<div class="dsec">
@@ -168,7 +191,7 @@
 				</div>
 			@endif
 			<span class="attachment-busy hint"><span class="dot amber pulse"></span>{{ __('Bijlage wordt toegevoegd…') }}</span>
-			<textarea id="prompt-text" class="textarea" data-send-on-enter wire:model="prompt" @paste="paste($event)" placeholder="{{ __('Wat is de volgende stap? Sleep of plak er een bestand bij.') }}" @disabled($run?->isRunning())></textarea>
+			<textarea id="prompt-text" class="textarea" data-send-on-enter wire:model="prompt" @paste="paste($event)" placeholder="{{ __('Wat is de volgende stap? Sleep of plak er een bestand bij.') }}"></textarea>
 			<div class="composer-tools">
 				<label class="clip icon-btn" title="{{ __('Bestand toevoegen') }}">
 					<input type="file" multiple class="sr" @change="pick($event)" accept="image/*,.pdf,.txt,.log,.csv,.json,.md,.xml,.html,.sql">
@@ -202,7 +225,7 @@
 						</div>
 					</details>
 				@endif
-				<button @class(['btn primary send', 'is-busy' => $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::PROMPT)]) type="button" wire:click="send" wire:target="send" wire:loading.attr="disabled" wire:loading.class="is-busy" aria-label="{{ __('Versturen') }}" @disabled($run?->isRunning() || $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::PROMPT))>
+				<button @class(['btn primary send', 'is-busy' => $workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::PROMPT)]) type="button" wire:click="send" wire:target="send" wire:loading.attr="disabled" wire:loading.class="is-busy" aria-label="{{ __('Versturen') }}">
 					@if ($workingCopyTask?->isPending(\Src\Worktree\Enums\WorkingCopyTaskEnum::PROMPT))
 						<span class="spin" aria-hidden="true"></span>
 					@else

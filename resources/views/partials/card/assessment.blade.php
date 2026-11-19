@@ -3,7 +3,7 @@
 		<summary class="assessment-head">
 			<x-icon name="chev" small/>
 			<span class="sdot amber"></span>
-			<b>{{ __('Beoordeling ronde :number · jij kiest', ['number' => $roundAssessment->roundNumber]) }}</b>
+			<b>{{ $roundAssessment->heading() }}</b>
 			<span class="hint push-end">{{ $choiceSummary }}</span>
 		</summary>
 		<ol class="assessment-list">

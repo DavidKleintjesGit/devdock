@@ -57,8 +57,12 @@ class ContinueReviewAction extends Command
 				return null;
 			}
 
-			// when you decide, the agent only assesses; it fixes what you pick afterwards
-			$prompt = BuildRoundPromptAction::execute($this->reviewRoundEntity, ! GetWorkflowSettingAction::execute($cardObject->project)->reviewMode->fixesByItself());
+			// when you decide, the findings wait in the chat for your choice and the agent stays yours
+			if (! GetWorkflowSettingAction::execute($cardObject->project)->reviewMode->fixesByItself()) {
+				return null;
+			}
+
+			$prompt = BuildRoundPromptAction::execute($this->reviewRoundEntity);
 
 			// a copy that is not ready or still busy waits without a failed turn; the card says why, and the next fetch round tries again
 			if ($prompt === null || ! $this->isReady()) {

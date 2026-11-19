@@ -1437,3 +1437,12 @@ body.window{margin:0;background:var(--surface)}
 .md-code-formatted{max-height:420px;overflow:auto;padding:14px 16px;background:var(--surface-2);color:var(--fg);border:1px solid #1E1F22;border-top:0;border-radius:0 0 10px 10px}
 .md-code-formatted .md-p,.md-code-formatted .md-li{color:var(--fg)}
 .task-bar-slot{display:contents}
+/* een bericht dat wacht tot de agent klaar is met zijn beurt */
+.chat-turn.you.queued .bubble{background:transparent;border:1px dashed var(--line-strong);color:var(--fg-2);max-height:180px;overflow:hidden}
+.queued-actions{display:inline-flex;align-items:center;gap:4px}
+.queued-actions .link{border:0;background:none;padding:0;color:var(--accent);font:inherit;cursor:pointer}
+/* de laatste stappen van een lopende beurt, open onder de naam */
+.live-steps{display:flex;flex-direction:column;gap:3px;margin:2px 0 8px;padding-left:10px;border-left:2px solid var(--accent-light);font-size:12.5px;color:var(--muted)}
+.live-steps li{display:flex;align-items:center;gap:6px;list-style:none;min-width:0}
+.live-steps li.now{color:var(--fg)}
+.live-steps .subject{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
