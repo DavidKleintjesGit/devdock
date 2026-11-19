@@ -1,3 +1,5 @@
+{{-- The task bar has a fixed place, so the panel below keeps its elements when the bar comes or goes. --}}
+<div class="task-bar-slot" wire:key="task-bar">
 @if ($workingCopyTask?->isRunning)
 	<div class="notice running" wire:poll.2s="followWorkingCopyTask">
 		<span class="notice-icon"><span class="sdot busy"></span></span>
@@ -10,3 +12,4 @@
 		<button class="icon-btn" type="button" wire:click="dismissWorkingCopyTask" aria-label="{{ __('Melding weg') }}"><x-icon name="x" small/></button>
 	</div>
 @endif
+</div>

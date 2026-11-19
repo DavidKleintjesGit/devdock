@@ -265,6 +265,7 @@ class Drawer extends Component
 	{
 		// another poll may redraw the panel before the task bar's own, and then that bar and its poll are gone
 		if ($this->openCard !== null) {
+			$this->receivedEndingsUntil = $this->seenEndingsUntil;
 			$this->followWorkingCopyTask();
 		}
 	}
@@ -285,6 +286,7 @@ class Drawer extends Component
 	{
 		$this->openCard = $card;
 		$this->seenEndingsUntil = 0;
+		$this->receivedEndingsUntil = 0;
 		$this->prompt = '';
 		$this->attachments = [];
 		$this->pickedSources = [];

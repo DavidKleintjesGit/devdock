@@ -57,12 +57,12 @@
 				</x-slot:actions>
 				<div class="field" x-data="{ get length() { return ($wire.commitMessage ?? '').length } }">
 					<span class="counter-row"><label for="commit-title" style="font-size:13px;font-weight:500;color:var(--fg)">{{ __('Titel') }}</label><span x-text="length + ' / 72'" :style="length > 72 ? 'color:var(--red)' : ''"></span></span>
-					<input id="commit-title" @class(['input', 'invalid' => $errors->has('commitMessage')]) type="text" wire:model="commitMessage" placeholder="{{ $card->suggestedCommitMessage() }}" autocomplete="off">
+					<input id="commit-title" wire:key="commit-title" @class(['input', 'invalid' => $errors->has('commitMessage')]) type="text" wire:model="commitMessage" placeholder="{{ $card->suggestedCommitMessage() }}" autocomplete="off">
 					@error('commitMessage')<span class="err">{{ $message }}</span>@enderror
 				</div>
 				<div class="field grow-field">
 					<span class="counter-row"><label for="commit-body" style="font-size:13px;font-weight:500;color:var(--fg)">{{ __('Bericht') }}</label><span>{{ __('mag leeg') }}</span></span>
-					<textarea id="commit-body" class="textarea" rows="4" wire:model="commitBody"></textarea>
+					<textarea id="commit-body" wire:key="commit-body" class="textarea" rows="4" wire:model="commitBody"></textarea>
 				</div>
 			</x-panel>
 		@endif

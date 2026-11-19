@@ -1436,3 +1436,4 @@ body.window{margin:0;background:var(--surface)}
 .md-code-copy{background:rgba(255,255,255,.06) !important}
 .md-code-formatted{max-height:420px;overflow:auto;padding:14px 16px;background:var(--surface-2);color:var(--fg);border:1px solid #1E1F22;border-top:0;border-radius:0 0 10px 10px}
 .md-code-formatted .md-p,.md-code-formatted .md-li{color:var(--fg)}
+.task-bar-slot{display:contents}

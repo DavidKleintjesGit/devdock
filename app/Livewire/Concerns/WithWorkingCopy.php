@@ -73,6 +73,9 @@ trait WithWorkingCopy
 	/** The moment, in milliseconds, of the last task ending this page received. */
 	public int $seenEndingsUntil = 0;
 
+	/** The moment the page reported as received when this request came in; only what lies before it is gone for good. */
+	protected ?int $receivedEndingsUntil = null;
+
 	public bool $targetDialog = false;
 
 	public string $targetChoice = '';
@@ -420,8 +423,13 @@ trait WithWorkingCopy
 			return;
 		}
 
-		foreach (TakeWorkingCopyTaskEndingsAction::execute($this->openCard, $this->seenEndingsUntil) as $ending) {
-			$this->seenEndingsUntil = max($this->seenEndingsUntil, $ending['at']);
+		foreach (TakeWorkingCopyTaskEndingsAction::execute($this->openCard, $this->receivedEndingsUntil ?? $this->seenEndingsUntil) as $ending) {
+			// taken earlier in this same request
+			if ($ending['at'] <= $this->seenEndingsUntil) {
+				continue;
+			}
+
+			$this->seenEndingsUntil = $ending['at'];
 			$this->failure = $ending['failure'] !== null
 				? WorkingCopyTaskEnum::from($ending['task'])->failedLabel() . ': ' . $ending['failure']
 				: $this->failure;
