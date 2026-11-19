@@ -355,14 +355,19 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	/**
 	 * Where the own work of this branch begins: the stand of its target DevDock
-	 * remembered while the branch still held it, else the fork point.
+	 * remembered while the branch still held it, else the fork point. A
+	 * remembered stand the target on origin still holds is an older point of
+	 * that same line; after a rebase onto its newer tip the fork point lies
+	 * past it, and the commits in between belong to the target.
 	 */
 	private function ownBase(string $path, string $target): ?string
 	{
 		$branch = $this->getBranch($path) ?? $this->getRebasingBranch($path);
 		$remembered = $branch === null ? null : trim(LocalCommand::run($path, ['git', 'config', '--get', 'branch.' . $branch . '.' . self::BASE_KEY])->output());
 
-		if (filled($remembered) && LocalCommand::run($path, ['git', 'merge-base', '--is-ancestor', $remembered, 'HEAD'])->successful()) {
+		if (filled($remembered)
+			&& LocalCommand::run($path, ['git', 'merge-base', '--is-ancestor', $remembered, 'HEAD'])->successful()
+			&& ! LocalCommand::run($path, ['git', 'merge-base', '--is-ancestor', $remembered, 'origin/' . $target])->successful()) {
 			return $remembered;
 		}
 
