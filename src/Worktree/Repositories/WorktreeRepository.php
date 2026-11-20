@@ -1186,7 +1186,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 		// kept as long as the status, and thrown away with it after a commit or push
 		$output = $this->remember($this->unpushedKey($path), function () use ($path): string {
-			$result = LocalCommand::run($path, ['git', 'log', '--format=%h%x09%cI%x09%s', 'HEAD', '--not', '--remotes']);
+			$result = LocalCommand::run($path, ['git', 'log', '--format=%h%x09%aI%x09%s', 'HEAD', '--not', '--remotes']);
 
 			return $result->successful() ? trim($result->output()) : '';
 		});
@@ -1733,7 +1733,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		foreach ($cold as $index => $path) {
 			$commands['status-' . $index] = [$path, $this->statusCommand()];
 			$commands['sides-' . $index] = [$path, $this->sidesCommand($targets[$index])];
-			$commands['unpushed-' . $index] = [$path, ['git', 'log', '--format=%h%x09%cI%x09%s', 'HEAD', '--not', '--remotes']];
+			$commands['unpushed-' . $index] = [$path, ['git', 'log', '--format=%h%x09%aI%x09%s', 'HEAD', '--not', '--remotes']];
 		}
 
 		$results = LocalCommand::pool($commands);
