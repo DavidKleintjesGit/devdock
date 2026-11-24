@@ -1,7 +1,7 @@
 {{-- The task bar has a fixed place, so the panel below keeps its elements when the bar comes or goes. --}}
 <div class="task-bar-slot" wire:key="task-bar">
 @if ($workingCopyTask?->isRunning)
-	<div class="notice running" wire:poll.2s="followWorkingCopyTask">
+	<div class="notice running" wire:poll.2s="followPanel">
 		<span class="notice-icon"><span class="sdot busy"></span></span>
 		<span class="notice-text"><b>{{ $workingCopyTask->task->busyLabel() }}</b>@if ($workingCopyTask->queued !== [])<span>{{ trans_choice('Daarna nog :count klus in de rij.|Daarna nog :count klussen in de rij.', count($workingCopyTask->queued), ['count' => count($workingCopyTask->queued)]) }}</span>@endif</span>
 	</div>

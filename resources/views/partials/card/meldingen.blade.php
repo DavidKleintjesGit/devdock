@@ -63,7 +63,7 @@
 	@endif
 
 	@if ($repairState?->isRunning)
-		<div class="notice running" wire:poll.3s>
+		<div class="notice running" wire:poll.3s="followPanel">
 			<span class="notice-icon"><span class="sdot busy"></span></span>
 			<span class="notice-text"><b>{{ __('DevDock herstelt de werkkopie') }}@if ($repairState->setupCheck) · {{ $repairState->setupCheck->label() }}@endif</b><span>{{ $repairState->step ?? __('Bezig met beginnen...') }}</span></span>
 		</div>

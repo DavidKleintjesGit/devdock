@@ -18,6 +18,7 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Src\Worktree\Objects\WorkingCopyTaskStateObject;
 use Src\Prompt\Actions\GetQueuedPromptsAction;
 use Src\Prompt\Actions\StartNextQueuedPromptAction;
 use Src\Prompt\Actions\TakeQueuedPromptAction;
@@ -211,6 +212,9 @@ class Drawer extends Component
 	public ?string $failure = null;
 
 	public ?string $openDiffFile = null;
+
+	/** How the task and the repair of the open card stood when the panel was last drawn. */
+	public string $panelSeen = '';
 
 	/** Which changes the Werkkopie tab and the code reader show; a DiffViewEnum value, or null for the default. */
 	public ?string $diffView = null;
@@ -1171,6 +1175,7 @@ class Drawer extends Component
 		$cardSteps = $this->cardSteps($cardObject);
 		$readiness = $worktreeEntity === null ? null : GetReadinessAction::execute($worktreeEntity->path);
 		$repairState = $worktreeEntity === null ? null : GetRepairStateAction::execute($worktreeEntity->path);
+		$this->panelSeen = $this->panelShape($workingCopyTask, $repairState);
 		$diffView = $worktreeEntity === null ? DiffViewEnum::BRANCH : $this->diffViewFor($worktreeEntity);
 		$diffTree = $this->openDiffFile === null ? [] : $this->diffTree($cardObject, $diffView);
 		$diffFiles = $this->openDiffFile === null || $worktreeEntity === null ? [] : $this->stackedDiffs($worktreeEntity, $diffView, $diffTree);
@@ -1812,6 +1817,32 @@ class Drawer extends Component
 	private function cardById(Collection $cardObjects, string $id): ?CardObject
 	{
 		return $cardObjects->first(fn (CardObject $cardObject) => $cardObject->id === $id);
+	}
+
+	/**
+	 * Draws the panel again while a task or a repair runs, only once something
+	 * came in or the task or the repair moved on.
+	 */
+	public function followPanel(): void
+	{
+		$cardObject = $this->openCard === null ? null : $this->cardById($this->board(), $this->openCard);
+		$worktreeEntity = $cardObject === null ? null : $this->worktreeFor($cardObject);
+		$panelShape = $this->panelShape(
+			$cardObject === null ? null : GetWorkingCopyTaskAction::execute($cardObject->id),
+			$worktreeEntity === null ? null : GetRepairStateAction::execute($worktreeEntity->path),
+		);
+
+		if ($this->seenEndingsUntil === $this->receivedEndingsUntil && $panelShape === $this->panelSeen) {
+			$this->skipRender();
+		}
+	}
+
+	/**
+	 * How the task and the repair of the open card stand, as one fingerprint.
+	 */
+	private function panelShape(?WorkingCopyTaskStateObject $workingCopyTaskStateObject, ?RepairStateObject $repairStateObject): string
+	{
+		return md5(serialize([$workingCopyTaskStateObject, $repairStateObject]));
 	}
 
 	public function render(): View

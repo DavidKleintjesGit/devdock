@@ -54,6 +54,9 @@ class Board extends Component
 	/** When the board this page shows was built. */
 	public float $builtAt = 0;
 
+	/** How the background tasks on the board stood when it was last drawn. */
+	public string $tasksSeen = '';
+
 	/**
 	 * Draws the board again once a newer one was built on the side; otherwise the page stays as it is.
 	 */
@@ -71,6 +74,24 @@ class Board extends Component
 		if (GetBoardAction::builtAt() <= $this->builtAt) {
 			$this->skipRender();
 		}
+	}
+
+	/**
+	 * Draws the board again while tasks run, only once a task or the board itself changed.
+	 */
+	public function followTasks(): void
+	{
+		if (GetBoardAction::builtAt() <= $this->builtAt && $this->tasksShape($this->taskStates($this->visible($this->board()))) === $this->tasksSeen) {
+			$this->skipRender();
+		}
+	}
+
+	/**
+	 * @param  Collection<string, WorkingCopyTaskStateObject>  $taskStates
+	 */
+	private function tasksShape(Collection $taskStates): string
+	{
+		return md5((string) json_encode([$this->busyLabels($taskStates), $this->taskTones($taskStates)]));
 	}
 
 	#[Session(key: 'devdock.board.query')]
@@ -438,6 +459,7 @@ class Board extends Component
 
 		$taskStates = $this->taskStates($visible);
 		$taskTones = $this->taskTones($taskStates);
+		$this->tasksSeen = $this->tasksShape($taskStates);
 
 		return view('livewire.board', [
 			'columns' => $columns,
