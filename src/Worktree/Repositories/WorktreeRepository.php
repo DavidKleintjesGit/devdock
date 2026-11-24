@@ -11,6 +11,7 @@ use Illuminate\Process\Pool;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Src\Packages\Process\DetachedCommand;
 use Src\Packages\Process\LocalCommand;
 use Src\Worktree\Contracts\WorktreeRepositoryContract;
 use Src\Worktree\Enums\DiffViewEnum;
@@ -64,6 +65,13 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 * read again in the next round, so this only bounds a copy left alone.
 	 */
 	private const READ_AHEAD_SECONDS = 3600;
+
+	private const READ_QUEUE_KEY = 'worktree.read-queue';
+
+	private const READER_KEY = 'worktree.reader';
+
+	// a reader that stopped without a word is taken for gone after this, and a new one may start
+	private const READER_SECONDS = 300;
 
 	/**
 	 * Set while the fetch round reads ahead: every reader then reads git again
@@ -269,7 +277,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return ChangeObjectCollection::fromArray([]);
 		}
 
-		$rows = $this->remember(
+		$rows = $this->remember($path, 
 			$this->branchChangesKey($path),
 			fn () => $this->readChangesSince($path, $this->branchBase($path)),
 		);
@@ -450,7 +458,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 		// alleen de gegevens gaan de cache in: objecten overleven het opslaan
 		// niet en komen er half terug
-		$rows = $this->remember(
+		$rows = $this->remember($path, 
 			$this->changesKey($path),
 			// by content, so a file that only changed its line endings does not count
 			fn () => $this->readChangesSince($path, 'HEAD'),
@@ -477,7 +485,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			return ChangeObjectCollection::fromArray([]);
 		}
 
-		$rows = $this->remember(
+		$rows = $this->remember($path, 
 			'worktree.unpushed-changes.' . md5($path),
 			fn () => $this->readChangesSince($path, $this->pushedBase($path)),
 		);
@@ -595,7 +603,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	private function diffBase(string $path, DiffViewEnum $view): string
 	{
 		// the code reader reads every file on its own; working out the base takes up to five git calls
-		return $this->remember(
+		return $this->remember($path, 
 			$this->diffBaseKey($path, $view),
 			fn (): string => match ($view) {
 				// what changed since the last commit
@@ -617,7 +625,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 
 	public function getNewCommitCount(string $path): int
 	{
-		return count($this->newCommits($path));
+		return $this->remember($path, 'worktree.new-commit-count.' . md5($path), fn (): int => count($this->newCommits($path)));
 	}
 
 	/**
@@ -744,7 +752,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 			Cache::forget('worktree.fingerprint.' . md5($path));
 		}
 
-		return $this->remember(
+		return $this->remember($path, 
 			'worktree.fingerprint.' . md5($path),
 			function () use ($path) {
 				// against the branch it merges into, so a commit of the judged work does not
@@ -786,7 +794,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		// Het bord vraagt dit bij elke klik om te weten of er iets op te leveren
 		// valt, dus het blijft even staan; wat DevDock zelf verandert haalt het
 		// samen met de staat weg
-		return $this->remember(
+		return $this->remember($path, 
 			$this->changedFilesKey($path),
 			fn () => $this->readChangedFiles($path),
 		);
@@ -1185,7 +1193,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		}
 
 		// kept as long as the status, and thrown away with it after a commit or push
-		$output = $this->remember($this->unpushedKey($path), function () use ($path): string {
+		$output = $this->remember($path, $this->unpushedKey($path), function () use ($path): string {
 			$result = LocalCommand::run($path, ['git', 'log', '--format=%h%x09%aI%x09%s', 'HEAD', '--not', '--remotes']);
 
 			return $result->successful() ? trim($result->output()) : '';
@@ -1552,7 +1560,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		// bord vraagt het van elke werkkopie bij elke klik. Een paar seconden
 		// onthouden scheelt seconden wachten; wat DevDock zelf verandert haalt
 		// de regel meteen weg
-		return $this->remember(
+		return $this->remember($path, 
 			$this->statusKey($path),
 			fn () => $this->readStatus($path),
 		);
@@ -1562,7 +1570,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	{
 		$paths = WorktreeEloquent::query()->pluck('path')->map(fn (mixed $path) => (string) $path)->all();
 
-		$this->warmStatuses($paths, $keepSeconds, again: true);
+		$this->warmStatuses($paths, again: true);
 
 		// what a card's panel reads lies ready too, so opening one never waits on git;
 		// reading all of it takes seconds per copy, so only a copy that moved is read again
@@ -1623,17 +1631,100 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 * What a reader kept for status_seconds, read again while the fetch round
 	 * reads ahead.
 	 */
-	private function remember(string $key, Closure $read): mixed
+	/**
+	 * Hands out what was read last time, at once. A reading older than
+	 * status_seconds still comes back, and one process of its own reads the
+	 * whole copy again on the side; only a copy that was never read is read
+	 * while the page waits.
+	 */
+	private function remember(string $path, string $key, Closure $read): mixed
 	{
-		if ($this->readAheadSeconds === null) {
-			return Cache::remember($key, (int) config('devdock.worktree.status_seconds'), $read);
+		$kept = $this->readAheadSeconds === null ? Cache::get($key) : null;
+
+		if (is_array($kept) && array_key_exists('read_at', $kept) && array_key_exists('value', $kept)) {
+			if (time() - (int) $kept['read_at'] > (int) config('devdock.worktree.status_seconds')) {
+				$this->readAgainOnTheSide($path);
+			}
+
+			return $kept['value'];
 		}
 
 		$value = $read();
 
-		Cache::put($key, $value, $this->readAheadSeconds);
+		Cache::forever($key, ['read_at' => time(), 'value' => $value]);
 
 		return $value;
+	}
+
+	/**
+	 * Puts a copy in line to be read again, and starts the one reader that
+	 * works through the line when it is not at work already. The copies are
+	 * read one after the other, so a board full of old readings never starts
+	 * dozens of git processes at once.
+	 */
+	private function readAgainOnTheSide(string $path): void
+	{
+		Cache::lock(self::READ_QUEUE_KEY . '.lock', 10)->block(5, function () use ($path): void {
+			$queued = (array) Cache::get(self::READ_QUEUE_KEY, []);
+
+			if (! in_array($path, $queued, true)) {
+				Cache::forever(self::READ_QUEUE_KEY, [...$queued, $path]);
+			}
+		});
+
+		if (Cache::add(self::READER_KEY, true, self::READER_SECONDS)) {
+			resolve(DetachedCommand::class)->artisan('devdock:read-working-copies');
+		}
+	}
+
+	public function readQueuedCopies(): void
+	{
+		while (($path = $this->nextQueuedCopy()) !== null) {
+			// the reader is still at work, so no request starts a second one
+			Cache::put(self::READER_KEY, true, self::READER_SECONDS);
+			$this->readAgain($path);
+		}
+
+		Cache::forget(self::READER_KEY);
+	}
+
+	private function nextQueuedCopy(): ?string
+	{
+		return Cache::lock(self::READ_QUEUE_KEY . '.lock', 10)->block(5, function (): ?string {
+			$queued = (array) Cache::get(self::READ_QUEUE_KEY, []);
+			$next = array_shift($queued);
+
+			$queued === [] ? Cache::forget(self::READ_QUEUE_KEY) : Cache::forever(self::READ_QUEUE_KEY, array_values($queued));
+
+			return is_string($next) ? $next : null;
+		});
+	}
+
+	private function readAgain(string $path): void
+	{
+		if (! is_dir($path)) {
+			return;
+		}
+
+		$this->readAheadSeconds = self::READ_AHEAD_SECONDS;
+
+		try {
+			$this->statusOf($path);
+			$this->getChanges($path);
+			$this->getBranchChanges($path);
+			$this->getUnpushedCommits($path);
+			$this->getNewCommitCount($path);
+
+			foreach (DiffViewEnum::cases() as $diffView) {
+				$this->diffBase($path, $diffView);
+				$this->getChangesFor($path, $diffView);
+			}
+
+			$this->getChangedFiles($path);
+			$this->getFingerprint($path);
+		} finally {
+			$this->readAheadSeconds = null;
+		}
 	}
 
 	public function forgetStatus(string $path): void
@@ -1645,6 +1736,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		Cache::forget($this->unpushedKey($path));
 		Cache::forget('worktree.unpushed-changes.' . md5($path));
 		Cache::forget('worktree.fingerprint.' . md5($path));
+		Cache::forget('worktree.new-commit-count.' . md5($path));
 		Cache::forget($this->diffBaseKey($path, DiffViewEnum::UNPUSHED));
 		Cache::forget($this->diffBaseKey($path, DiffViewEnum::BRANCH));
 		Cache::forget($this->readAheadKey($path));
@@ -1715,7 +1807,7 @@ class WorktreeRepository implements WorktreeRepositoryContract
 	 *
 	 * @param  array<int, string>  $paths
 	 */
-	private function warmStatuses(array $paths, ?int $keepSeconds = null, bool $again = false): void
+	private function warmStatuses(array $paths, bool $again = false): void
 	{
 		$cold = array_values(array_filter(
 			$paths,
@@ -1739,15 +1831,16 @@ class WorktreeRepository implements WorktreeRepositoryContract
 		$results = LocalCommand::pool($commands);
 
 		foreach ($cold as $index => $path) {
-			$seconds = $keepSeconds ?? (int) config('devdock.worktree.status_seconds');
 			$unpushed = $results['unpushed-' . $index];
 
-			Cache::put(
-				$this->statusKey($path),
-				$this->parseStatus($path, $targets[$index], $results['status-' . $index], $results['sides-' . $index]),
-				$seconds,
-			);
-			Cache::put($this->unpushedKey($path), $unpushed->successful() ? trim($unpushed->output()) : '', $seconds);
+			Cache::forever($this->statusKey($path), [
+				'read_at' => time(),
+				'value' => $this->parseStatus($path, $targets[$index], $results['status-' . $index], $results['sides-' . $index]),
+			]);
+			Cache::forever($this->unpushedKey($path), [
+				'read_at' => time(),
+				'value' => $unpushed->successful() ? trim($unpushed->output()) : '',
+			]);
 		}
 	}
 

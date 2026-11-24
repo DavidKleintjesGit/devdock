@@ -319,4 +319,9 @@ interface WorktreeRepositoryContract
 	 * time, so a page finds it ready instead of waiting on git.
 	 */
 	public function refreshStatuses(int $keepSeconds): void;
+
+	/**
+	 * Reads every working copy in line to be read again, one after the other, until the line is empty.
+	 */
+	public function readQueuedCopies(): void;
 }
