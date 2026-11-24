@@ -716,7 +716,7 @@ button.row{width:100%;border:0;background:transparent;text-align:left;cursor:poi
 .say.you .bubble{background:var(--accent-soft);border-color:transparent;color:var(--accent-ink)}
 .say .bubble code{font-family:var(--mono);font-size:12px;background:var(--sunken);padding:1px 5px;border-radius:5px}
 .say .acts{display:flex;gap:6px}
-.drawer.switching>:is(.dbody,.composer,.dfoot):not(.tab-skeleton),.drawer:not(.switching)>.tab-skeleton{display:none}
+.drawer.switching>:is(.dbody,.composer,.dfoot):not(.tab-skeleton):not(.tab-ghost),.drawer:not(.switching)>:is(.tab-skeleton,.tab-ghost),.drawer.switching:not(.has-ghost)>.tab-ghost,.drawer.switching.has-ghost>.tab-skeleton{display:none}
 .skeleton{display:flex;flex-direction:column;gap:10px;width:100%;max-width:980px;margin:0 auto;padding:24px}
 .skeleton .bone{display:block;background:var(--sunken);border-radius:6px;animation:bone 1.4s ease-in-out infinite}
 .skeleton .bone.line{height:10px}
@@ -1446,3 +1446,7 @@ body.window{margin:0;background:var(--surface)}
 .live-steps li{display:flex;align-items:center;gap:6px;list-style:none;min-width:0}
 .live-steps li.now{color:var(--fg)}
 .live-steps .subject{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* de vorige stand van een tab, onaanraakbaar tot de verse binnen is */
+.tab-ghost{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;padding:0;pointer-events:none}
+.tab-ghost>*{flex:none}
+.tab-ghost>.dbody{flex:1;min-height:0;overflow:hidden}

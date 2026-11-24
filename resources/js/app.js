@@ -875,3 +875,47 @@ document.addEventListener('alpine:init', () => {
 		},
 	}));
 });
+
+// Een tab die je eerder op deze kaart zag, staat bij de volgende klik meteen
+// weer in beeld zoals hij toen was, tot de verse versie binnen is. De kopie
+// leeft zolang de pagina open is.
+const tabGhosts = new Map();
+const TAB_GHOST_LIMIT = 60;
+
+// Takes the copy without ids, so nothing on the page finds an element of it.
+const ghostHtml = (elements) => elements.map((element) => element.outerHTML).join('').replace(/\sid="[^"]*"/g, '');
+
+window.keepTabGhost = (drawer) => {
+	const card = drawer?.dataset.card;
+	const [tab, subtab] = (drawer?.dataset.view ?? '').split(':');
+
+	if (! card || ! tab) {
+		return;
+	}
+
+	const body = [...drawer.querySelectorAll(':scope > :is(.dbody, .composer, .dfoot):not(.tab-skeleton):not(.tab-ghost)')];
+	const subbar = drawer.querySelector(':scope > .subbar');
+
+	// a click on a tab shows its subtabs too; a click on a subtab keeps the bar that stands
+	tabGhosts.set(card + ':' + tab, ghostHtml(subbar ? [subbar, ...body] : body));
+
+	if (subtab) {
+		tabGhosts.set(card + ':' + tab + ':' + subtab, ghostHtml(body));
+	}
+
+	while (tabGhosts.size > TAB_GHOST_LIMIT) {
+		tabGhosts.delete(tabGhosts.keys().next().value);
+	}
+};
+
+window.showTabGhost = (drawer, view) => {
+	const ghost = drawer?.querySelector(':scope > .tab-ghost');
+	const html = tabGhosts.get(drawer?.dataset.card + ':' + view);
+
+	if (! ghost) {
+		return;
+	}
+
+	ghost.innerHTML = html ?? '';
+	drawer.classList.toggle('has-ghost', html !== undefined);
+};

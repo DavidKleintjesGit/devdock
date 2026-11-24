@@ -1,4 +1,4 @@
-<aside class="drawer card-drawer" role="dialog" aria-labelledby="drawer-title" x-data="{
+<aside class="drawer card-drawer" role="dialog" aria-labelledby="drawer-title" data-card="{{ $card->id }}" data-view="{{ $tab }}:{{ $subtab?->value }}" x-data="{
 	tall: $persist(false).as('devdock.chat-tall'),
 	pendingTab: null,
 	pendingView: null,
@@ -19,7 +19,7 @@
 
 		this.compact = body.scrollTop > 48 && body.scrollHeight - body.clientHeight > headHeight + 48;
 	},
-}" :class="{ 'chat-tall': tall, switching: pendingView, 'switching-tab': pendingTab, compact }" @drawer-card.window="pendingTab = null; pendingView = null" @scroll.capture="follow($event.target)">
+}" :class="{ 'chat-tall': tall, switching: pendingView, 'switching-tab': pendingTab, compact }" @drawer-card.window="pendingTab = null; pendingView = null; $nextTick(() => keepTabGhost($el))" @scroll.capture="follow($event.target)">
 	<div class="dbar">
 		@if ($previous)
 			<button class="back kind" type="button" wire:click="back"><x-icon name="back" small/>{{ $previous }}</button>
@@ -97,7 +97,7 @@
 	@else
 		<nav class="tabs card-tabs" role="tablist" aria-label="{{ __('Panelen') }}">
 			@foreach ($drawerTabs as $drawerTab)
-				<button type="button" role="tab" aria-selected="{{ $tab === $drawerTab['tab']->value ? 'true' : 'false' }}" :aria-selected="(pendingTab ?? @js($tab)) === @js($drawerTab['tab']->value)" @click="if (@js($tab) !== @js($drawerTab['tab']->value)) { pendingTab = @js($drawerTab['tab']->value); pendingView = pendingTab; compact = false }" wire:click="setDrawerTab('{{ $drawerTab['tab']->value }}')" aria-label="{{ $drawerTab['tab']->label() }}">
+				<button type="button" role="tab" aria-selected="{{ $tab === $drawerTab['tab']->value ? 'true' : 'false' }}" :aria-selected="(pendingTab ?? @js($tab)) === @js($drawerTab['tab']->value)" @click="if (@js($tab) !== @js($drawerTab['tab']->value)) { pendingTab = @js($drawerTab['tab']->value); pendingView = pendingTab; compact = false; showTabGhost($el.closest('.card-drawer'), pendingTab) }" wire:click="setDrawerTab('{{ $drawerTab['tab']->value }}')" aria-label="{{ $drawerTab['tab']->label() }}">
 					<x-icon :name="$drawerTab['tab']->icon()"/>
 					<span class="tab-label">{{ $drawerTab['tab']->label() }}</span>
 					@if ($drawerTab['tones'] !== [])
@@ -115,7 +115,7 @@
 			<div class="subbar">
 				<nav class="segmented" aria-label="{{ __($tab) }}">
 					@foreach ($tabSubtabs as $subtabRow)
-						<button type="button" @if ($subtab === $subtabRow['subtab']) aria-current="page" @endif :aria-current="((pendingView ?? @js($tab . ':' . $subtab->value)) === @js($tab . ':' . $subtabRow['subtab']->value)) ? 'page' : null" @click="pendingView = @js($subtab === $subtabRow['subtab'] ? null : $tab . ':' . $subtabRow['subtab']->value); compact = false" wire:click="setDrawerSubtab('{{ $subtabRow['subtab']->value }}')">
+						<button type="button" @if ($subtab === $subtabRow['subtab']) aria-current="page" @endif :aria-current="((pendingView ?? @js($tab . ':' . $subtab->value)) === @js($tab . ':' . $subtabRow['subtab']->value)) ? 'page' : null" @click="pendingView = @js($subtab === $subtabRow['subtab'] ? null : $tab . ':' . $subtabRow['subtab']->value); compact = false; if (pendingView) showTabGhost($el.closest('.card-drawer'), pendingView)" wire:click="setDrawerSubtab('{{ $subtabRow['subtab']->value }}')">
 							<x-hint-dot :tones="$subtabRow['tones']"/>
 							{{ $subtabRow['subtab']->label() }}
 							@if ($subtabRow['count'] > 0)<span class="note">{{ $subtabRow['count'] }}</span>@endif
@@ -130,6 +130,8 @@
 		@endif
 
 		@include('partials.skeletons.tab')
+		{{-- how a tab looked the last time, shown at once until the fresh one arrives --}}
+		<div class="dbody tab-ghost" wire:ignore x-ignore aria-hidden="true" inert></div>
 
 		@switch ($tab)
 			@case ('Agent')
