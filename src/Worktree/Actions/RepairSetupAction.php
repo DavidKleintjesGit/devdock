@@ -6,6 +6,7 @@ namespace Src\Worktree\Actions;
 
 use Carbon\CarbonImmutable;
 use Closure;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Src\Packages\Cqrs\Command;
@@ -48,6 +49,13 @@ class RepairSetupAction extends Command
 	 */
 	private const MAX_REPAIRS = 16;
 
+	private const REPAIRS_AT_ONCE = 2;
+
+	// a place is free again after this, also when the repair that held it stopped without a word
+	private const SLOT_SECONDS = 3600;
+
+	private const SLOT_WAIT_SECONDS = 2;
+
 	private const INSTALL_SECONDS = 900;
 
 	private const STEP_SECONDS = 600;
@@ -75,38 +83,77 @@ class RepairSetupAction extends Command
 		$failures = [];
 		$reasons = [];
 		$current = null;
+		$slot = $this->waitForSlot();
 
-		for ($repair = 0; $repair < self::MAX_REPAIRS; $repair++) {
-			$readinessObject = CheckReadinessAction::execute($this->directory, true);
-			$setupCheckObject = $this->nextRepair($readinessObject, array_keys($failures));
+		try {
+			for ($repair = 0; $repair < self::MAX_REPAIRS; $repair++) {
+				$readinessObject = CheckReadinessAction::execute($this->directory, true);
+				$setupCheckObject = $this->nextRepair($readinessObject, array_keys($failures));
 
-			if ($setupCheckObject === null) {
-				break;
+				if ($setupCheckObject === null) {
+					break;
+				}
+
+				$current = $setupCheckObject->setupCheck;
+				$this->writeState(true, $current, $setupCheckObject->repair, null, $reasons);
+				File::append($logPath, PHP_EOL . '# ' . $current->label() . ' · ' . $setupCheckObject->repair . PHP_EOL);
+
+				$failure = $this->repair($setupCheckObject->setupCheck, $logPath, $workingCopyStateRepository, $workingCopyRepository, $worktreeDatabaseRepository, $worktreeRepository);
+				CheckReadinessAction::forget($this->directory);
+
+				if ($failure !== null) {
+					$failures[$current->value] = $current->label() . ': ' . $failure;
+					$reasons[$current->value] = $failure;
+					File::append($logPath, PHP_EOL . $failure . PHP_EOL);
+				}
+
+				// one point asked for is one repair; the points that waited on it are left for the next
+				if ($this->setupCheck !== null) {
+					break;
+				}
 			}
-
-			$current = $setupCheckObject->setupCheck;
-			$this->writeState(true, $current, $setupCheckObject->repair, null, $reasons);
-			File::append($logPath, PHP_EOL . '# ' . $current->label() . ' · ' . $setupCheckObject->repair . PHP_EOL);
-
-			$failure = $this->repair($setupCheckObject->setupCheck, $logPath, $workingCopyStateRepository, $workingCopyRepository, $worktreeDatabaseRepository, $worktreeRepository);
-			CheckReadinessAction::forget($this->directory);
-
-			if ($failure !== null) {
-				$failures[$current->value] = $current->label() . ': ' . $failure;
-				$reasons[$current->value] = $failure;
-				File::append($logPath, PHP_EOL . $failure . PHP_EOL);
-			}
-
-			// one point asked for is one repair; the points that waited on it are left for the next
-			if ($this->setupCheck !== null) {
-				break;
-			}
+		} finally {
+			$slot->release();
 		}
 
 		GetReadinessAction::forget($this->directory);
 		$worktreeRepository->forgetStatus($this->directory);
 
 		return $this->writeState(false, $current, null, $failures === [] ? null : implode("\n", $failures), $reasons);
+	}
+
+	/**
+	 * Waits for one of the places for a repair to come free. A repair installs
+	 * packages and copies databases; a few at once keep the machine usable, and
+	 * the rest wait in line with their bar saying so.
+	 */
+	private function waitForSlot(): Lock
+	{
+		while (true) {
+			foreach (range(1, self::REPAIRS_AT_ONCE) as $place) {
+				$lock = Cache::lock(self::KEY . 'slot.' . $place, self::SLOT_SECONDS);
+
+				if ($lock->get()) {
+					$this->startClock();
+
+					return $lock;
+				}
+			}
+
+			$this->writeState(true, $this->setupCheck, __('Wacht op een vrije plek; er lopen al :count herstellingen.', ['count' => self::REPAIRS_AT_ONCE]), null, []);
+			$this->startClock();
+			sleep(self::SLOT_WAIT_SECONDS);
+		}
+	}
+
+	/**
+	 * Counts the time of the repair from now, so waiting in line never makes it look stopped.
+	 */
+	private function startClock(): void
+	{
+		$key = self::KEY . md5(CheckReadinessAction::normalize($this->directory));
+
+		Cache::forever($key, [...(array) Cache::get($key, []), 'started_at' => CarbonImmutable::now()->toIso8601String()]);
 	}
 
 	/**

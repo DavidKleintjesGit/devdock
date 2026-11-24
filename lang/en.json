@@ -1910,5 +1910,6 @@
     "wijzigen": "change",
     "weghalen": "remove",
     "Bevindingen voor de agent": "Findings for the agent",
-    "Ronde :number · :count bevinding · jij kiest|Ronde :number · :count bevindingen · jij kiest": "Round :number · :count finding · your call|Round :number · :count findings · your call"
+    "Ronde :number · :count bevinding · jij kiest|Ronde :number · :count bevindingen · jij kiest": "Round :number · :count finding · your call|Round :number · :count findings · your call",
+    "Wacht op een vrije plek; er lopen al :count herstellingen.": "Waiting for a free place; :count repairs are already running."
 }
