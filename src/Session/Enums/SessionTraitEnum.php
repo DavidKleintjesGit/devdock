@@ -85,7 +85,7 @@ enum SessionTraitEnum: string
 			self::OLDER_THAN_QUARTER => 'Drie maanden niets meer mee gedaan.',
 			self::NEVER_RESUMED => 'Op één dag gevoerd en daarna nooit meer geopend.',
 			self::RUNNING_NOW => 'Is op dit moment nog bezig.',
-			self::OPEN_TASK => 'Hoort bij een taak die nog niet klaar is.',
+			self::OPEN_TASK => 'Het gesprek van de agent van een taak die nog niet klaar is.',
 			self::UNSAVED_WORK => 'In de map staan wijzigingen die nog niet gecommit zijn.',
 			self::USED_THIS_WEEK => 'Deze week nog gebruikt.',
 			self::PINNED => 'Je hebt hem vastgezet; hij wordt nooit opgeruimd.',

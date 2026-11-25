@@ -10,6 +10,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use Src\Task\Contracts\TaskRepositoryContract;
 use Src\Board\Actions\BuildBoardAction;
 use Src\Board\Enums\BoardColumnEnum;
 use Src\Board\Objects\CardObject;
@@ -48,7 +49,7 @@ class GetSessionTraitsAction extends Command
 	/**
 	 * @return array<string, array<int, SessionTraitEnum>>
 	 */
-	public function handle(): array
+	public function handle(TaskRepositoryContract $taskRepository): array
 	{
 		$kept = $this->isFresh ? null : Cache::get(self::KEY);
 
@@ -56,7 +57,7 @@ class GetSessionTraitsAction extends Command
 			return $kept;
 		}
 
-		$traits = $this->traits();
+		$traits = $this->traits($taskRepository);
 		Cache::forever(self::KEY, $traits);
 
 		return $traits;
@@ -65,12 +66,21 @@ class GetSessionTraitsAction extends Command
 	/**
 	 * @return array<string, array<int, SessionTraitEnum>>
 	 */
-	private function traits(): array
+	private function traits(TaskRepositoryContract $taskRepository): array
 	{
 		$sessionEntities = collect(GetSessionsAction::execute());
 		$cardObjects = collect(BuildBoardAction::execute());
 		$projectEntities = collect(GetProjectsAction::execute())->keyBy('name');
 		$worktreeEntities = collect(GetWorktreesAction::execute());
+
+		// the conversations of the agents of a task, the one sessions an open task keeps
+		$agentSessions = [];
+
+		foreach ($taskRepository->getAll() as $taskEntity) {
+			foreach ($taskEntity->agents as $taskAgentEntity) {
+				$agentSessions[$taskAgentEntity->sessionUuid] = true;
+			}
+		}
 
 		$cardsBySession = [];
 
@@ -106,6 +116,7 @@ class GetSessionTraitsAction extends Command
 				$latestByBranch,
 				$projectEntities,
 				$worktreeEntities,
+				isset($agentSessions[$sessionEntity->uuid]),
 			);
 		}
 
@@ -154,6 +165,7 @@ class GetSessionTraitsAction extends Command
 	 * @param  Collection<string, int>  $latestByBranch
 	 * @param  Collection<string, ProjectEntity>  $projectEntities
 	 * @param  Collection<int, WorktreeEntity>  $worktreeEntities
+	 * @param  bool  $isAgentSession  whether this is the conversation of an agent of a task
 	 * @return array<int, SessionTraitEnum>
 	 */
 	private function traitsOf(
@@ -164,6 +176,7 @@ class GetSessionTraitsAction extends Command
 		Collection $latestByBranch,
 		Collection $projectEntities,
 		Collection $worktreeEntities,
+		bool $isAgentSession,
 	): array {
 		$now = CarbonImmutable::now();
 		$lastActiveAt = $sessionEntity->lastActiveAt ?? $now->subYears(10);
@@ -200,7 +213,7 @@ class GetSessionTraitsAction extends Command
 			SessionTraitEnum::OLDER_THAN_QUARTER->value => $daysQuiet >= 90,
 			SessionTraitEnum::NEVER_RESUMED->value => $sessionEntity->activeDays <= 1 && $daysQuiet >= 1,
 			SessionTraitEnum::RUNNING_NOW->value => $isRunning,
-			SessionTraitEnum::OPEN_TASK->value => $cardObject !== null && $cardObject->column !== BoardColumnEnum::DONE,
+			SessionTraitEnum::OPEN_TASK->value => $isAgentSession && $cardObject !== null && $cardObject->column !== BoardColumnEnum::DONE,
 			SessionTraitEnum::UNSAVED_WORK->value => ($worktreeEntity?->changedFiles ?? 0) > 0
 				|| ($isProjectRoot && $projectEntity->branch === $branch && $projectEntity->changedFiles > 0),
 			SessionTraitEnum::USED_THIS_WEEK->value => $daysQuiet < 7,

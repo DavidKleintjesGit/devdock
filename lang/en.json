@@ -696,7 +696,6 @@
     "Hoogstens": "At most",
     "hoogstens :count keer|hoogstens :count keer": "at most :count time|at most :count times",
     "Hoogstens :max rondes, daarna :after": "At most :max rounds, then :after",
-    "Hoort bij een taak die nog niet klaar is.": "Belongs to a task that isn't done yet.",
     "In": "In",
     "In andere projecten": "In other projects",
     "In bibliotheek": "In library",
@@ -1911,5 +1910,6 @@
     "weghalen": "remove",
     "Bevindingen voor de agent": "Findings for the agent",
     "Ronde :number · :count bevinding · jij kiest|Ronde :number · :count bevindingen · jij kiest": "Round :number · :count finding · your call|Round :number · :count findings · your call",
-    "Wacht op een vrije plek; er lopen al :count herstellingen.": "Waiting for a free place; :count repairs are already running."
+    "Wacht op een vrije plek; er lopen al :count herstellingen.": "Waiting for a free place; :count repairs are already running.",
+    "Het gesprek van de agent van een taak die nog niet klaar is.": "The conversation of the agent of a task that is not done yet."
 }
