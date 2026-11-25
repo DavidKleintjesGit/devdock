@@ -12,6 +12,7 @@ use Src\Session\Actions\GetSessionsAction;
 use Src\Session\Actions\GetTranscriptAction;
 use Src\Session\Actions\PinSessionAction;
 use Src\Session\Actions\RenameSessionAction;
+use Src\Session\Actions\GetSessionTraitsAction;
 use Src\Session\Enums\SessionTraitEnum;
 use Src\Session\Objects\SessionEntity;
 use Src\Session\Objects\SessionId;
@@ -91,6 +92,13 @@ trait WithSessionActions
 			return;
 		}
 
+		// a running conversation is still being written; taking its file away would break it
+		if (collect(GetSessionTraitsAction::execute()[$uuid] ?? [])->contains(fn (SessionTraitEnum $trait): bool => $trait->blocks())) {
+			$this->confirmingDelete = false;
+
+			return;
+		}
+
 		DeleteSessionAction::execute(new SessionId(uuid: $uuid));
 
 		$this->confirmingDelete = false;
@@ -156,10 +164,15 @@ trait WithSessionActions
 		$away = count($traits) - $protecting->count();
 
 		return match (true) {
-			$protecting->isNotEmpty() => [
-				'title' => __('Bewaren'),
-				'text' => __('Hij is beschermd: :traits.', ['traits' => mb_strtolower($protecting->map(fn (SessionTraitEnum $trait) => $trait->label())->implode(', '))]),
+			collect($traits)->contains(fn (SessionTraitEnum $trait) => $trait->blocks()) => [
+				'title' => __('Draait nu'),
+				'text' => __('Hij wordt nog geschreven; weghalen kan pas als hij stilligt.'),
 				'tone' => 'green',
+			],
+			$protecting->isNotEmpty() => [
+				'title' => __('Liever bewaren'),
+				'text' => __('Er pleit iets voor bewaren: :traits. Weghalen kan wel; alleen het gesprek gaat weg.', ['traits' => mb_strtolower($protecting->map(fn (SessionTraitEnum $trait) => $trait->label())->implode(', '))]),
+				'tone' => 'amber',
 			],
 			$away >= self::TRAITS_TO_GO => [
 				'title' => __('Deze kan weg'),

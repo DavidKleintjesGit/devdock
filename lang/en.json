@@ -71,7 +71,6 @@
     ":count gelezen|:count gelezen": ":count read|:count read",
     ":count gelijk": ":count equal",
     ":count gesprek|:count gesprekken": ":count conversation|:count conversations",
-    ":count is beschermd en blijft staan|:count zijn beschermd en blijven staan": ":count is protected and stays|:count are protected and stay",
     ":count jouw beurt": ":count your turn",
     ":count kan weg, samen :size|:count kunnen weg, samen :size": ":count can go, :size together|:count can go, :size together",
     ":count kenmerk wijst die kant op, en niets pleit ertegen.|:count kenmerken wijzen die kant op, en niets pleit ertegen.": ":count trait points that way, and nothing argues against it.|:count traits point that way, and nothing argues against it.",
@@ -688,7 +687,6 @@
     "Hier valt niets in te stellen.": "Nothing to set here.",
     "Hier wacht een taak op collega's en de merge.": "A task waits here for colleagues and the merge.",
     "Hier werkt de agent, in een eigen werkkopie.": "This is where the agent works, in its own working copy.",
-    "Hij is beschermd: :traits.": "It is protected: :traits.",
     "Hij komt in de backlog in plaats van in Te doen.": "It goes into the backlog instead of To do.",
     "Hoe DevDock er op dit apparaat uitziet.": "How DevDock looks on this device.",
     "Hoge prioriteit": "High priority",
@@ -1911,5 +1909,10 @@
     "Bevindingen voor de agent": "Findings for the agent",
     "Ronde :number · :count bevinding · jij kiest|Ronde :number · :count bevindingen · jij kiest": "Round :number · :count finding · your call|Round :number · :count findings · your call",
     "Wacht op een vrije plek; er lopen al :count herstellingen.": "Waiting for a free place; :count repairs are already running.",
-    "Het gesprek van de agent van een taak die nog niet klaar is.": "The conversation of the agent of a task that is not done yet."
+    "Het gesprek van de agent van een taak die nog niet klaar is.": "The conversation of the agent of a task that is not done yet.",
+    ":count draait nu en blijft staan|:count draaien nu en blijven staan": ":count is running now and stays|:count are running now and stay",
+    "Hij wordt nog geschreven; weghalen kan pas als hij stilligt.": "It is still being written; it can go once it has stopped.",
+    "Liever bewaren": "Better kept",
+    "Er pleit iets voor bewaren: :traits. Weghalen kan wel; alleen het gesprek gaat weg.": "Something pleads for keeping it: :traits. Removing it is possible; only the conversation goes.",
+    "Pleit voor bewaren: :warnings. Alleen het gesprek gaat weg; de code blijft staan.": "Pleads for keeping: :warnings. Only the conversation goes; the code stays."
 }

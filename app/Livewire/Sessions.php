@@ -107,13 +107,13 @@ class Sessions extends Component
 	}
 
 	/**
-	 * Picks every session in view that nothing protects, or lets them all go.
+	 * Picks every session in view that is not running, or lets them all go.
 	 */
 	public function toggleAllShown(): void
 	{
 		$traitsByUuid = GetSessionTraitsAction::execute();
 		$selectable = $this->shown(collect(GetSessionsAction::execute()), $traitsByUuid)
-			->reject(fn (SessionEntity $sessionEntity) => $this->isProtected($traitsByUuid[$sessionEntity->uuid] ?? []))
+			->reject(fn (SessionEntity $sessionEntity) => $this->isBlocked($traitsByUuid[$sessionEntity->uuid] ?? []))
 			->pluck('uuid')
 			->all();
 
@@ -154,8 +154,13 @@ class Sessions extends Component
 			return;
 		}
 
+		$traitsByUuid = GetSessionTraitsAction::execute();
+
 		foreach ($this->selected as $uuid) {
-			DeleteSessionAction::execute(new SessionId(uuid: $uuid));
+			// a running conversation is still being written; taking its file away would break it
+			if (! $this->isBlocked($traitsByUuid[$uuid] ?? [])) {
+				DeleteSessionAction::execute(new SessionId(uuid: $uuid));
+			}
 		}
 
 		$this->selected = [];
@@ -198,7 +203,8 @@ class Sessions extends Component
 			'traits' => $shownTraits->take(self::TRAITS_ON_ROW)->all(),
 			'moreTraits' => max(0, $shownTraits->count() - self::TRAITS_ON_ROW),
 			'canGo' => $this->canGo($traits),
-			'isProtected' => $this->isProtected($traits),
+			'isBlocked' => $this->isBlocked($traits),
+			'warnings' => collect($traits)->filter(fn (SessionTraitEnum $trait) => $trait->protects() && ! $trait->blocks())->values()->all(),
 			'isSelected' => in_array($sessionEntity->uuid, $this->selected, true),
 			'age' => $sessionEntity->lastActiveAt === null
 				? '–'
@@ -252,6 +258,31 @@ class Sessions extends Component
 	/**
 	 * @param  array<int, SessionTraitEnum>  $traits
 	 */
+	private function isBlocked(array $traits): bool
+	{
+		return collect($traits)->contains(fn (SessionTraitEnum $trait) => $trait->blocks());
+	}
+
+	/**
+	 * What pleads for keeping the picked sessions, in words: per reason how many, such as "239 werk niet vastgelegd".
+	 *
+	 * @param  Collection<int, SessionEntity>  $picked
+	 * @param  array<string, array<int, SessionTraitEnum>>  $traitsByUuid
+	 */
+	private function pickedWarnings(Collection $picked, array $traitsByUuid): string
+	{
+		$counts = $picked
+			->flatMap(fn (SessionEntity $sessionEntity) => collect($traitsByUuid[$sessionEntity->uuid] ?? [])->filter(fn (SessionTraitEnum $trait) => $trait->protects() && ! $trait->blocks()))
+			->countBy(fn (SessionTraitEnum $trait) => $trait->value);
+
+		return $counts
+			->map(fn (int $count, string $trait) => $count . ' ' . mb_strtolower(SessionTraitEnum::from($trait)->label()))
+			->implode(' · ');
+	}
+
+	/**
+	 * @param  array<int, SessionTraitEnum>  $traits
+	 */
 	private function canGo(array $traits): bool
 	{
 		return ! $this->isProtected($traits) && count($traits) >= self::TRAITS_TO_GO;
@@ -278,7 +309,7 @@ class Sessions extends Component
 		$traitsByUuid = GetSessionTraitsAction::execute();
 		$shown = $this->shown($all, $traitsByUuid);
 		$canGo = $all->filter(fn (SessionEntity $sessionEntity) => $this->canGo($traitsByUuid[$sessionEntity->uuid] ?? []));
-		$selectable = $shown->reject(fn (SessionEntity $sessionEntity) => $this->isProtected($traitsByUuid[$sessionEntity->uuid] ?? []));
+		$selectable = $shown->reject(fn (SessionEntity $sessionEntity) => $this->isBlocked($traitsByUuid[$sessionEntity->uuid] ?? []));
 		$picked = $all->filter(fn (SessionEntity $sessionEntity) => in_array($sessionEntity->uuid, $this->selected, true));
 
 		return view('livewire.sessions', [
@@ -294,7 +325,8 @@ class Sessions extends Component
 			'traitGroups' => $this->traitGroups($all, $traitsByUuid),
 			'activeTraits' => array_map(fn (string $trait) => SessionTraitEnum::from($trait), $this->traits),
 			'selectableCount' => $selectable->count(),
-			'protectedCount' => $shown->count() - $selectable->count(),
+			'runningCount' => $shown->count() - $selectable->count(),
+			'pickedWarnings' => $this->pickedWarnings($picked, $traitsByUuid),
 			'pickedLine' => __(':count gekozen · :size komt vrij', ['count' => $picked->count(), 'size' => $this->megabytes((int) $picked->sum('bytes'))]),
 			'projectOptions' => $this->projectOptions($all->map(fn (SessionEntity $sessionEntity) => $sessionEntity->project)->countBy()),
 			'projectTotal' => $all->count(),

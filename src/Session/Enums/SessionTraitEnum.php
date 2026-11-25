@@ -104,8 +104,18 @@ enum SessionTraitEnum: string
 	}
 
 	/**
-	 * Whether this trait pleads for keeping the session. One of these is
-	 * enough to keep it out of a clean-up.
+	 * Whether a session that is running holds back a clean-up: its file is
+	 * still being written, and taking it away breaks the conversation.
+	 */
+	public function blocks(): bool
+	{
+		return $this === self::RUNNING_NOW;
+	}
+
+	/**
+	 * Whether this trait pleads for keeping the session. It keeps the session
+	 * out of what can go on its own, and asks you to look twice before you
+	 * remove it yourself.
 	 */
 	public function protects(): bool
 	{

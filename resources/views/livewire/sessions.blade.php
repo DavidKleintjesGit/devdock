@@ -80,15 +80,15 @@
 						<span class="mark"></span>
 						<b>{{ __('Alles kiezen (:count)', ['count' => $selectableCount]) }}</b>
 					</label>
-					@if ($protectedCount > 0)
-						<span class="hint">{{ trans_choice(':count is beschermd en blijft staan|:count zijn beschermd en blijven staan', $protectedCount, ['count' => $protectedCount]) }}</span>
+					@if ($runningCount > 0)
+						<span class="hint">{{ trans_choice(':count draait nu en blijft staan|:count draaien nu en blijven staan', $runningCount, ['count' => $runningCount]) }}</span>
 					@endif
 				</div>
 
 				@foreach ($rows as $row)
 					<div class="row" style="gap:14px;padding:0 18px;{{ $row['isSelected'] ? 'background:var(--accent-wash)' : '' }}" wire:key="session-{{ $row['session']->uuid }}">
-						@if ($row['isProtected'])
-							<span class="tick cell" title="{{ __('Beschermd') }}"><x-icon name="lock" small/></span>
+						@if ($row['isBlocked'])
+							<span class="tick cell" title="{{ __('Draait nu') }}"><x-icon name="lock" small/></span>
 						@else
 							<label class="tick cell">
 								<input type="checkbox" @checked($row['isSelected']) wire:click="toggleSelected('{{ $row['session']->uuid }}')" aria-label="{{ __(':name kiezen', ['name' => $row['session']->name()]) }}">
@@ -104,6 +104,7 @@
 							<span class="chips session-traits">
 								@foreach ($row['traits'] as $trait)<span class="label">{{ $trait->label() }}</span>@endforeach
 								@if ($row['moreTraits'] > 0)<span class="label muted">+{{ $row['moreTraits'] }}</span>@endif
+								@foreach ($row['warnings'] as $warning)<span class="label amber" title="{{ $warning->explanation() }}">{{ $warning->label() }}</span>@endforeach
 							</span>
 							<span class="session-stats">
 								<span>{{ trans_choice(':count bericht|:count berichten', $row['session']->promptCount, ['count' => $row['session']->promptCount]) }}</span>
@@ -125,6 +126,9 @@
 			<button class="btn danger" type="button" wire:click="deleteSelected">{{ $confirmingDelete ? __('Zeker weten? Verwijderen') : __('Verwijderen') }}</button>
 			<button class="btn text" type="button" style="color:var(--fg-2)" wire:click="clearSelection">{{ __('Selectie wissen') }}</button>
 			<span class="hint" style="font-size:13px">{{ $pickedLine }}</span>
+			@if ($pickedWarnings !== '')
+				<span class="hint" style="font-size:13px;color:var(--amber)"><x-icon name="alert" small/> {{ __('Pleit voor bewaren: :warnings. Alleen het gesprek gaat weg; de code blijft staan.', ['warnings' => $pickedWarnings]) }}</span>
+			@endif
 		</div>
 	@endif
 
