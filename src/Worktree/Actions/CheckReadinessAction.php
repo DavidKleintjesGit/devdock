@@ -160,6 +160,7 @@ class CheckReadinessAction extends Command
 					'current' => $workingCopyStateObject->currentBranch ?? __('geen branch'),
 					'branch' => $worktreeEntity->branch,
 				]),
+				__('terugzetten op :branch', ['branch' => $worktreeEntity->branch]),
 			),
 			$workingCopyStateObject->operationInProgress !== null => new SetupCheckObject(
 				SetupCheckEnum::BRANCH,

@@ -1183,7 +1183,7 @@ class Drawer extends Component
 		$roundAssessment = in_array($tab, ['Agent', 'Review'], true) ? $this->roundAssessment($cardObject) : null;
 		// a turn that ended without handing over the queue, such as one that was stopped, gets it moving again
 		StartNextQueuedPromptAction::execute($cardObject->id);
-		$loopStatus =GetLoopStatusAction::execute($latestRound, $latestRound === null ? null : $roundTurns[(int) $latestRound->reviewRoundId->id] ?? null, $workflowSetting->maxRounds);
+		$loopStatus = GetLoopStatusAction::execute($latestRound, $latestRound === null ? null : $roundTurns[(int) $latestRound->reviewRoundId->id] ?? null, $workflowSetting->maxRounds, $workflowSetting->reviewMode);
 		$tabHints = $this->tabHints($cardObject, $worktreeEntity, $readiness, $latestRound, $loopStatus);
 		$promptSources = $tab === 'Agent' ? $this->promptSources($cardObject, $reviewCommentEntities) : [];
 		$pullRequests = $cardObject->pullRequests

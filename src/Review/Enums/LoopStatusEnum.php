@@ -13,6 +13,7 @@ enum LoopStatusEnum: string
 	case LENSES = 'lenses';
 	case AGENT = 'agent';
 	case WAITING = 'waiting';
+	case YOU_CHOOSE = 'you_choose';
 	case AGENT_ASKS = 'agent_asks';
 	case STOPPED = 'stopped';
 	case CLEAN = 'clean';
@@ -28,6 +29,7 @@ enum LoopStatusEnum: string
 			self::LENSES => __('Ronde :position van :max · de lenzen kijken', ['position' => $position, 'max' => $max]),
 			self::AGENT => __('De agent werkt de bevindingen van ronde :position bij', ['position' => $position]),
 			self::WAITING => __('Ronde :position niet schoon · de agent pakt het zo op', ['position' => $position]),
+			self::YOU_CHOOSE => __('Ronde :position · :findings · jij kiest wat er gefixt wordt', ['position' => $position, 'findings' => $findings]),
 			self::AGENT_ASKS => __('Ronde :position · de agent wacht op jou', ['position' => $position]),
 			self::STOPPED => __('Loop gestopt na :max rondes · nog :findings', ['max' => $max, 'findings' => $findings]),
 			self::CLEAN => __('Ronde :position schoon · klaar om te committen', ['position' => $position]),
@@ -46,6 +48,7 @@ enum LoopStatusEnum: string
 			self::LENSES, self::AGENT, self::WAITING => 'busy',
 			self::STOPPED, self::AGENT_ASKS, self::LENS_FELL, self::NEXT_ROUND => 'red',
 			self::CLEAN => 'green',
+			self::YOU_CHOOSE => 'yours',
 			self::IDLE, self::BROKEN_OFF => 'quiet',
 		};
 	}
@@ -56,6 +59,6 @@ enum LoopStatusEnum: string
 	 */
 	public function needsYou(): bool
 	{
-		return in_array($this, [self::STOPPED, self::AGENT_ASKS, self::NEXT_ROUND], true);
+		return in_array($this, [self::STOPPED, self::AGENT_ASKS, self::NEXT_ROUND, self::YOU_CHOOSE], true);
 	}
 }

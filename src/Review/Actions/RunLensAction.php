@@ -132,6 +132,13 @@ class RunLensAction extends Command implements ShouldQueue
 			$answer = null;
 		}
 
+		// a lens that never answered fell over, for a reason of Claude's own; it found nothing in the code
+		if (blank($answer) && $this->verdictMessage === null) {
+			$reviewRoundEntity = $reviewRoundRepository->writeResult($this->reviewRoundId, $this->lensId, VerdictEnum::ERROR, 0, $this->fallReason($claudeProcessRepository->errorIn($this->logPath($lensEntity))));
+
+			return CloseRoundAction::execute($this->reviewRoundId) ?? $reviewRoundEntity;
+		}
+
 		// the answer is only the last message; a lens that was woken again after
 		// its verdict, by a background task finishing, ends on a line without it
 		$verdictObject = ReadVerdictAction::execute(
@@ -251,6 +258,18 @@ class RunLensAction extends Command implements ShouldQueue
 	 * Where everything this lens sent back is kept, so a round that went wrong
 	 * can still be read afterwards.
 	 */
+	/**
+	 * Why a lens gave no answer, in words you can act on: a login that ran out says how to get back in.
+	 */
+	private function fallReason(?string $error): string
+	{
+		return match (true) {
+			$error === null => __('Deze lens gaf geen antwoord.'),
+			str_contains($error, 'authenticate') || str_contains($error, 'OAuth') => __('Claude kon niet inloggen (:error). Log opnieuw in met claude in een terminal, of zet een vaste token in DEVDOCK_CLAUDE_TOKEN.', ['error' => $error]),
+			default => __('Claude stopte met een fout: :error', ['error' => $error]),
+		};
+	}
+
 	private function logPath(LensEntity $lensEntity): string
 	{
 		return resolve(ReviewRoundRepositoryContract::class)->logFolder($this->reviewRoundId) . '/' . $lensEntity->name . '.jsonl';

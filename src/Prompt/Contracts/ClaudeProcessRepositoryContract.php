@@ -53,6 +53,12 @@ interface ClaudeProcessRepositoryContract
 	public function ask(RoleAccessObject $roleAccessObject, string $directory, ?string $sessionUuid, string $question): ?string;
 
 	/**
+	 * The error Claude closed a run with, read from the end of its log; null
+	 * when the run ended without one.
+	 */
+	public function errorIn(string $logPath): ?string;
+
+	/**
 	 * Lets Claude work while it says what it is doing. Meant for work that
 	 * takes minutes and that somebody is watching.
 	 *

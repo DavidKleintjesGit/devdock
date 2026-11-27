@@ -22,12 +22,13 @@
 			</div>
 			<div class="field">
 				<label for="target-branch" class="label-text">{{ __('Of een andere branch op origin') }}</label>
-				<input id="target-branch" class="input mono" type="text" list="target-branches" wire:model.live.debounce.300ms="targetChoice" placeholder="feature/…" spellcheck="false" autocomplete="off">
-				<datalist id="target-branches">
+				<select id="target-branch" class="input mono" wire:model.live="targetChoice">
+					<option value="{{ $worktree->mainBranch }}">{{ __('Kies een branch') }}</option>
 					@foreach ($remoteBranches as $remote)
-						<option value="{{ substr($remote, strlen('origin/')) }}"></option>
+						@continue(substr($remote, strlen('origin/')) === $worktree->branch)
+						<option value="{{ substr($remote, strlen('origin/')) }}">{{ substr($remote, strlen('origin/')) }}</option>
 					@endforeach
-				</datalist>
+				</select>
 			</div>
 			<span class="hint">{{ __('DevDock rebaset de eigen commits van deze taak op de gekozen branch en zet de pull request erop. Werk dat nog niet gecommit is gaat mee; stuit een rebase op conflicten, dan lost de agent ze op.') }}</span>
 		</div>

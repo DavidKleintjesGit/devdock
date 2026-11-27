@@ -211,6 +211,19 @@ class ClaudeProcessRepository implements ClaudeProcessRepositoryContract
 	 *
 	 * @param  Closure(array<string, mixed>): void  $onEvent
 	 */
+	public function errorIn(string $logPath): ?string
+	{
+		foreach (array_reverse(@file($logPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: []) as $line) {
+			$event = json_decode($line, true);
+
+			if (is_array($event) && ($event['type'] ?? null) === 'result') {
+				return ($event['is_error'] ?? false) === true && filled($event['result'] ?? null) ? (string) $event['result'] : null;
+			}
+		}
+
+		return null;
+	}
+
 	public function watch(
 		RoleAccessObject $roleAccessObject,
 		string $directory,

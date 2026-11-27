@@ -208,7 +208,10 @@ class RepairSetupAction extends Command
 		};
 
 		return match ($setupCheck) {
-			SetupCheckEnum::BRANCH => $workingCopyStateRepository->runStep($path, ['git', 'branch', '--unset-upstream'], $logPath, self::STEP_SECONDS),
+			// a copy that left the branch of its task goes back to it; git refuses when that would lose work
+			SetupCheckEnum::BRANCH => $worktreeRepository->getBranch($path) !== $worktreeEntity->branch
+				? $workingCopyStateRepository->runStep($path, ['git', 'switch', $worktreeEntity->branch], $logPath, self::STEP_SECONDS)
+				: $workingCopyStateRepository->runStep($path, ['git', 'branch', '--unset-upstream'], $logPath, self::STEP_SECONDS),
 			SetupCheckEnum::CARRIED_FILES, SetupCheckEnum::OWN_FILES_OUT_OF_GIT => $prepare(),
 			SetupCheckEnum::SITE => $prepare() ?? $this->isolatedSite($path, $worktreeEntity->site),
 			// skips the project's own composer scripts: they set up its main checkout, such as git hooks, and are often written for one shell

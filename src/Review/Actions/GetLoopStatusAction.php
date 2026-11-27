@@ -7,6 +7,7 @@ namespace Src\Review\Actions;
 use Src\Packages\Cqrs\Command;
 use Src\Prompt\Enums\ReportStatusEnum;
 use Src\Review\Enums\LoopStatusEnum;
+use Src\Review\Enums\ReviewModeEnum;
 use Src\Review\Enums\RoundStatusEnum;
 use Src\Review\Objects\ReviewRoundEntity;
 use Src\Review\Objects\RoundTurnObject;
@@ -14,7 +15,7 @@ use Src\Review\Objects\RoundTurnObject;
 /**
  * Reads where the loop stands from its latest round and the agent turn on it.
  *
- * @method static LoopStatusEnum execute(?ReviewRoundEntity $latestRound, ?RoundTurnObject $latestTurn, int $maxRounds)
+ * @method static LoopStatusEnum execute(?ReviewRoundEntity $latestRound, ?RoundTurnObject $latestTurn, int $maxRounds, ReviewModeEnum $reviewMode = ReviewModeEnum::AUTOMATIC)
  */
 class GetLoopStatusAction extends Command
 {
@@ -22,6 +23,7 @@ class GetLoopStatusAction extends Command
 		public readonly ?ReviewRoundEntity $latestRound,
 		public readonly ?RoundTurnObject $latestTurn,
 		public readonly int $maxRounds,
+		public readonly ReviewModeEnum $reviewMode = ReviewModeEnum::AUTOMATIC,
 	) {}
 
 	public function handle(): LoopStatusEnum
@@ -36,6 +38,8 @@ class GetLoopStatusAction extends Command
 			$latestRound->isClean() => LoopStatusEnum::CLEAN,
 			$this->latestTurn?->run->isRunning() === true => LoopStatusEnum::AGENT,
 			$this->latestTurn !== null && $this->latestTurn->report?->status !== ReportStatusEnum::DONE => LoopStatusEnum::AGENT_ASKS,
+			// in self-review the findings wait for you; no round threshold applies
+			$this->latestTurn === null && ! $this->reviewMode->fixesByItself() => LoopStatusEnum::YOU_CHOOSE,
 			$latestRound->positionInSeries() >= $this->maxRounds => LoopStatusEnum::STOPPED,
 			// a done turn starts the next round on the spot; standing here means that start was refused
 			$this->latestTurn !== null => LoopStatusEnum::NEXT_ROUND,

@@ -1914,5 +1914,10 @@
     "Hij wordt nog geschreven; weghalen kan pas als hij stilligt.": "It is still being written; it can go once it has stopped.",
     "Liever bewaren": "Better kept",
     "Er pleit iets voor bewaren: :traits. Weghalen kan wel; alleen het gesprek gaat weg.": "Something pleads for keeping it: :traits. Removing it is possible; only the conversation goes.",
-    "Pleit voor bewaren: :warnings. Alleen het gesprek gaat weg; de code blijft staan.": "Pleads for keeping: :warnings. Only the conversation goes; the code stays."
+    "Pleit voor bewaren: :warnings. Alleen het gesprek gaat weg; de code blijft staan.": "Pleads for keeping: :warnings. Only the conversation goes; the code stays.",
+    "Kies een branch": "Pick a branch",
+    "terugzetten op :branch": "switch back to :branch",
+    "Claude kon niet inloggen (:error). Log opnieuw in met claude in een terminal, of zet een vaste token in DEVDOCK_CLAUDE_TOKEN.": "Claude could not sign in (:error). Sign in again with claude in a terminal, or set a fixed token in DEVDOCK_CLAUDE_TOKEN.",
+    "Claude stopte met een fout: :error": "Claude stopped with an error: :error",
+    "Ronde :position · :findings · jij kiest wat er gefixt wordt": "Round :position · :findings · you choose what gets fixed"
 }
