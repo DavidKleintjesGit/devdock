@@ -23,6 +23,15 @@ class BranchChainObject extends ValueObject
 	}
 
 	/**
+	 * The branch the stack stands on: what its lowest link merges into, which
+	 * is the main line unless that link was pointed at another branch.
+	 */
+	public function root(): string
+	{
+		return $this->links === [] ? $this->mainBranch : $this->links[array_key_last($this->links)]->target;
+	}
+
+	/**
 	 * Whether the branch stands on another pull request rather than on the main line.
 	 */
 	public function isStacked(): bool

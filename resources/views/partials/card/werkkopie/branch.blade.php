@@ -6,7 +6,7 @@
 					<div class="v">
 						<span class="sdot {{ $blockingLink ? 'conflict' : 'quiet' }}"></span>
 						<span class="grow branch-chain">
-							<span class="mono muted">{{ $branchChain->mainBranch }}</span>
+							<span class="mono muted">{{ $branchChain->root() }}</span>
 							@foreach ($branchChain->linksFromMain() as $link)
 								<span class="chain-arrow" aria-hidden="true">→</span>
 								@if ($link->branch === $worktree->branch)
